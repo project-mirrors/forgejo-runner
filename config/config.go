@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strconv"
 
-	"gitea.com/gitea/act_runner/core"
+	"codeberg.org/forgejo/runner/core"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"

@@ -11,9 +11,9 @@ import (
 	"time"
 
 	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
-	"gitea.com/gitea/act_runner/client"
-	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/register"
+	"codeberg.org/forgejo/runner/client"
+	"codeberg.org/forgejo/runner/config"
+	"codeberg.org/forgejo/runner/register"
 
 	"github.com/bufbuild/connect-go"
 	"github.com/joho/godotenv"

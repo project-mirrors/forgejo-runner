@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"gitea.com/gitea/act_runner/client"
-	"gitea.com/gitea/act_runner/config"
-	"gitea.com/gitea/act_runner/engine"
-	"gitea.com/gitea/act_runner/poller"
-	"gitea.com/gitea/act_runner/runtime"
+	"codeberg.org/forgejo/runner/client"
+	"codeberg.org/forgejo/runner/config"
+	"codeberg.org/forgejo/runner/engine"
+	"codeberg.org/forgejo/runner/poller"
+	"codeberg.org/forgejo/runner/runtime"
 
 	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"

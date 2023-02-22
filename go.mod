@@ -1,4 +1,4 @@
-module gitea.com/gitea/act_runner
+module codeberg.org/forgejo/runner
 
 go 1.18
 

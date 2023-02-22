@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
+	"codeberg.org/forgejo/runner/client"
 )
 
 // Runner runs the pipeline.

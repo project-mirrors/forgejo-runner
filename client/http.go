@@ -8,7 +8,7 @@ import (
 
 	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
 	"code.gitea.io/actions-proto-go/runner/v1/runnerv1connect"
-	"gitea.com/gitea/act_runner/core"
+	"codeberg.org/forgejo/runner/core"
 	"github.com/bufbuild/connect-go"
 )
 

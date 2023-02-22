@@ -11,7 +11,7 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"gitea.com/gitea/act_runner/client"
+	"codeberg.org/forgejo/runner/client"
 
 	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
