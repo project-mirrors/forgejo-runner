@@ -288,11 +288,11 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 		}
 		if err != nil {
 			log.WithError(err).
-				Errorln("Cannot ping the Gitea instance server")
+				Errorln("Cannot ping the Forgejo instance server")
 			// TODO: if ping failed, retry or exit
 			time.Sleep(time.Second)
 		} else {
-			log.Debugln("Successfully pinged the Gitea instance server")
+			log.Debugln("Successfully pinged the Forgejo instance server")
 			break
 		}
 	}
