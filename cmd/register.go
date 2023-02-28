@@ -221,7 +221,7 @@ func printStageHelp(stage registerStage) {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
 	case StageInputInstance:
-		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
+		log.Infoln("Enter the Forgejo instance URL (for example, https://codeberg.org/):")
 	case StageInputToken:
 		log.Infoln("Enter the runner token:")
 	case StageInputRunnerName:
