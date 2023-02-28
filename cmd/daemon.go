@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"codeberg.org/forgejo/runner/artifactcache"
 	"codeberg.org/forgejo/runner/client"
 	"codeberg.org/forgejo/runner/config"
 	"codeberg.org/forgejo/runner/engine"
@@ -49,6 +50,12 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			}
 		}
 
+		handler, err := artifactcache.NewHandler()
+		if err != nil {
+			return err
+		}
+		log.Infof("cache handler listens on: %v", handler.ExternalURL())
+
 		var g errgroup.Group
 
 		cli := client.New(
@@ -64,6 +71,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			ForgeInstance: cfg.Client.Address,
 			Environ:       cfg.Runner.Environ,
 			Labels:        cfg.Runner.Labels,
+			CacheHandler:  handler,
 		}
 
 		poller := poller.New(
