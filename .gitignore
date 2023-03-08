@@ -1,4 +1,9 @@
-act_runner
+forgejo-runner
 .env
 .runner
 coverage.txt
+/gitea-vet
+
+# MS VSCode
+.vscode
+__debug_bin
