@@ -25,6 +25,7 @@ func Execute(ctx context.Context) {
 		Args:         cobra.MaximumNArgs(1),
 		Version:      version,
 		SilenceUsage: true,
+		RunE:         runDaemon(ctx, gArgs.EnvFile),
 	}
 	rootCmd.PersistentFlags().StringVarP(&gArgs.EnvFile, "env-file", "", ".env", "Read in a file of environment variables.")
 
