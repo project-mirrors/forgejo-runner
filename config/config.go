@@ -33,7 +33,7 @@ type (
 		Name     string            `envconfig:"GITEA_RUNNER_NAME"`
 		Token    string            `ignored:"true"`
 		Capacity int               `envconfig:"GITEA_RUNNER_CAPACITY" default:"1"`
-		File     string            `envconfig:"GITEA_RUNNER_FILE" default:".runner"`
+		File     string            `envconfig:"FORGEJO_RUNNER_FILE" default:".runner"`
 		Environ  map[string]string `envconfig:"GITEA_RUNNER_ENVIRON"`
 		EnvFile  string            `envconfig:"GITEA_RUNNER_ENV_FILE"`
 		Labels   []string          `envconfig:"GITEA_RUNNER_LABELS"`
