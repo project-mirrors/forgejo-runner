@@ -17,6 +17,7 @@ require (
 	github.com/sirupsen/logrus v1.9.0
 	github.com/spf13/cobra v1.6.1
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	google.golang.org/protobuf v1.28.1
 	modernc.org/sqlite v1.14.2
 	xorm.io/builder v0.3.11-0.20220531020008-1bd24a7dc978
@@ -87,7 +88,6 @@ require (
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
 	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/tools v0.1.5 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
@@ -104,4 +104,4 @@ require (
 	modernc.org/token v1.0.0 // indirect
 )
 
-replace github.com/nektos/act => codeberg.org/forgejo/act v1.0.1
+replace github.com/nektos/act => codeberg.org/forgejo/act v1.1.0
