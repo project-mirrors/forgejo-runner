@@ -3,9 +3,11 @@ package runner
 import (
 	"archive/tar"
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -16,6 +18,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"text/template"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/nektos/act/pkg/common"
@@ -183,6 +186,94 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string) {
 	return binds, mounts
 }
 
+//go:embed lxc-helpers-lib.sh
+var lxcHelpersLib string
+
+//go:embed lxc-helpers.sh
+var lxcHelpers string
+
+var startTemplate = template.Must(template.New("start").Parse(`#!/bin/bash -e
+source $(dirname $0)/lxc-helpers-lib.sh
+
+LXC_CONTAINER_RELEASE="{{.Release}}"
+
+function template_act() {
+    echo $(lxc_template_release)-act
+}
+
+function install_nodejs() {
+    local name="$1"
+
+    local script=/usr/local/bin/lxc-helpers-install-node.sh
+
+    cat > $(lxc_root $name)/$script <<'EOF'
+#!/bin/sh -e
+# https://github.com/nodesource/distributions#debinstall
+export DEBIAN_FRONTEND=noninteractive
+apt-get install -qq -y ca-certificates curl gnupg git
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
+NODE_MAJOR=20
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
+apt-get update -qq
+apt-get install -qq -y nodejs
+EOF
+    lxc_container_run_script $name $script
+}
+
+function build_template_act() {
+    local name="$(template_act)"
+
+    if lxc_exists $name ; then
+      return
+    fi
+
+    lxc_build_template $(lxc_template_release) $name
+    lxc_container_start $name
+    install_nodejs $name
+    lxc_container_stop $name
+}
+
+lxc_prepare_environment
+build_template_act
+lxc_build_template $(template_act) "{{.Name}}"
+lxc_container_mount "{{.Name}}" "{{ .Root }}"
+lxc_container_start "{{.Name}}"
+`))
+
+var stopTemplate = template.Must(template.New("stop").Parse(`#!/bin/bash
+source $(dirname $0)/lxc-helpers-lib.sh
+
+lxc_container_destroy "{{.Name}}"
+`))
+
+func (rc *RunContext) stopHostEnvironment() common.Executor {
+	return func(ctx context.Context) error {
+		logger := common.Logger(ctx)
+		logger.Debugf("stopHostEnvironment")
+
+		var stopScript bytes.Buffer
+		if err := stopTemplate.Execute(&stopScript, struct {
+			Name string
+			Root string
+		}{
+			Name: rc.JobContainer.GetName(),
+			Root: rc.JobContainer.GetRoot(),
+		}); err != nil {
+			return err
+		}
+
+		return common.NewPipelineExecutor(
+			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+				Name: "workflow/stop-lxc.sh",
+				Mode: 0755,
+				Body: stopScript.String(),
+			}),
+			rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/stop-lxc.sh"}, map[string]string{}, "root", "/tmp"),
+		)(ctx)
+	}
+}
+
 func (rc *RunContext) startHostEnvironment() common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
@@ -198,7 +289,8 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 		cacheDir := rc.ActionCacheDir()
 		randBytes := make([]byte, 8)
 		_, _ = rand.Read(randBytes)
-		miscpath := filepath.Join(cacheDir, hex.EncodeToString(randBytes))
+		randName := hex.EncodeToString(randBytes)
+		miscpath := filepath.Join(cacheDir, randName)
 		actPath := filepath.Join(miscpath, "act")
 		if err := os.MkdirAll(actPath, 0o777); err != nil {
 			return err
@@ -213,6 +305,8 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 		}
 		toolCache := filepath.Join(cacheDir, "tool_cache")
 		rc.JobContainer = &container.HostEnvironment{
+			Name:      randName,
+			Root:      miscpath,
 			Path:      path,
 			TmpDir:    runnerTmp,
 			ToolCache: toolCache,
@@ -238,7 +332,44 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 			}
 		}
 
+		var startScript bytes.Buffer
+		if err := startTemplate.Execute(&startScript, struct {
+			Name     string
+			Template string
+			Release  string
+			Repo     string
+			Root     string
+			TmpDir   string
+			Script   string
+		}{
+			Name:     rc.JobContainer.GetName(),
+			Template: "debian",
+			Release:  "bullseye",
+			Repo:     "", // step.Environment["CI_REPO"],
+			Root:     rc.JobContainer.GetRoot(),
+			TmpDir:   runnerTmp,
+			Script:   "", // "commands-" + step.Name,
+		}); err != nil {
+			return err
+		}
+
 		return common.NewPipelineExecutor(
+			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+				Name: "workflow/lxc-helpers-lib.sh",
+				Mode: 0755,
+				Body: lxcHelpersLib,
+			}),
+			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+				Name: "workflow/lxc-helpers.sh",
+				Mode: 0755,
+				Body: lxcHelpers,
+			}),
+			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+				Name: "workflow/start-lxc.sh",
+				Mode: 0755,
+				Body: startScript.String(),
+			}),
+			rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/start-lxc.sh"}, map[string]string{}, "root", "/tmp"),
 			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
 				Name: "workflow/event.json",
 				Mode: 0o644,
@@ -601,12 +732,22 @@ func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
 }
 
 func (rc *RunContext) stopContainer() common.Executor {
-	return rc.stopJobContainer()
+	return func(ctx context.Context) error {
+		image := rc.platformImage(ctx)
+		if strings.EqualFold(image, "-self-hosted") {
+			return rc.stopHostEnvironment()(ctx)
+		}
+		return rc.stopJobContainer()(ctx)
+	}
 }
 
 func (rc *RunContext) closeContainer() common.Executor {
 	return func(ctx context.Context) error {
 		if rc.JobContainer != nil {
+			image := rc.platformImage(ctx)
+			if strings.EqualFold(image, "-self-hosted") {
+				return rc.stopHostEnvironment()(ctx)
+			}
 			return rc.JobContainer.Close()(ctx)
 		}
 		return nil
@@ -628,7 +769,7 @@ func (rc *RunContext) steps() []*model.Step {
 // Executor returns a pipeline executor for all the steps in the job
 func (rc *RunContext) Executor() (common.Executor, error) {
 	var executor common.Executor
-	var jobType, err = rc.Run.Job().Type()
+	jobType, err := rc.Run.Job().Type()
 
 	switch jobType {
 	case model.JobTypeDefault:

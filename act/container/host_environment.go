@@ -26,16 +26,18 @@ import (
 )
 
 type HostEnvironment struct {
+	Name      string
 	Path      string
 	TmpDir    string
 	ToolCache string
 	Workdir   string
 	ActPath   string
+	Root      string
 	CleanUp   func()
 	StdOut    io.Writer
 }
 
-func (e *HostEnvironment) Create(_ []string, _ []string) common.Executor {
+func (e *HostEnvironment) Create(_, _ []string) common.Executor {
 	return func(ctx context.Context) error {
 		return nil
 	}
@@ -94,7 +96,7 @@ func (e *HostEnvironment) CopyTarStream(ctx context.Context, destPath string, ta
 	}
 }
 
-func (e *HostEnvironment) CopyDir(destPath string, srcPath string, useGitIgnore bool) common.Executor {
+func (e *HostEnvironment) CopyDir(destPath, srcPath string, useGitIgnore bool) common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
 		srcPrefix := filepath.Dir(srcPath)
@@ -288,7 +290,7 @@ func getEnvListFromMap(env map[string]string) []string {
 	return envList
 }
 
-func (e *HostEnvironment) exec(ctx context.Context, command []string, cmdline string, env map[string]string, _, workdir string) error {
+func (e *HostEnvironment) exec(ctx context.Context, commandparam []string, cmdline string, env map[string]string, user, workdir string) error {
 	envList := getEnvListFromMap(env)
 	var wd string
 	if workdir != "" {
@@ -300,6 +302,19 @@ func (e *HostEnvironment) exec(ctx context.Context, command []string, cmdline st
 	} else {
 		wd = e.Path
 	}
+	if _, err := os.Stat(wd); err != nil {
+		common.Logger(ctx).Debugf("Failed to stat working directory %s %v\n", wd, err.Error())
+	}
+
+	command := make([]string, len(commandparam))
+	copy(command, commandparam)
+	if user == "root" {
+		command = append([]string{"/usr/bin/sudo"}, command...)
+	} else {
+		common.Logger(ctx).Debugf("lxc-attach --name %v %v", e.Name, command)
+		command = append([]string{"/usr/bin/sudo", "--preserve-env", "--preserve-env=PATH", "/usr/bin/lxc-attach", "--keep-env", "--name", e.Name, "--"}, command...)
+	}
+
 	f, err := lookupPathHost(command[0], env, e.StdOut)
 	if err != nil {
 		return err
@@ -342,7 +357,7 @@ func (e *HostEnvironment) exec(ctx context.Context, command []string, cmdline st
 	}
 	err = cmd.Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("RUN %w", err)
 	}
 	if tty != nil {
 		writer.AutoStop = true
@@ -397,6 +412,14 @@ func (e *HostEnvironment) ToContainerPath(path string) string {
 		return e.Path
 	}
 	return path
+}
+
+func (e *HostEnvironment) GetName() string {
+	return e.Name
+}
+
+func (e *HostEnvironment) GetRoot() string {
+	return e.Root
 }
 
 func (e *HostEnvironment) GetActPath() string {
@@ -458,7 +481,7 @@ func (e *HostEnvironment) GetRunnerContext(_ context.Context) map[string]interfa
 	}
 }
 
-func (e *HostEnvironment) ReplaceLogWriter(stdout io.Writer, _ io.Writer) (io.Writer, io.Writer) {
+func (e *HostEnvironment) ReplaceLogWriter(stdout, _ io.Writer) (io.Writer, io.Writer) {
 	org := e.StdOut
 	e.StdOut = stdout
 	return org, org
