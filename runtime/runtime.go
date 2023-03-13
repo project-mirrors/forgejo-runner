@@ -12,6 +12,7 @@ import (
 // Runner runs the pipeline.
 type Runner struct {
 	Machine       string
+	Version       string
 	ForgeInstance string
 	Environ       map[string]string
 	Client        client.Client
@@ -26,7 +27,7 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 		env[k] = v
 	}
 	env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
-	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task, s.Machine)
+	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task, s.Machine, s.Version)
 }
 
 func (s *Runner) platformPicker(labels []string) string {
