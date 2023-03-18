@@ -9,11 +9,13 @@ HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
 XGO_PACKAGE ?= src.techknowlogick.com/xgo@latest
 XGO_VERSION := go-1.18.x
 GXZ_PAGAGE ?= github.com/ulikunitz/xz/cmd/gxz@v0.5.10
+RUNNER_CMD_PACKAGE_PATH := codeberg.org/forgejo/runner/cmd
 
 LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
 WINDOWS_ARCHS ?= windows/amd64
-GOFILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
+GO_FMT_FILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
+GOFILES := $(shell find . -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
 
 ifneq ($(shell uname), Darwin)
 	EXTLDFLAGS = -extldflags "-static" $(null)
@@ -49,7 +51,7 @@ else
 	ifneq ($(DRONE_BRANCH),)
 		VERSION ?= $(subst release/v,,$(DRONE_BRANCH))
 	else
-		VERSION ?= master
+		VERSION ?= main
 	endif
 
 	STORED_VERSION=$(shell cat $(STORED_VERSION_FILE) 2>/dev/null)
@@ -61,7 +63,7 @@ else
 endif
 
 TAGS ?=
-LDFLAGS ?= -X 'main.Version=$(VERSION)'
+LDFLAGS ?= -X "$(RUNNER_CMD_PACKAGE_PATH).version=$(RELASE_VERSION)"
 
 all: build
 
@@ -69,17 +71,27 @@ fmt:
 	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) install mvdan.cc/gofumpt@latest; \
 	fi
-	$(GOFMT) -w $(GOFILES)
+	$(GOFMT) -w $(GO_FMT_FILES)
 
 vet:
 	$(GO) vet ./...
+
+.PHONY: go-check
+go-check:
+	$(eval MIN_GO_VERSION_STR := $(shell grep -Eo '^go\s+[0-9]+\.[0-9]+' go.mod | cut -d' ' -f2))
+	$(eval MIN_GO_VERSION := $(shell printf "%03d%03d" $(shell echo '$(MIN_GO_VERSION_STR)' | tr '.' ' ')))
+	$(eval GO_VERSION := $(shell printf "%03d%03d" $(shell $(GO) version | grep -Eo '[0-9]+\.[0-9]+' | tr '.' ' ');))
+	@if [ "$(GO_VERSION)" -lt "$(MIN_GO_VERSION)" ]; then \
+		echo "Act Runner requires Go $(MIN_GO_VERSION_STR) or greater to build. You can get it at https://go.dev/dl/"; \
+		exit 1; \
+	fi
 
 .PHONY: fmt-check
 fmt-check:
 	@hash gofumpt > /dev/null 2>&1; if [ $$? -ne 0 ]; then \
 		$(GO) install mvdan.cc/gofumpt@latest; \
 	fi
-	@diff=$$($(GOFMT) -d $(GOFILES)); \
+	@diff=$$($(GOFMT) -d $(GO_FMT_FILES)); \
 	if [ -n "$$diff" ]; then \
 		echo "Please run 'make fmt' and commit the result:"; \
 		echo "$${diff}"; \
@@ -92,7 +104,7 @@ test: fmt-check
 install: $(GOFILES)
 	$(GO) install -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)'
 
-build: $(EXECUTABLE)
+build: go-check $(EXECUTABLE)
 
 $(EXECUTABLE): $(GOFILES)
 	$(GO) build -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)' -o $@

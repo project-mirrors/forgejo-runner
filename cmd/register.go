@@ -271,7 +271,9 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	cli := client.New(
 		inputs.InstanceAddr,
 		inputs.Insecure,
-		"", "",
+		"",
+		"",
+		version,
 	)
 
 	for {

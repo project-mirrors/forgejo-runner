@@ -11,7 +11,6 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"github.com/nektos/act/pkg/artifacts"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
@@ -112,7 +111,7 @@ func getToken(task *runnerv1.Task) string {
 	return token
 }
 
-func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) (lastErr error) {
+func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName, runnerVersion string) (lastErr error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	_, exist := globalTaskMap.Load(task.Id)
@@ -141,7 +140,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) 
 	}()
 	reporter.RunDaemon()
 
-	reporter.Logf("%s received task %v of job %v", runnerName, task.Id, task.Context.Fields["job"].GetStringValue())
+	reporter.Logf("%s(version:%s) received task %v of job %v, be triggered by event: %s", runnerName, runnerVersion, task.Id, task.Context.Fields["job"].GetStringValue(), task.Context.Fields["event_name"].GetStringValue())
 
 	workflowsPath, err := getWorkflowsPath(t.Input.repoDirectory)
 	if err != nil {
@@ -156,7 +155,6 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) 
 		return err
 	}
 
-	var plan *model.Plan
 	jobIDs := workflow.GetJobIDs()
 	if len(jobIDs) != 1 {
 		err := fmt.Errorf("multiple jobs found: %v", jobIDs)
@@ -164,7 +162,11 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) 
 		return err
 	}
 	jobID := jobIDs[0]
-	plan = model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
+	plan, err := model.CombineWorkflowPlanner(workflow).PlanJob(jobID)
+	if err != nil {
+		lastWords = err.Error()
+		return err
+	}
 	job := workflow.GetJob(jobID)
 	reporter.ResetSteps(len(job.Steps))
 
@@ -243,13 +245,7 @@ func (t *Task) Run(ctx context.Context, task *runnerv1.Task, runnerName string) 
 		return err
 	}
 
-	artifactCancel := artifacts.Serve(ctx, input.artifactServerPath, input.artifactServerPort)
-	t.log.Debugf("artifacts server started at %s:%s", input.artifactServerPath, input.artifactServerPort)
-
-	executor := r.NewPlanExecutor(plan).Finally(func(ctx context.Context) error {
-		artifactCancel()
-		return nil
-	})
+	executor := r.NewPlanExecutor(plan)
 
 	t.log.Infof("workflow prepared")
 	reporter.Logf("workflow prepared")

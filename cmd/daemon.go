@@ -63,6 +63,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			cfg.Client.Insecure,
 			cfg.Runner.UUID,
 			cfg.Runner.Token,
+			version,
 		)
 
 		runner := &runtime.Runner{
@@ -71,6 +72,7 @@ func runDaemon(ctx context.Context, envFile string) func(cmd *cobra.Command, arg
 			ForgeInstance: cfg.Client.Address,
 			Environ:       cfg.Runner.Environ,
 			Labels:        cfg.Runner.Labels,
+			Version:       version,
 			CacheHandler:  handler,
 		}
 
