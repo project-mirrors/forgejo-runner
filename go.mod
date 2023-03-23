@@ -1,6 +1,6 @@
 module codeberg.org/forgejo/runner
 
-go 1.20
+go 1.19
 
 require (
 	code.gitea.io/actions-proto-go v0.2.0
