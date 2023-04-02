@@ -7,22 +7,23 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"codeberg.org/forgejo/runner/client"
-
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
+
+	"codeberg.org/forgejo/runner/client"
+	"codeberg.org/forgejo/runner/config"
 )
 
 var ErrDataLock = errors.New("Data Lock Error")
 
-func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, workerNum int) *Poller {
+func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, cfg *config.Config) *Poller {
 	return &Poller{
 		Client:       cli,
 		Dispatch:     dispatch,
 		routineGroup: newRoutineGroup(),
 		metric:       &metric{},
-		workerNum:    workerNum,
 		ready:        make(chan struct{}, 1),
+		cfg:          cfg,
 	}
 }
 
@@ -34,13 +35,13 @@ type Poller struct {
 	routineGroup *routineGroup
 	metric       *metric
 	ready        chan struct{}
-	workerNum    int
+	cfg          *config.Config
 }
 
 func (p *Poller) schedule() {
 	p.Lock()
 	defer p.Unlock()
-	if int(p.metric.BusyWorkers()) >= p.workerNum {
+	if int(p.metric.BusyWorkers()) >= p.cfg.Runner.Capacity {
 		return
 	}
 
@@ -148,7 +149,7 @@ func (p *Poller) dispatchTask(ctx context.Context, task *runnerv1.Task) error {
 		}
 	}()
 
-	runCtx, cancel := context.WithTimeout(ctx, time.Hour)
+	runCtx, cancel := context.WithTimeout(ctx, p.cfg.Runner.Timeout)
 	defer cancel()
 
 	return p.Dispatch(runCtx, task)
