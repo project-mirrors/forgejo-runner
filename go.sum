@@ -1,7 +1,7 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-code.forgejo.org/forgejo/act v1.2.0 h1:kAARLd4oZ04QksHXk6NGE7wgRnx10CO4OIzk7emlJxk=
-code.forgejo.org/forgejo/act v1.2.0/go.mod h1:iLHCXqOPUElA2nSyHo4wtxSmvdkym3WU7CkP3AxF39Q=
+code.forgejo.org/forgejo/act v1.3.0 h1:AWHBqaTsPo/qnlovUq6sqXUmVogqmFYOg7cCi6Usvuk=
+code.forgejo.org/forgejo/act v1.3.0/go.mod h1:mabw6AZAiDgxGlK83orWLrNERSPvgBJzEUS3S7u2bHI=
 code.gitea.io/actions-proto-go v0.2.0 h1:nYh9nhhfk67YA4wVNLsCzd//RCvXnljwXClJ33+HPVk=
 code.gitea.io/actions-proto-go v0.2.0/go.mod h1:00ys5QDo1iHN1tHNvvddAcy2W/g+425hQya1cCSvq9A=
 code.gitea.io/gitea-vet v0.2.3-0.20230113022436-2b1561217fa5 h1:daBEK2GQeqGikJESctP5Cu1i33z5ztAD4kyQWiw185M=
