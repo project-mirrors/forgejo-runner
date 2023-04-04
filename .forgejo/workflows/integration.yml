@@ -3,6 +3,7 @@ name: Integration tests for the release process
 on: 
   push:
     paths:
+      - go.mod
       - .forgejo/workflows/release.yml
       - .forgejo/workflows/integration.yml
 
