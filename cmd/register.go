@@ -1,3 +1,6 @@
+// Copyright 2022 The Gitea Authors. All rights reserved.
+// SPDX-License-Identifier: MIT
+
 package cmd
 
 import (
@@ -6,24 +9,25 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
+	goruntime "runtime"
 	"strings"
 	"time"
 
 	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
+	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+
 	"codeberg.org/forgejo/runner/client"
 	"codeberg.org/forgejo/runner/config"
-	"codeberg.org/forgejo/runner/register"
+	"codeberg.org/forgejo/runner/runtime"
 
 	"github.com/bufbuild/connect-go"
-	"github.com/joho/godotenv"
 	"github.com/mattn/go-isatty"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 // runRegister registers a runner to the server
-func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) func(*cobra.Command, []string) error {
+func runRegister(ctx context.Context, regArgs *registerArgs, configFile *string) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		log.SetReportCaller(false)
 		isTerm := isatty.IsTerminal(os.Stdout.Fd())
@@ -34,7 +38,7 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 		log.SetLevel(log.DebugLevel)
 
 		log.Infof("Registering runner, arch=%s, os=%s, version=%s.",
-			runtime.GOARCH, runtime.GOOS, version)
+			goruntime.GOARCH, goruntime.GOOS, version)
 
 		// runner always needs root permission
 		if os.Getuid() != 0 {
@@ -43,14 +47,13 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 		}
 
 		if regArgs.NoInteractive {
-			if err := registerNoInteractive(envFile, regArgs); err != nil {
+			if err := registerNoInteractive(*configFile, regArgs); err != nil {
 				return err
 			}
 		} else {
 			go func() {
-				if err := registerInteractive(envFile); err != nil {
-					// log.Errorln(err)
-					os.Exit(2)
+				if err := registerInteractive(*configFile); err != nil {
+					log.Fatal(err)
 					return
 				}
 				os.Exit(0)
@@ -69,7 +72,6 @@ func runRegister(ctx context.Context, regArgs *registerArgs, envFile string) fun
 type registerArgs struct {
 	NoInteractive bool
 	InstanceAddr  string
-	Insecure      bool
 	Token         string
 	RunnerName    string
 	Labels        string
@@ -97,7 +99,6 @@ var defaultLabels = []string{
 
 type registerInputs struct {
 	InstanceAddr string
-	Insecure     bool
 	Token        string
 	RunnerName   string
 	CustomLabels []string
@@ -118,12 +119,9 @@ func (r *registerInputs) validate() error {
 
 func validateLabels(labels []string) error {
 	for _, label := range labels {
-		values := strings.SplitN(label, ":", 2)
-		if len(values) > 2 {
-			return fmt.Errorf("Invalid label: %s", label)
+		if _, _, _, err := runtime.ParseLabel(label); err != nil {
+			return err
 		}
-		// len(values) == 1, label for non docker execution environment
-		// TODO: validate value format, like docker://node:16-buster
 	}
 	return nil
 }
@@ -164,7 +162,7 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 		}
 
 		if validateLabels(r.CustomLabels) != nil {
-			log.Infoln("Invalid labels, please input again, leave blank to use the default labels (for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster)")
+			log.Infoln("Invalid labels, please input again, leave blank to use the default labels (for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster,linux_arm:host)")
 			return StageInputCustomLabels
 		}
 		return StageWaitingForRegistration
@@ -172,16 +170,17 @@ func (r *registerInputs) assignToNext(stage registerStage, value string) registe
 	return StageUnknown
 }
 
-func registerInteractive(envFile string) error {
+func registerInteractive(configFile string) error {
 	var (
 		reader = bufio.NewReader(os.Stdin)
 		stage  = StageInputInstance
 		inputs = new(registerInputs)
 	)
 
-	// check if overwrite local config
-	_ = godotenv.Load(envFile)
-	cfg, _ := config.FromEnviron()
+	cfg, err := config.LoadDefault(configFile)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %v", err)
+	}
 	if f, err := os.Stat(cfg.Runner.File); err == nil && !f.IsDir() {
 		stage = StageOverwriteLocalConfig
 	}
@@ -197,7 +196,7 @@ func registerInteractive(envFile string) error {
 
 		if stage == StageWaitingForRegistration {
 			log.Infof("Registering runner, name=%s, instance=%s, labels=%v.", inputs.RunnerName, inputs.InstanceAddr, inputs.CustomLabels)
-			if err := doRegister(&cfg, inputs); err != nil {
+			if err := doRegister(cfg, inputs); err != nil {
 				log.Errorf("Failed to register runner: %v", err)
 			} else {
 				log.Infof("Runner registered successfully.")
@@ -221,25 +220,26 @@ func printStageHelp(stage registerStage) {
 	case StageOverwriteLocalConfig:
 		log.Infoln("Runner is already registered, overwrite local config? [y/N]")
 	case StageInputInstance:
-		log.Infoln("Enter the Forgejo instance URL (for example, https://codeberg.org/):")
+		log.Infoln("Enter the Gitea instance URL (for example, https://gitea.com/):")
 	case StageInputToken:
 		log.Infoln("Enter the runner token:")
 	case StageInputRunnerName:
 		hostname, _ := os.Hostname()
-		log.Infof("Enter the runner name (if set empty, use hostname:%s ):\n", hostname)
+		log.Infof("Enter the runner name (if set empty, use hostname: %s):\n", hostname)
 	case StageInputCustomLabels:
-		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, self-hosted,ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster):")
+		log.Infoln("Enter the runner labels, leave blank to use the default labels (comma-separated, for example, ubuntu-20.04:docker://node:16-bullseye,ubuntu-18.04:docker://node:16-buster,linux_arm:host):")
 	case StageWaitingForRegistration:
 		log.Infoln("Waiting for registration...")
 	}
 }
 
-func registerNoInteractive(envFile string, regArgs *registerArgs) error {
-	_ = godotenv.Load(envFile)
-	cfg, _ := config.FromEnviron()
+func registerNoInteractive(configFile string, regArgs *registerArgs) error {
+	cfg, err := config.LoadDefault(configFile)
+	if err != nil {
+		return err
+	}
 	inputs := &registerInputs{
 		InstanceAddr: regArgs.InstanceAddr,
-		Insecure:     regArgs.Insecure,
 		Token:        regArgs.Token,
 		RunnerName:   regArgs.RunnerName,
 		CustomLabels: defaultLabels,
@@ -256,7 +256,7 @@ func registerNoInteractive(envFile string, regArgs *registerArgs) error {
 		log.WithError(err).Errorf("Invalid input, please re-run act command.")
 		return nil
 	}
-	if err := doRegister(&cfg, inputs); err != nil {
+	if err := doRegister(cfg, inputs); err != nil {
 		log.Errorf("Failed to register runner: %v", err)
 		return nil
 	}
@@ -270,7 +270,7 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 	// initial http client
 	cli := client.New(
 		inputs.InstanceAddr,
-		inputs.Insecure,
+		cfg.Runner.Insecure,
 		"",
 		"",
 		version,
@@ -290,18 +290,45 @@ func doRegister(cfg *config.Config, inputs *registerInputs) error {
 		}
 		if err != nil {
 			log.WithError(err).
-				Errorln("Cannot ping the Forgejo instance server")
+				Errorln("Cannot ping the Gitea instance server")
 			// TODO: if ping failed, retry or exit
 			time.Sleep(time.Second)
 		} else {
-			log.Debugln("Successfully pinged the Forgejo instance server")
+			log.Debugln("Successfully pinged the Gitea instance server")
 			break
 		}
 	}
 
-	cfg.Runner.Name = inputs.RunnerName
-	cfg.Runner.Token = inputs.Token
-	cfg.Runner.Labels = inputs.CustomLabels
-	_, err := register.New(cli).Register(ctx, cfg.Runner)
-	return err
+	reg := &config.Registration{
+		Name:    inputs.RunnerName,
+		Token:   inputs.Token,
+		Address: inputs.InstanceAddr,
+		Labels:  inputs.CustomLabels,
+	}
+
+	labels := make([]string, len(reg.Labels))
+	for i, v := range reg.Labels {
+		l, _, _, _ := runtime.ParseLabel(v)
+		labels[i] = l
+	}
+	// register new runner.
+	resp, err := cli.Register(ctx, connect.NewRequest(&runnerv1.RegisterRequest{
+		Name:        reg.Name,
+		Token:       reg.Token,
+		AgentLabels: labels,
+	}))
+	if err != nil {
+		log.WithError(err).Error("poller: cannot register new runner")
+		return err
+	}
+
+	reg.ID = resp.Msg.Runner.Id
+	reg.UUID = resp.Msg.Runner.Uuid
+	reg.Name = resp.Msg.Runner.Name
+	reg.Token = resp.Msg.Runner.Token
+
+	if err := config.SaveRegistration(cfg.Runner.File, reg); err != nil {
+		return fmt.Errorf("failed to save runner config: %w", err)
+	}
+	return nil
 }

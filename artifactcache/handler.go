@@ -18,7 +18,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"github.com/nektos/act/pkg/common"
 	log "github.com/sirupsen/logrus"
 	_ "modernc.org/sqlite"
 	"xorm.io/builder"
@@ -39,16 +38,19 @@ type Handler struct {
 
 	gc   atomic.Bool
 	gcAt time.Time
+
+	outboundIP string
 }
 
-func NewHandler() (*Handler, error) {
+func NewHandler(dir, outboundIP string, port uint16) (*Handler, error) {
 	h := &Handler{}
 
-	dir := "" // TODO: make the dir configurable if necessary
-	if home, err := os.UserHomeDir(); err != nil {
-		return nil, err
-	} else {
-		dir = filepath.Join(home, ".cache/actcache")
+	if dir == "" {
+		if home, err := os.UserHomeDir(); err != nil {
+			return nil, err
+		} else {
+			dir = filepath.Join(home, ".cache", "actcache")
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
@@ -68,6 +70,14 @@ func NewHandler() (*Handler, error) {
 		return nil, err
 	}
 	h.storage = storage
+
+	if outboundIP != "" {
+		h.outboundIP = outboundIP
+	} else if ip, err := getOutboundIP(); err != nil {
+		return nil, err
+	} else {
+		h.outboundIP = ip.String()
+	}
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{Logger: logger}))
@@ -95,8 +105,7 @@ func NewHandler() (*Handler, error) {
 
 	h.gcCache()
 
-	// TODO: make the port configurable if necessary
-	listener, err := net.Listen("tcp", ":0") // random available port
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port)) // listen on all interfaces
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +122,7 @@ func NewHandler() (*Handler, error) {
 func (h *Handler) ExternalURL() string {
 	// TODO: make the external url configurable if necessary
 	return fmt.Sprintf("http://%s:%d",
-		common.GetOutboundIP().String(),
+		h.outboundIP,
 		h.listener.Addr().(*net.TCPAddr).Port)
 }
 

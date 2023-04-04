@@ -4,6 +4,7 @@ forgejo-runner
 .runner
 coverage.txt
 /gitea-vet
+/config.yaml
 
 # MS VSCode
 .vscode

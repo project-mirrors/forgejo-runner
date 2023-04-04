@@ -7,6 +7,7 @@ import (
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	"codeberg.org/forgejo/runner/artifactcache"
 	"codeberg.org/forgejo/runner/client"
+	log "github.com/sirupsen/logrus"
 )
 
 // Runner runs the pipeline.
@@ -17,6 +18,7 @@ type Runner struct {
 	Environ       map[string]string
 	Client        client.Client
 	Labels        []string
+	Network       string
 	CacheHandler  *artifactcache.Handler
 }
 
@@ -26,33 +28,31 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 	for k, v := range s.Environ {
 		env[k] = v
 	}
-	env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
-	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task, s.Machine, s.Version)
+	if s.CacheHandler != nil {
+		env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
+	}
+	return NewTask(task.Id, s.Client, env, s.Network, s.platformPicker).Run(ctx, task, s.Machine, s.Version)
 }
 
 func (s *Runner) platformPicker(labels []string) string {
-	// "ubuntu-18.04:docker://node:16-buster"
-	// "self-hosted"
-
-	platforms := make(map[string]string, len(labels))
+	platforms := make(map[string]string, len(s.Labels))
 	for _, l := range s.Labels {
-		// "ubuntu-18.04:docker://node:16-buster"
-		splits := strings.SplitN(l, ":", 2)
-		if len(splits) == 1 {
-			// identifier for non docker execution environment
-			platforms[splits[0]] = "-self-hosted"
+		label, schema, arg, err := ParseLabel(l)
+		if err != nil {
+			log.Errorf("invaid label %q: %v", l, err)
 			continue
 		}
-		// ["ubuntu-18.04", "docker://node:16-buster"]
-		k, v := splits[0], splits[1]
 
-		if prefix := "docker://"; !strings.HasPrefix(v, prefix) {
+		switch schema {
+		case "docker":
+			// TODO "//" will be ignored, maybe we should use 'ubuntu-18.04:docker:node:16-buster' instead
+			platforms[label] = strings.TrimPrefix(arg, "//")
+		case "host":
+			platforms[label] = "-self-hosted"
+		default:
+			// It should not happen, because ParseLabel has checked it.
 			continue
-		} else {
-			v = strings.TrimPrefix(v, prefix)
 		}
-		// ubuntu-18.04 => node:16-buster
-		platforms[k] = v
 	}
 
 	for _, label := range labels {
@@ -67,6 +67,8 @@ func (s *Runner) platformPicker(labels []string) string {
 	//   ["with-gpu"] => "linux:with-gpu"
 	//   ["ubuntu-22.04", "with-gpu"] => "ubuntu:22.04_with-gpu"
 
-	// return default
-	return "node:16-bullseye"
+	// return default.
+	// So the runner receives a task with a label that the runner doesn't have,
+	// it happens when the user have edited the label of the runner in the web UI.
+	return "node:16-bullseye" // TODO: it may be not correct, what if the runner is used as host mode only?
 }

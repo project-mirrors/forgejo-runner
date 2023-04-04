@@ -7,22 +7,23 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	"codeberg.org/forgejo/runner/client"
-
 	"github.com/bufbuild/connect-go"
 	log "github.com/sirupsen/logrus"
+
+	"codeberg.org/forgejo/runner/client"
+	"codeberg.org/forgejo/runner/config"
 )
 
 var ErrDataLock = errors.New("Data Lock Error")
 
-func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, workerNum int) *Poller {
+func New(cli client.Client, dispatch func(context.Context, *runnerv1.Task) error, cfg *config.Config) *Poller {
 	return &Poller{
 		Client:       cli,
 		Dispatch:     dispatch,
 		routineGroup: newRoutineGroup(),
 		metric:       &metric{},
-		workerNum:    workerNum,
 		ready:        make(chan struct{}, 1),
+		cfg:          cfg,
 	}
 }
 
@@ -34,13 +35,13 @@ type Poller struct {
 	routineGroup *routineGroup
 	metric       *metric
 	ready        chan struct{}
-	workerNum    int
+	cfg          *config.Config
 }
 
 func (p *Poller) schedule() {
 	p.Lock()
 	defer p.Unlock()
-	if int(p.metric.BusyWorkers()) >= p.workerNum {
+	if int(p.metric.BusyWorkers()) >= p.cfg.Runner.Capacity {
 		return
 	}
 
@@ -52,6 +53,40 @@ func (p *Poller) schedule() {
 
 func (p *Poller) Wait() {
 	p.routineGroup.Wait()
+}
+
+func (p *Poller) handle(ctx context.Context, l *log.Entry) {
+	defer func() {
+		if r := recover(); r != nil {
+			l.Errorf("handle task panic: %+v", r)
+		}
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			task, err := p.pollTask(ctx)
+			if task == nil || err != nil {
+				if err != nil {
+					l.Errorf("can't find the task: %v", err.Error())
+				}
+				time.Sleep(5 * time.Second)
+				break
+			}
+
+			p.metric.IncBusyWorker()
+			p.routineGroup.Run(func() {
+				defer p.schedule()
+				defer p.metric.DecBusyWorker()
+				if err := p.dispatchTask(ctx, task); err != nil {
+					l.Errorf("execute task: %v", err.Error())
+				}
+			})
+			return
+		}
+	}
 }
 
 func (p *Poller) Poll(ctx context.Context) error {
@@ -67,32 +102,7 @@ func (p *Poller) Poll(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		}
-	LOOP:
-		for {
-			select {
-			case <-ctx.Done():
-				break LOOP
-			default:
-				task, err := p.pollTask(ctx)
-				if task == nil || err != nil {
-					if err != nil {
-						l.Errorf("can't find the task: %v", err.Error())
-					}
-					time.Sleep(5 * time.Second)
-					break
-				}
-
-				p.metric.IncBusyWorker()
-				p.routineGroup.Run(func() {
-					defer p.schedule()
-					defer p.metric.DecBusyWorker()
-					if err := p.dispatchTask(ctx, task); err != nil {
-						l.Errorf("execute task: %v", err.Error())
-					}
-				})
-				break LOOP
-			}
-		}
+		p.handle(ctx, l)
 	}
 }
 
@@ -139,7 +149,7 @@ func (p *Poller) dispatchTask(ctx context.Context, task *runnerv1.Task) error {
 		}
 	}()
 
-	runCtx, cancel := context.WithTimeout(ctx, time.Hour)
+	runCtx, cancel := context.WithTimeout(ctx, p.cfg.Runner.Timeout)
 	defer cancel()
 
 	return p.Dispatch(runCtx, task)
