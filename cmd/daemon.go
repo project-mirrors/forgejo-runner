@@ -71,6 +71,7 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 			ForgeInstance: reg.Address,
 			Environ:       cfg.Runner.Envs,
 			Labels:        reg.Labels,
+			Network:       cfg.Container.Network,
 			Version:       version,
 		}
 

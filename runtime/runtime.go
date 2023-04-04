@@ -18,6 +18,7 @@ type Runner struct {
 	Environ       map[string]string
 	Client        client.Client
 	Labels        []string
+	Network       string
 	CacheHandler  *artifactcache.Handler
 }
 
@@ -30,7 +31,7 @@ func (s *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 	if s.CacheHandler != nil {
 		env["ACTIONS_CACHE_URL"] = s.CacheHandler.ExternalURL() + "/"
 	}
-	return NewTask(s.ForgeInstance, task.Id, s.Client, env, s.platformPicker).Run(ctx, task, s.Machine, s.Version)
+	return NewTask(task.Id, s.Client, env, s.Network, s.platformPicker).Run(ctx, task, s.Machine, s.Version)
 }
 
 func (s *Runner) platformPicker(labels []string) string {
