@@ -65,6 +65,14 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 			version,
 		)
 
+		if cfg.Runner.Envs == nil {
+			cfg.Runner.Envs = make(map[string]string, 10)
+		}
+
+		if _, ok := cfg.Runner.Envs["GITHUB_SERVER_URL"]; !ok {
+			cfg.Runner.Envs["GITHUB_SERVER_URL"] = reg.Address
+		}
+
 		runner := &runtime.Runner{
 			Client:        cli,
 			Machine:       reg.Name,
