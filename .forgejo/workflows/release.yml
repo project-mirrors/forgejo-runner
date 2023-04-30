@@ -91,6 +91,9 @@ jobs:
           echo "image=${{ steps.registry.outputs.host-port }}/${{ github.repository }}:${tag}" >> "$GITHUB_OUTPUT"
           
       - uses: https://github.com/docker/build-push-action@v4
+        # workaround until https://github.com/docker/build-push-action/commit/d8823bfaed2a82c6f5d4799a2f8e86173c461aba is in @v4 or @v5 is released
+        env:
+          ACTIONS_RUNTIME_TOKEN: ''
         with:
           context: .
           push: true
