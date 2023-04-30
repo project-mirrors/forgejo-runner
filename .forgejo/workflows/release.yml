@@ -74,7 +74,9 @@ jobs:
            ${{ steps.registry.outputs.buildx-config }}
 
       - run: |
-          BASE64_AUTH=`echo -n "${{ steps.secrets.outputs.doer }}:${{ steps.secrets.outputs.token }}" | base64`
+          token="${{ steps.secrets.outputs.token }}" ; test -z "$token" && token="${{ secrets.TOKEN }}"
+          doer="${{ steps.secrets.outputs.doer }}" ; test -z "$doer" && doer="${{ secrets.DOER }}"
+          BASE64_AUTH=`echo -n "$doer:$token" | base64`
           mkdir -p ~/.docker
           echo "{\"auths\": {\"$CI_REGISTRY\": {\"auth\": \"$BASE64_AUTH\"}}}" > ~/.docker/config.json
         env:
@@ -105,10 +107,22 @@ jobs:
             docker rm runner
           done
 
-      - uses: https://code.forgejo.org/actions/forgejo-release@v1
+      - name: publish release (when TOKEN secret is NOT set)
+        if: ${{ secrets.TOKEN == '' }}
+        uses: https://code.forgejo.org/actions/forgejo-release@v1
         with:
           direction: upload
           release-dir: release
           release-notes: "RELEASE-NOTES#${{ steps.build.outputs.tag }}"
           token: ${{ steps.secrets.outputs.token }}
+          verbose: ${{ steps.verbose.outputs.value }}
+
+      - name: publish release (when TOKEN secret is set)
+        if: ${{ secrets.TOKEN != '' }}
+        uses: https://code.forgejo.org/actions/forgejo-release@v1
+        with:
+          direction: upload
+          release-dir: release
+          release-notes: "RELEASE-NOTES#${{ steps.build.outputs.tag }}"
+          token: ${{ secrets.TOKEN }}
           verbose: ${{ steps.verbose.outputs.value }}
