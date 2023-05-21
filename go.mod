@@ -110,4 +110,4 @@ require (
 	modernc.org/token v1.1.0 // indirect
 )
 
-replace github.com/nektos/act => code.forgejo.org/forgejo/act v1.4.0
+replace github.com/nektos/act => code.forgejo.org/forgejo/act v1.5.0
