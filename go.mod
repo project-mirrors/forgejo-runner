@@ -8,6 +8,7 @@ require (
 	github.com/avast/retry-go/v4 v4.5.0
 	github.com/bufbuild/connect-go v1.10.0
 	github.com/docker/docker v24.0.5+incompatible
+	github.com/google/uuid v1.3.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-isatty v0.0.19
 	github.com/nektos/act v0.2.49
