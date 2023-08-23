@@ -1,5 +1,9 @@
 # Release Notes
 
+## v2.5.0
+
+* Update [code.forgejo.org/forgejo/act v1.10.0](https://code.forgejo.org/forgejo/runner/pulls/71)
+
 ## v2.4.0
 
 * Update [code.forgejo.org/forgejo/act v1.9.0](https://code.forgejo.org/forgejo/runner/pulls/64)
