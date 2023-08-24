@@ -1,0 +1,68 @@
+# Copyright 2023 The Forgejo Authors.
+# SPDX-License-Identifier: MIT
+
+version: "3"
+
+services:
+
+  docker-in-docker:
+    image: docker:dind
+    privileged: true
+    command: [ "dockerd", "-H", "tcp://0.0.0.0:2375", "--tls=false" ]
+
+  forgejo:
+    image: codeberg.org/forgejo/forgejo:1.20.3-0
+    command: >-
+      bash -c '
+      /bin/s6-svscan /etc/s6 &
+      sleep 10 ;
+      su -c "forgejo forgejo-cli actions register --secret e3359786173a7aeb3818c19637479c5dbd7c5abb --labels docker --version 3.0.0" git ;
+      su -c "forgejo admin user create --admin --username root --password admin1234 --email root@example.com" git ;
+      sleep infinity
+      '
+    environment:
+      FORGEJO__security__INSTALL_LOCK: "true"
+      FORGEJO__log__LEVEL: "debug"
+      FORGEJO__actions__ENABLED: "true"
+      FORGEJO__repository__ENABLE_PUSH_CREATE_USER: "true"
+      FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE: "false"
+      FORGEJO__repository__DEFAULT_REPO_UNITS: "repo.code,repo.actions"
+    volumes:
+      - /srv/forgejo-data:/data
+    ports:
+      - 8080:3000
+
+  runner-register:
+    image: code.forgejo.org/forgejo/runner:3.0.0
+    links:
+      - docker-in-docker
+      - forgejo
+    environment:
+      DOCKER_HOST: tcp://docker-in-docker:2375
+    volumes:
+      - /srv/runner-data:/data
+    user: 0:0
+    command: >-
+      bash -c '
+      while : ; do
+        forgejo-runner create-runner-file --instance http://forgejo:3000 --name runner --secret e3359786173a7aeb3818c19637479c5dbd7c5abb && break ;
+        sleep 1 ;
+      done ;
+      forgejo-runner generate-config > config.yml ;
+      sed -i -e "s|labels: \[\]|labels: \[\"docker:docker://alpine:3.18\"\]|" config.yml ;
+      chown -R 1000:1000 /data
+      '
+
+  runner-daemon:
+    image: code.forgejo.org/forgejo/runner:3.0.0
+    links:
+      - docker-in-docker
+      - forgejo
+    environment:
+      DOCKER_HOST: tcp://docker-in-docker:2375
+    depends_on:
+      runner-register:
+        condition: service_completed_successfully
+    volumes:
+      - /srv/runner-data:/data
+    command: "forgejo-runner --config config.yml daemon"
