@@ -1,5 +1,10 @@
 # Release Notes
 
+## v3.0.0
+
+* Publish a rootless OCI image with examples on how to use it
+* Refactor the release process
+
 ## v2.5.0
 
 * Update [code.forgejo.org/forgejo/act v1.10.0](https://code.forgejo.org/forgejo/runner/pulls/71)
