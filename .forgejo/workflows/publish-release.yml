@@ -39,6 +39,7 @@ jobs:
           forgejo: ${{ secrets.FORGEJO }}
           from-owner: ${{ secrets.FROM_OWNER }}
           to-owner: ${{ secrets.TO_OWNER }}
+          repo: "runner"
           ref-name: ${{ github.ref_name }}
           doer: ${{ secrets.DOER }}
           token: ${{ secrets.TOKEN }}
