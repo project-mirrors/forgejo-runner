@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: MIT
+#
+# https://forgejo.octopuce.forgejo.org/forgejo-release/runner
+#
+#  Copies & sign a release from code.forgejo.org/forgejo-integration/runner to code.forgejo.org/forgejo/runner
+#
+#  ROLE: forgejo-release
+#  FORGEJO: https://code.forgejo.org
+#  FROM_OWNER: forgejo-integration
+#  TO_OWNER: forgejo
+#  DOER: release-team
+#  TOKEN: <generated from codeberg.org/release-team>
+#  GPG_PRIVATE_KEY: <XYZ>
+#  GPG_PASSPHRASE: <ABC>
+#
+name: pubish
+
+on:
+  push:
+    tags: 'v*'
+
+jobs:
+  publish:
+    runs-on: self-hosted
+    if: secrets.DOER != '' && secrets.FORGEJO != '' && secrets.TO_OWNER != '' && secrets.FROM_OWNER != '' && secrets.TOKEN != ''
+    steps:
+      - name: install the certificate authority
+        if: secrets.ROLE == 'forgejo-release'
+        run: |
+          apt-get install -qq -y wget
+          wget --no-check-certificate -O /usr/local/share/ca-certificates/enough.crt https://forgejo.octopuce.forgejo.org/forgejo/enough/raw/branch/main/certs/2023-05-13/ca.crt
+          update-ca-certificates --fresh
+
+      - uses: actions/checkout@v3
+
+      - name: copy & sign
+        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/publish@v1
+        with:
+          forgejo: ${{ secrets.FORGEJO }}
+          from-owner: ${{ secrets.FROM_OWNER }}
+          to-owner: ${{ secrets.TO_OWNER }}
+          ref-name: ${{ github.ref_name }}
+          doer: ${{ secrets.DOER }}
+          token: ${{ secrets.TOKEN }}
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          verbose: ${{ secrets.VERBOSE }}
