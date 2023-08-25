@@ -2,7 +2,7 @@
 
 ## v3.0.0
 
-* Publish a rootless OCI image with examples on how to use it
+* Publish a rootless OCI image
 * Refactor the release process
 
 ## v2.5.0
