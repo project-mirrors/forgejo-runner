@@ -41,6 +41,7 @@ jobs:
           to-owner: ${{ secrets.TO_OWNER }}
           repo: "runner"
           ref-name: ${{ github.ref_name }}
+          container-suffixes: " "
           doer: ${{ secrets.DOER }}
           token: ${{ secrets.TOKEN }}
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
