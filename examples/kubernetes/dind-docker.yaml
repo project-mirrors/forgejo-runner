@@ -12,20 +12,20 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: act-runner
-  name: act-runner
+    app: forgejo-runner
+  name: forgejo-runner
 spec:
   # Two replicas means that if one is busy, the other can pick up jobs.
   replicas: 2
   selector:
     matchLabels:
-      app: act-runner
+      app: forgejo-runner
   strategy: {}
   template:
     metadata:
       creationTimestamp: null
       labels:
-        app: act-runner
+        app: forgejo-runner
     spec:
       restartPolicy: Always
       volumes:
@@ -37,23 +37,23 @@ spec:
       # https://forgejo.org/docs/v1.21/admin/actions/#offline-registration
       initContainers:
       - name: runner-config-generation
-        image: code.forgejo.org/forgejo/runner:2.4.0
-        command: [ "sh", "-c", "cd /data && forgejo-runner create-runner-file --instance $GITEA_INSTANCE_URL --secret $RUNNER_SECRET --connect" ]
+        image: code.forgejo.org/forgejo/runner:3.0.0
+        command: [ "forgejo-runner create-runner-file --instance $FORGEJO_INSTANCE_URL --secret $RUNNER_SECRET --connect" ]
         env:
         - name: RUNNER_SECRET
           valueFrom:
             secretKeyRef:
               name: runner-secret
               key: token
-        - name: GITEA_INSTANCE_URL
+        - name: FORGEJO_INSTANCE_URL
           value: http://gitea-http.gitea.svc.cluster.local:3000
         volumeMounts:
         - name: runner-data
           mountPath: /data
       containers:
       - name: runner
-        image: gitea/act_runner:nightly
-        command: ["sh", "-c", "while ! nc -z localhost 2376 </dev/null; do echo 'waiting for docker daemon...'; sleep 5; done; /sbin/tini -- /opt/act/run.sh"]
+        image: code.forgejo.org/forgejo/runner:3.0.0
+        command: ["sh", "-c", "while ! nc -z localhost 2376 </dev/null; do echo 'waiting for docker daemon...'; sleep 5; done; forgejo-runner daemon"]
         env:
         - name: DOCKER_HOST
           value: tcp://localhost:2376
@@ -61,8 +61,6 @@ spec:
           value: /certs/client
         - name: DOCKER_TLS_VERIFY
           value: "1"
-        - name: GITEA_INSTANCE_URL
-          value: http://gitea-http.gitea.svc.cluster.local:3000
         volumeMounts:
         - name: docker-certs
           mountPath: /certs
