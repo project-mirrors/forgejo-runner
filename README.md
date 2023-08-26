@@ -2,13 +2,7 @@
 
 **WARNING:** this is [alpha release quality](https://en.wikipedia.org/wiki/Software_release_life_cycle#Alpha) code and should not be considered secure enough to deploy in production.
 
-A daemon that connects to a Forgejo instance and runs jobs for continous integration. The high level [installation instructions](https://forgejo.org/docs/next/admin/actions/) are part of the Forgejo documentation.
-
-# Configuration
-
-Display the usage with `forgejo-runner --help`.
-
-For more information on the configuration file, see the [commented example](internal/pkg/config/config.example.yaml).
+A daemon that connects to a Forgejo instance and runs jobs for continous integration. The [installation and usage instructions](https://forgejo.org/docs/next/admin/actions/) are part of the Forgejo documentation.
 
 # Hacking
 
