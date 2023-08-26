@@ -1,20 +1,73 @@
-### Running `act_runner` using `docker-compose`
+## Docker compose with docker-in-docker
 
-```yml
+The `compose-forgejo-and-runner.yml` compose file runs a Forgejo
+instance and registers a `Forgejo runner`. A docker server is also
+launched within a container (using
+[dind](https://hub.docker.com/_/docker/tags?name=dind)) and will be
+used by the `Forgejo runner` to execute the workflows.
+
+### Running
+
+```sh
+docker-compose -f compose-forgejo-and-runner.yml up
+Creating docker-compose_docker-in-docker_1 ... done
+Creating docker-compose_forgejo_1          ... done
+Creating docker-compose_runner-register_1  ... done
 ...
-  gitea:
-    image: gitea/gitea
-    ...
+docker-in-docker_1  | time="2023-08-24T10:22:15.023338461Z" level=warning msg="WARNING: API is accessible on http://0.0.0.0:2375
+...
+forgejo_1           | 2023/08/24 10:22:14 ...s/graceful/server.go:75:func1() [D] Starting server on tcp:0.0.0.0:3000 (PID: 19)
+...
+runner-daemon_1     | time="2023-08-24T10:22:16Z" level=info msg="Starting runner daemon"
+```
 
-  runner:
-    image: gitea/act_runner
-    restart: always
-    depends_on:
-      - gitea
-    volumes:
-      - ./data/act_runner:/data
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - GITEA_INSTANCE_URL=<instance url>
-      - GITEA_RUNNER_REGISTRATION_TOKEN=<registration token>
+### Manual testing
+
+To login the Forgejo instance:
+
+* URL: http://0.0.0.0:8080
+* user: root
+* password: admin1234
+
+`Forgejo Actions` is enabled by default when creating a repository.
+
+### Security
+
+This is a demo and **must not be used in production** because:
+
+* the runner secret is hardcoded
+* the admin password is hardcoded to admin1234
+
+## Tests workflow
+
+The `compose-demo-workflow.yml` compose file runs a demo workflow to
+verify the `Forgejo runner` can pick up a task from the Forgejo instance
+and run it to completion.
+
+A new repository is created in root/test with the following workflow
+in `.forgejo/workflows/demo.yml`:
+
+```yaml
+on: [push]
+jobs:
+  test:
+    runs-on: docker
+    steps:
+      - run: echo All Good
+```
+
+A wait loop expects the status of the check associated with the
+commit in Forgejo to show "success" to assert the workflow was run.
+
+### Running
+
+```sh
+$ docker-compose -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml up demo-workflow
+...
+demo-workflow_1     | To http://forgejo:3000/root/test
+demo-workflow_1     |  + 5ce134e...261cc79 main -> main (forced update)
+demo-workflow_1     | branch 'main' set up to track 'http://root:admin1234@forgejo:3000/root/test/main'.
+...
+demo-workflow_1     | running
+...
 ```
