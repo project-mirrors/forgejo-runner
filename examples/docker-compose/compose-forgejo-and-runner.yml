@@ -1,6 +1,19 @@
 # Copyright 2023 The Forgejo Authors.
 # SPDX-License-Identifier: MIT
 
+#
+# Create a secret with:
+#
+#   openssl rand -hex 20
+#
+# Replace all occurences of {SHARED_SECRET} below with the output.
+#
+# NOTE: a token obtained from the Forgejo web interface cannot be used
+#       as a shared secret.
+#
+# Replace {ROOT_PASSWORD} with a secure password
+#
+
 version: "3"
 
 services:
@@ -16,8 +29,8 @@ services:
       bash -c '
       /bin/s6-svscan /etc/s6 &
       sleep 10 ;
-      su -c "forgejo forgejo-cli actions register --secret e3359786173a7aeb3818c19637479c5dbd7c5abb --labels docker --version 3.0.0" git ;
-      su -c "forgejo admin user create --admin --username root --password admin1234 --email root@example.com" git ;
+      su -c "forgejo forgejo-cli actions register --secret {SHARED_SECRET} --labels docker --version 3.0.0" git ;
+      su -c "forgejo admin user create --admin --username root --password {ROOT_PASSWORD} --email root@example.com" git ;
       sleep infinity
       '
     environment:
@@ -45,7 +58,7 @@ services:
     command: >-
       bash -c '
       while : ; do
-        forgejo-runner create-runner-file --instance http://forgejo:3000 --name runner --secret e3359786173a7aeb3818c19637479c5dbd7c5abb && break ;
+        forgejo-runner create-runner-file --instance http://forgejo:3000 --name runner --secret {SHARED_SECRET} && break ;
         sleep 1 ;
       done ;
       forgejo-runner generate-config > config.yml ;

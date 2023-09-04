@@ -28,6 +28,8 @@ jobs:
         run: |
           set -x
           cd examples/docker-compose
+          secret=$(openssl rand -hex 20)
+          sed -i -e "s/{SHARED_SECRET}/$secret/" compose-forgejo-and-runner.yml
           cli="docker compose -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml"
           #
           # Launch
