@@ -8,6 +8,20 @@ used by the `Forgejo runner` to execute the workflows.
 
 ### Running
 
+Create a shared secret with:
+
+```sh
+openssl rand -hex 20
+```
+
+Replace all occurences of {SHARED_SECRET} in
+[compose-forgejo-and-runner.yml](compose-forgejo-and-runner.yml).
+
+> **NOTE:** a token obtained from the Forgejo web interface cannot be used as a shared secret.
+
+Replace {ROOT_PASSWORD} with a secure password in
+[compose-forgejo-and-runner.yml](compose-forgejo-and-runner.yml).
+
 ```sh
 docker-compose -f compose-forgejo-and-runner.yml up
 Creating docker-compose_docker-in-docker_1 ... done
@@ -27,16 +41,9 @@ To login the Forgejo instance:
 
 * URL: http://0.0.0.0:8080
 * user: root
-* password: admin1234
+* password: {ROOT_PASSWORD}
 
 `Forgejo Actions` is enabled by default when creating a repository.
-
-### Security
-
-This is a demo and **must not be used in production** because:
-
-* the runner secret is hardcoded
-* the admin password is hardcoded to admin1234
 
 ## Tests workflow
 
