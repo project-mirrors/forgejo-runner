@@ -46,7 +46,7 @@ services:
       - 8080:3000
 
   runner-register:
-    image: code.forgejo.org/forgejo/runner:3.0.0
+    image: code.forgejo.org/forgejo/runner:3.0.1
     links:
       - docker-in-docker
       - forgejo
@@ -56,18 +56,19 @@ services:
       - /srv/runner-data:/data
     user: 0:0
     command: >-
-      bash -c '
+      bash -ec '
       while : ; do
         forgejo-runner create-runner-file --instance http://forgejo:3000 --name runner --secret {SHARED_SECRET} && break ;
         sleep 1 ;
       done ;
       forgejo-runner generate-config > config.yml ;
+      sed -i -e "s|network: .*|network: host|" config.yml ;
       sed -i -e "s|labels: \[\]|labels: \[\"docker:docker://alpine:3.18\"\]|" config.yml ;
       chown -R 1000:1000 /data
       '
 
   runner-daemon:
-    image: code.forgejo.org/forgejo/runner:3.0.0
+    image: code.forgejo.org/forgejo/runner:3.0.1
     links:
       - docker-in-docker
       - forgejo
