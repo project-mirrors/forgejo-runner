@@ -62,6 +62,7 @@ services:
         sleep 1 ;
       done ;
       forgejo-runner generate-config > config.yml ;
+      sed -i -e "s|network: .*|network: host|" config.yml ;
       sed -i -e "s|labels: \[\]|labels: \[\"docker:docker://alpine:3.18\"\]|" config.yml ;
       chown -R 1000:1000 /data
       '
