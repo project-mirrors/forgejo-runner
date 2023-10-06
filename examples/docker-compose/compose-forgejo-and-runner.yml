@@ -24,12 +24,12 @@ services:
     command: [ "dockerd", "-H", "tcp://0.0.0.0:2375", "--tls=false" ]
 
   forgejo:
-    image: codeberg.org/forgejo/forgejo:1.20.3-0
+    image: codeberg.org/forgejo/forgejo:1.20.4-1
     command: >-
       bash -c '
       /bin/s6-svscan /etc/s6 &
       sleep 10 ;
-      su -c "forgejo forgejo-cli actions register --secret {SHARED_SECRET} --labels docker --version 3.0.0" git ;
+      su -c "forgejo forgejo-cli actions register --secret {SHARED_SECRET} --labels docker --version 3.0.1" git ;
       su -c "forgejo admin user create --admin --username root --password {ROOT_PASSWORD} --email root@example.com" git ;
       sleep infinity
       '
