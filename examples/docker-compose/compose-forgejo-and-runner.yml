@@ -56,7 +56,7 @@ services:
       - /srv/runner-data:/data
     user: 0:0
     command: >-
-      bash -c '
+      bash -ec '
       while : ; do
         forgejo-runner create-runner-file --instance http://forgejo:3000 --name runner --secret {SHARED_SECRET} && break ;
         sleep 1 ;
