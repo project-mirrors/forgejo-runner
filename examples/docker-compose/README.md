@@ -6,6 +6,17 @@ launched within a container (using
 [dind](https://hub.docker.com/_/docker/tags?name=dind)) and will be
 used by the `Forgejo runner` to execute the workflows.
 
+### Quick start
+
+```sh
+rm -fr /srv/runner-data /srv/forgejo-data
+secret=$(openssl rand -hex 20)
+sed -i -e "s/{SHARED_SECRET}/$secret/" compose-forgejo-and-runner.yml
+docker compose -f compose-forgejo-and-runner.yml up -d
+docker compose -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml up demo-workflow
+firefox http://0.0.0.0:8080/root/test/actions/runs/1 # login root, password {ROOT_PASSWORD}
+```
+
 ### Running
 
 Create a shared secret with:
