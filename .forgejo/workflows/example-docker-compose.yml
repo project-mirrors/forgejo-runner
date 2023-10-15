@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: MIT
 on:
-  pull_request_target:
   push:
+    branches:
+      - 'main'
+  pull_request_target:
 
 jobs:
   example-docker-compose:

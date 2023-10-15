@@ -1,7 +1,9 @@
 name: checks
-on: 
-  - pull_request
-  - push
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
 
 env:
   FORGEJO_HOST_PORT: 'forgejo:3000'
