@@ -97,7 +97,9 @@ create a network that cannot reach the forgejo instance.
 
 ### Try a sample workflow
 
-From the Forgejo web interface, create a repository and add the following to `.forgejo/workflows/try.yaml`. It will launch the job and the result can be observed from the `actions` tab.
+From the Forgejo web interface, create a repository and add the
+following to `.forgejo/workflows/try.yaml`. It will launch the job and
+the result can be observed from the `actions` tab.
 
 ```yaml
 on: [push]

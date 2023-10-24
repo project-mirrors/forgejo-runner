@@ -20,4 +20,5 @@ jobs:
           destination-repo: actions/setup-forgejo
           destination-branch: main
           destination-token: ${{ secrets.CASCADING_PR_DESTINATION }}
+          close-merge: true
           update: .forgejo/cascading-pr-setup-forgejo
