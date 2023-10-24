@@ -12,3 +12,4 @@ branch=$(jq --raw-output .head.ref < $runner_pr)
 test "$branch" != null
 cd $setup_forgejo
 ./utils/upgrade-runner.sh $url @$branch
+date > last-upgrade
