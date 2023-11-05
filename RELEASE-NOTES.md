@@ -1,5 +1,9 @@
 # Release Notes
 
+## 3.0.2
+
+* Update [code.forgejo.org/forgejo/act v1.12.0](https://code.forgejo.org/forgejo/runner/pulls/106) to upgrade the node installed in the LXC container to node20
+
 ## 3.0.1
 
 * Update [code.forgejo.org/forgejo/act v1.11.0](https://code.forgejo.org/forgejo/runner/pulls/86) to resolve a bug preventing actions based on node20 from running, such as [checkout@v4](https://code.forgejo.org/actions/checkout/src/tag/v4).
