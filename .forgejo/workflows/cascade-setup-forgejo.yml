@@ -9,7 +9,6 @@ jobs:
   cascade:
     runs-on: docker
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/cascading-pr@v1
         with:
           origin-url: ${{ env.GITHUB_SERVER_URL }}
