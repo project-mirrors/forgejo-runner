@@ -1,5 +1,17 @@
 # Release Notes
 
+## 3.1.0
+
+The `self-hosted` label that was hardwired to be a LXC container
+running `debian:bullseye` was reworked and documented ([user guide](https://forgejo.org/docs/next/user/actions/#jobsjob_idruns-on) and [admin guide](https://forgejo.org/docs/next/admin/actions/#labels-and-runs-on)).
+
+There now are two different schemes: `lxc://` for LXC containers and
+`host://` for running directly on the host.
+
+* Support the `host://` scheme for running directly on the host.
+* Support the `lxc://` scheme in labels
+* Update [code.forgejo.org/forgejo/act v1.14.0](https://code.forgejo.org/forgejo/act/pulls/19) to implement both self-hosted and LXC schemes
+
 ## 3.0.3
 
 * Update [code.forgejo.org/forgejo/act v1.13.0](https://code.forgejo.org/forgejo/runner/pulls/106) to keep up with github.com/nektos/act

@@ -49,7 +49,8 @@ cd runner ; rm -f forgejo-runner ; make forgejo-runner
 A Forgejo instance is launched with:
 
 ```shell
-cd setup-forgejo ; ./forgejo.sh setup
+cd setup-forgejo
+./forgejo.sh setup
 firefox http://$(cat forgejo-ip):3000
 ```
 
