@@ -11,6 +11,7 @@ import (
 const (
 	SchemeHost   = "host"
 	SchemeDocker = "docker"
+	SchemeLXC    = "lxc"
 )
 
 type Label struct {
@@ -32,7 +33,7 @@ func Parse(str string) (*Label, error) {
 	if len(splits) >= 3 {
 		label.Arg = splits[2]
 	}
-	if label.Schema != SchemeHost && label.Schema != SchemeDocker {
+	if label.Schema != SchemeHost && label.Schema != SchemeDocker && label.Schema != SchemeLXC {
 		return nil, fmt.Errorf("unsupported schema: %s", label.Schema)
 	}
 	return label, nil
@@ -59,6 +60,8 @@ func (l Labels) PickPlatform(runsOn []string) string {
 			platforms[label.Name] = strings.TrimPrefix(label.Arg, "//")
 		case SchemeHost:
 			platforms[label.Name] = "-self-hosted"
+		case SchemeLXC:
+			platforms[label.Name] = "lxc:" + strings.TrimPrefix(label.Arg, "//")
 		default:
 			// It should not happen, because Parse has checked it.
 			continue
