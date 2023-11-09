@@ -35,6 +35,7 @@ type HostEnvironment struct {
 	Root      string
 	CleanUp   func()
 	StdOut    io.Writer
+	LXC       bool
 }
 
 func (e *HostEnvironment) Create(_, _ []string) common.Executor {
@@ -302,17 +303,21 @@ func (e *HostEnvironment) exec(ctx context.Context, commandparam []string, cmdli
 	} else {
 		wd = e.Path
 	}
+
 	if _, err := os.Stat(wd); err != nil {
 		common.Logger(ctx).Debugf("Failed to stat working directory %s %v\n", wd, err.Error())
 	}
 
 	command := make([]string, len(commandparam))
 	copy(command, commandparam)
-	if user == "root" {
-		command = append([]string{"/usr/bin/sudo"}, command...)
-	} else {
-		common.Logger(ctx).Debugf("lxc-attach --name %v %v", e.Name, command)
-		command = append([]string{"/usr/bin/sudo", "--preserve-env", "--preserve-env=PATH", "/usr/bin/lxc-attach", "--keep-env", "--name", e.Name, "--"}, command...)
+
+	if e.GetLXC() {
+		if user == "root" {
+			command = append([]string{"/usr/bin/sudo"}, command...)
+		} else {
+			common.Logger(ctx).Debugf("lxc-attach --name %v %v", e.Name, command)
+			command = append([]string{"/usr/bin/sudo", "--preserve-env", "--preserve-env=PATH", "/usr/bin/lxc-attach", "--keep-env", "--name", e.Name, "--"}, command...)
+		}
 	}
 
 	f, err := lookupPathHost(command[0], env, e.StdOut)
@@ -412,6 +417,10 @@ func (e *HostEnvironment) ToContainerPath(path string) string {
 		return e.Path
 	}
 	return path
+}
+
+func (e *HostEnvironment) GetLXC() bool {
+	return e.LXC
 }
 
 func (e *HostEnvironment) GetName() string {

@@ -7,6 +7,7 @@ type ExecutionsEnvironment interface {
 	ToContainerPath(string) string
 	GetName() string
 	GetRoot() string
+	GetLXC() bool
 	GetActPath() string
 	GetPathVariableName() string
 	DefaultPathVariable() string

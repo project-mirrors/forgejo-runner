@@ -247,31 +247,29 @@ source $(dirname $0)/lxc-helpers-lib.sh
 lxc_container_destroy "{{.Name}}"
 `))
 
-func (rc *RunContext) stopHostEnvironment() common.Executor {
-	return func(ctx context.Context) error {
-		logger := common.Logger(ctx)
-		logger.Debugf("stopHostEnvironment")
+func (rc *RunContext) stopHostEnvironment(ctx context.Context) error {
+	logger := common.Logger(ctx)
+	logger.Debugf("stopHostEnvironment")
 
-		var stopScript bytes.Buffer
-		if err := stopTemplate.Execute(&stopScript, struct {
-			Name string
-			Root string
-		}{
-			Name: rc.JobContainer.GetName(),
-			Root: rc.JobContainer.GetRoot(),
-		}); err != nil {
-			return err
-		}
-
-		return common.NewPipelineExecutor(
-			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
-				Name: "workflow/stop-lxc.sh",
-				Mode: 0755,
-				Body: stopScript.String(),
-			}),
-			rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/stop-lxc.sh"}, map[string]string{}, "root", "/tmp"),
-		)(ctx)
+	var stopScript bytes.Buffer
+	if err := stopTemplate.Execute(&stopScript, struct {
+		Name string
+		Root string
+	}{
+		Name: rc.JobContainer.GetName(),
+		Root: rc.JobContainer.GetRoot(),
+	}); err != nil {
+		return err
 	}
+
+	return common.NewPipelineExecutor(
+		rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+			Name: "workflow/stop-lxc.sh",
+			Mode: 0755,
+			Body: stopScript.String(),
+		}),
+		rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/stop-lxc.sh"}, map[string]string{}, "root", "/tmp"),
+	)(ctx)
 }
 
 func (rc *RunContext) startHostEnvironment() common.Executor {
@@ -316,6 +314,7 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 				os.RemoveAll(miscpath)
 			},
 			StdOut: logWriter,
+			LXC:    rc.IsLXCHostEnv(ctx),
 		}
 		rc.cleanUpJobContainer = rc.JobContainer.Remove()
 		for k, v := range rc.JobContainer.GetRunnerContext(ctx) {
@@ -353,33 +352,40 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 			return err
 		}
 
-		return common.NewPipelineExecutor(
-			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
-				Name: "workflow/lxc-helpers-lib.sh",
-				Mode: 0755,
-				Body: lxcHelpersLib,
-			}),
-			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
-				Name: "workflow/lxc-helpers.sh",
-				Mode: 0755,
-				Body: lxcHelpers,
-			}),
-			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
-				Name: "workflow/start-lxc.sh",
-				Mode: 0755,
-				Body: startScript.String(),
-			}),
-			rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/start-lxc.sh"}, map[string]string{}, "root", "/tmp"),
-			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
-				Name: "workflow/event.json",
-				Mode: 0o644,
-				Body: rc.EventJSON,
-			}, &container.FileEntry{
-				Name: "workflow/envs.txt",
-				Mode: 0o666,
-				Body: "",
-			}),
-		)(ctx)
+		executors := make([]common.Executor, 0, 10)
+
+		if rc.IsLXCHostEnv(ctx) {
+			executors = append(executors,
+				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+					Name: "workflow/lxc-helpers-lib.sh",
+					Mode: 0755,
+					Body: lxcHelpersLib,
+				}),
+				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+					Name: "workflow/lxc-helpers.sh",
+					Mode: 0755,
+					Body: lxcHelpers,
+				}),
+				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+					Name: "workflow/start-lxc.sh",
+					Mode: 0755,
+					Body: startScript.String(),
+				}),
+				rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/start-lxc.sh"}, map[string]string{}, "root", "/tmp"),
+			)
+		}
+
+		executors = append(executors, rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
+			Name: "workflow/event.json",
+			Mode: 0o644,
+			Body: rc.EventJSON,
+		}, &container.FileEntry{
+			Name: "workflow/envs.txt",
+			Mode: 0o666,
+			Body: "",
+		}))
+
+		return common.NewPipelineExecutor(executors...)(ctx)
 	}
 }
 
@@ -725,17 +731,25 @@ func (rc *RunContext) startContainer() common.Executor {
 	}
 }
 
-func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
+func (rc *RunContext) IsBareHostEnv(ctx context.Context) bool {
 	platform := rc.runsOnImage(ctx)
 	image := rc.containerImage(ctx)
 	return image == "" && strings.EqualFold(platform, "-self-hosted")
 }
 
+func (rc *RunContext) IsLXCHostEnv(ctx context.Context) bool {
+	platform := rc.runsOnImage(ctx)
+	return strings.HasPrefix(platform, "lxc:")
+}
+
+func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
+	return rc.IsBareHostEnv(ctx) || rc.IsLXCHostEnv(ctx)
+}
+
 func (rc *RunContext) stopContainer() common.Executor {
 	return func(ctx context.Context) error {
-		image := rc.platformImage(ctx)
-		if strings.EqualFold(image, "-self-hosted") {
-			return rc.stopHostEnvironment()(ctx)
+		if rc.IsLXCHostEnv(ctx) {
+			return rc.stopHostEnvironment(ctx)
 		}
 		return rc.stopJobContainer()(ctx)
 	}
@@ -744,9 +758,8 @@ func (rc *RunContext) stopContainer() common.Executor {
 func (rc *RunContext) closeContainer() common.Executor {
 	return func(ctx context.Context) error {
 		if rc.JobContainer != nil {
-			image := rc.platformImage(ctx)
-			if strings.EqualFold(image, "-self-hosted") {
-				return rc.stopHostEnvironment()(ctx)
+			if rc.IsLXCHostEnv(ctx) {
+				return rc.stopHostEnvironment(ctx)
 			}
 			return rc.JobContainer.Close()(ctx)
 		}

@@ -50,6 +50,10 @@ func (*LinuxContainerEnvironmentExtensions) GetName() string {
 	return "NAME"
 }
 
+func (*LinuxContainerEnvironmentExtensions) GetLXC() bool {
+	return false
+}
+
 func (*LinuxContainerEnvironmentExtensions) GetRoot() string {
 	return "/var/run"
 }
