@@ -1,5 +1,9 @@
 # Release Notes
 
+## 3.2.0
+
+* Support LXC container capabilities via `lxc:lxc://debian:bookworm:k8s` or  `lxc:lxc://debian:bookworm:docker lxc k8s`
+
 ## 3.1.0
 
 The `self-hosted` label that was hardwired to be a LXC container
