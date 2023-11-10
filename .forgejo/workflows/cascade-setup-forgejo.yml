@@ -8,6 +8,7 @@ on:
 jobs:
   cascade:
     runs-on: docker
+    if: vars.CASCADE != 'no'
     steps:
       - uses: actions/cascading-pr@v1
         with:
