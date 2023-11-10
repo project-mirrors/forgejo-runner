@@ -193,9 +193,11 @@ var lxcHelpersLib string
 var lxcHelpers string
 
 var startTemplate = template.Must(template.New("start").Parse(`#!/bin/bash -e
-source $(dirname $0)/lxc-helpers-lib.sh
 
+LXC_CONTAINER_CONFIG="{{.Config}}"
 LXC_CONTAINER_RELEASE="{{.Release}}"
+
+source $(dirname $0)/lxc-helpers-lib.sh
 
 function template_act() {
     echo $(lxc_template_release)-act
@@ -235,7 +237,7 @@ function build_template_act() {
 }
 
 lxc_prepare_environment
-build_template_act
+LXC_CONTAINER_CONFIG="" build_template_act
 lxc_build_template $(template_act) "{{.Name}}"
 lxc_container_mount "{{.Name}}" "{{ .Root }}"
 lxc_container_start "{{.Name}}"
@@ -331,30 +333,34 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 			}
 		}
 
-		var startScript bytes.Buffer
-		if err := startTemplate.Execute(&startScript, struct {
-			Name     string
-			Template string
-			Release  string
-			Repo     string
-			Root     string
-			TmpDir   string
-			Script   string
-		}{
-			Name:     rc.JobContainer.GetName(),
-			Template: "debian",
-			Release:  "bullseye",
-			Repo:     "", // step.Environment["CI_REPO"],
-			Root:     rc.JobContainer.GetRoot(),
-			TmpDir:   runnerTmp,
-			Script:   "", // "commands-" + step.Name,
-		}); err != nil {
-			return err
-		}
-
 		executors := make([]common.Executor, 0, 10)
 
-		if rc.IsLXCHostEnv(ctx) {
+		isLXCHost, LXCTemplate, LXCRelease, LXCConfig := rc.GetLXCInfo(ctx)
+
+		if isLXCHost {
+			var startScript bytes.Buffer
+			if err := startTemplate.Execute(&startScript, struct {
+				Name     string
+				Template string
+				Release  string
+				Config   string
+				Repo     string
+				Root     string
+				TmpDir   string
+				Script   string
+			}{
+				Name:     rc.JobContainer.GetName(),
+				Template: LXCTemplate,
+				Release:  LXCRelease,
+				Config:   LXCConfig,
+				Repo:     "", // step.Environment["CI_REPO"],
+				Root:     rc.JobContainer.GetRoot(),
+				TmpDir:   runnerTmp,
+				Script:   "", // "commands-" + step.Name,
+			}); err != nil {
+				return err
+			}
+
 			executors = append(executors,
 				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
 					Name: "workflow/lxc-helpers-lib.sh",
@@ -737,9 +743,28 @@ func (rc *RunContext) IsBareHostEnv(ctx context.Context) bool {
 	return image == "" && strings.EqualFold(platform, "-self-hosted")
 }
 
+const lxcPrefix = "lxc:"
+
 func (rc *RunContext) IsLXCHostEnv(ctx context.Context) bool {
 	platform := rc.runsOnImage(ctx)
-	return strings.HasPrefix(platform, "lxc:")
+	return strings.HasPrefix(platform, lxcPrefix)
+}
+
+func (rc *RunContext) GetLXCInfo(ctx context.Context) (isLXC bool, template, release, config string) {
+	platform := rc.runsOnImage(ctx)
+	if !strings.HasPrefix(platform, lxcPrefix) {
+		return
+	}
+	isLXC = true
+	s := strings.SplitN(strings.TrimPrefix(platform, lxcPrefix), ":", 3)
+	template = s[0]
+	if len(s) > 1 {
+		release = s[1]
+	}
+	if len(s) > 2 {
+		config = s[2]
+	}
+	return
 }
 
 func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
