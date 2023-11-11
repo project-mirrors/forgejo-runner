@@ -3,6 +3,7 @@
 ## 3.2.0
 
 * Support LXC container capabilities via `lxc:lxc://debian:bookworm:k8s` or  `lxc:lxc://debian:bookworm:docker lxc k8s`
+* Update ACT v1.16.0 to resolve a [race condition when bootstraping LXC templates](https://code.forgejo.org/forgejo/act/pulls/23)
 
 ## 3.1.0
 
