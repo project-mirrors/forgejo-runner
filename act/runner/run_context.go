@@ -20,6 +20,7 @@ import (
 	"strings"
 	"text/template"
 
+	docker "github.com/docker/docker/api/types"
 	"github.com/docker/go-connections/nat"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
@@ -97,13 +98,9 @@ func (rc *RunContext) jobContainerName() string {
 }
 
 // networkName return the name of the network which will be created by `act` automatically for job,
-// only create network if using a service container
 func (rc *RunContext) networkName() (string, bool) {
-	if len(rc.Run.Job().Services) > 0 {
+	if len(rc.Run.Job().Services) > 0 || rc.Config.ContainerNetworkMode == "" {
 		return fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID), true
-	}
-	if rc.Config.ContainerNetworkMode == "" {
-		return "host", false
 	}
 	return string(rc.Config.ContainerNetworkMode), false
 }
@@ -571,11 +568,16 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			return errors.New("Failed to create job container")
 		}
 
+		networkConfig := docker.NetworkCreate{
+			Driver:     "bridge",
+			Scope:      "local",
+			EnableIPv6: rc.Config.ContainerNetworkEnableIPv6,
+		}
 		return common.NewPipelineExecutor(
 			rc.pullServicesImages(rc.Config.ForcePull),
 			rc.JobContainer.Pull(rc.Config.ForcePull),
 			rc.stopJobContainer(),
-			container.NewDockerNetworkCreateExecutor(networkName).IfBool(!rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == ""), // if the value of `ContainerNetworkMode` is empty string, then will create a new network for containers.
+			container.NewDockerNetworkCreateExecutor(networkName, &networkConfig).IfBool(!rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == ""), // if the value of `ContainerNetworkMode` is empty string, then will create a new network for containers.
 			rc.startServiceContainers(networkName),
 			rc.JobContainer.Create(rc.Config.ContainerCapAdd, rc.Config.ContainerCapDrop),
 			rc.JobContainer.Start(false),

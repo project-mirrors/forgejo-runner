@@ -9,7 +9,7 @@ import (
 	"github.com/nektos/act/pkg/common"
 )
 
-func NewDockerNetworkCreateExecutor(name string) common.Executor {
+func NewDockerNetworkCreateExecutor(name string, config *types.NetworkCreate) common.Executor {
 	return func(ctx context.Context) error {
 		cli, err := GetDockerClient(ctx)
 		if err != nil {
@@ -30,10 +30,7 @@ func NewDockerNetworkCreateExecutor(name string) common.Executor {
 			}
 		}
 
-		_, err = cli.NetworkCreate(ctx, name, types.NetworkCreate{
-			Driver: "bridge",
-			Scope:  "local",
-		})
+		_, err = cli.NetworkCreate(ctx, name, *config)
 		if err != nil {
 			return err
 		}

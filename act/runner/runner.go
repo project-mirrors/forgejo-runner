@@ -73,6 +73,8 @@ type Config struct {
 	JobLoggerLevel        *log.Level                   // the level of job logger
 	ValidVolumes          []string                     // only volumes (and bind mounts) in this slice can be mounted on the job container or service containers
 	InsecureSkipTLS       bool                         // whether to skip verifying TLS certificate of the Gitea instance
+
+	ContainerNetworkEnableIPv6 bool // create the network with IPv6 support enabled
 }
 
 // GetToken: Adapt to Gitea
@@ -209,7 +211,6 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 					stageExecutor = append(stageExecutor, func(ctx context.Context) error {
 						jobName := fmt.Sprintf("%-*s", maxJobNameLen, rc.String())
 						executor, err := rc.Executor()
-
 						if err != nil {
 							return err
 						}
