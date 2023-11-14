@@ -58,6 +58,7 @@ type executeArgs struct {
 	image                 string
 	cacheHandler          *artifactcache.Handler
 	network               string
+	enableIPv6            bool
 	githubInstance        string
 }
 
@@ -378,36 +379,37 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 
 		// run the plan
 		config := &runner.Config{
-			Workdir:               execArgs.Workdir(),
-			BindWorkdir:           false,
-			ReuseContainers:       false,
-			ForcePull:             execArgs.forcePull,
-			ForceRebuild:          execArgs.forceRebuild,
-			LogOutput:             true,
-			JSONLogger:            execArgs.jsonLogger,
-			Env:                   execArgs.LoadEnvs(),
-			Secrets:               execArgs.LoadSecrets(),
-			InsecureSecrets:       execArgs.insecureSecrets,
-			Privileged:            execArgs.privileged,
-			UsernsMode:            execArgs.usernsMode,
-			ContainerArchitecture: execArgs.containerArchitecture,
-			ContainerDaemonSocket: execArgs.containerDaemonSocket,
-			UseGitIgnore:          execArgs.useGitIgnore,
-			GitHubInstance:        execArgs.githubInstance,
-			ContainerCapAdd:       execArgs.containerCapAdd,
-			ContainerCapDrop:      execArgs.containerCapDrop,
-			ContainerOptions:      execArgs.containerOptions,
-			AutoRemove:            true,
-			ArtifactServerPath:    execArgs.artifactServerPath,
-			ArtifactServerPort:    execArgs.artifactServerPort,
-			ArtifactServerAddr:    execArgs.artifactServerAddr,
-			NoSkipCheckout:        execArgs.noSkipCheckout,
-			// PresetGitHubContext:   preset,
-			// EventJSON:             string(eventJSON),
-			ContainerNamePrefix:   fmt.Sprintf("FORGEJO-ACTIONS-TASK-%s", eventName),
-			ContainerMaxLifetime:  maxLifetime,
-			ContainerNetworkMode:  container.NetworkMode(execArgs.network),
-			DefaultActionInstance: execArgs.defaultActionsURL,
+			Workdir:                    execArgs.Workdir(),
+			BindWorkdir:                false,
+			ReuseContainers:            false,
+			ForcePull:                  execArgs.forcePull,
+			ForceRebuild:               execArgs.forceRebuild,
+			LogOutput:                  true,
+			JSONLogger:                 execArgs.jsonLogger,
+			Env:                        execArgs.LoadEnvs(),
+			Secrets:                    execArgs.LoadSecrets(),
+			InsecureSecrets:            execArgs.insecureSecrets,
+			Privileged:                 execArgs.privileged,
+			UsernsMode:                 execArgs.usernsMode,
+			ContainerArchitecture:      execArgs.containerArchitecture,
+			ContainerDaemonSocket:      execArgs.containerDaemonSocket,
+			UseGitIgnore:               execArgs.useGitIgnore,
+			GitHubInstance:             execArgs.githubInstance,
+			ContainerCapAdd:            execArgs.containerCapAdd,
+			ContainerCapDrop:           execArgs.containerCapDrop,
+			ContainerOptions:           execArgs.containerOptions,
+			AutoRemove:                 true,
+			ArtifactServerPath:         execArgs.artifactServerPath,
+			ArtifactServerPort:         execArgs.artifactServerPort,
+			ArtifactServerAddr:         execArgs.artifactServerAddr,
+			NoSkipCheckout:             execArgs.noSkipCheckout,
+			// PresetGitHubContext:        preset,
+			// EventJSON:                  string(eventJSON),
+			ContainerNamePrefix:        fmt.Sprintf("FORGEJO-ACTIONS-TASK-%s", eventName),
+			ContainerMaxLifetime:       maxLifetime,
+			ContainerNetworkMode:       container.NetworkMode(execArgs.network),
+			ContainerNetworkEnableIPv6: execArgs.enableIPv6,
+			DefaultActionInstance:      execArgs.defaultActionsURL,
 			PlatformPicker: func(_ []string) string {
 				return execArgs.image
 			},
@@ -486,6 +488,7 @@ func loadExecCmd(ctx context.Context) *cobra.Command {
 	execCmd.PersistentFlags().BoolVarP(&execArg.dryrun, "dryrun", "n", false, "dryrun mode")
 	execCmd.PersistentFlags().StringVarP(&execArg.image, "image", "i", "node:16-bullseye", "docker image to use")
 	execCmd.PersistentFlags().StringVarP(&execArg.network, "network", "", "", "Specify the network to which the container will connect")
+	execCmd.PersistentFlags().BoolVarP(&execArg.enableIPv6, "enable-ipv6", "6", false, "Create network with IPv6 enabled.")
 	execCmd.PersistentFlags().StringVarP(&execArg.githubInstance, "gitea-instance", "", "", "Gitea instance to use.")
 
 	return execCmd
