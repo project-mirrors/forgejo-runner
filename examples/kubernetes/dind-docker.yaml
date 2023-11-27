@@ -1,4 +1,5 @@
 # Secret data.
+# You will need to retrive this from the web UI, and your Forgejo instance must be running v1.21+
 # Alternatively, create this with
 # kubectl create secret generic runner-secret --from-literal=token=your_offline_token_here
 apiVersion: v1
@@ -36,20 +37,24 @@ spec:
       # Initialise our configuration file using offline registration
       # https://forgejo.org/docs/v1.21/admin/actions/#offline-registration
       initContainers:
-      - name: runner-config-generation
-        image: code.forgejo.org/forgejo/runner:3.0.0
-        command: [ "forgejo-runner create-runner-file --instance $FORGEJO_INSTANCE_URL --secret $RUNNER_SECRET --connect" ]
-        env:
-        - name: RUNNER_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: runner-secret
-              key: token
-        - name: FORGEJO_INSTANCE_URL
-          value: http://gitea-http.gitea.svc.cluster.local:3000
-        volumeMounts:
-        - name: runner-data
-          mountPath: /data
+        - name: runner-register
+          image: code.forgejo.org/forgejo/runner:3.2.0
+          command: ["forgejo-runner", "register", "--no-interactive", "--token", $(RUNNER_SECRET), "--name", "runner", "--instance", $(FORGEJO_INSTANCE_URL)]
+          env:
+            - name: RUNNER_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: forgejo-runner-secret
+                  key: token
+            - name: FORGEJO_INSTANCE_URL
+              value: http://forgejo-http.forgejo.svc.cluster.local:3000
+          resources:
+            limits:
+              cpu: "0.50"
+              memory: "64Mi"
+          volumeMounts:
+            - name: runner-data
+              mountPath: /data
       containers:
       - name: runner
         image: code.forgejo.org/forgejo/runner:3.0.0
