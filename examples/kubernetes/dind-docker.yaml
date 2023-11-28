@@ -39,8 +39,12 @@ spec:
       initContainers:
         - name: runner-register
           image: code.forgejo.org/forgejo/runner:3.2.0
-          command: ["forgejo-runner", "register", "--no-interactive", "--token", $(RUNNER_SECRET), "--name", "runner", "--instance", $(FORGEJO_INSTANCE_URL)]
+          command: ["forgejo-runner", "register", "--no-interactive", "--token", $(RUNNER_SECRET), "--name", $(RUNNER_NAME), "--instance", $(FORGEJO_INSTANCE_URL)]
           env:
+            - name: RUNNER_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: RUNNER_SECRET
               valueFrom:
                 secretKeyRef:
