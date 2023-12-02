@@ -1,0 +1,11 @@
+---
+on: push
+jobs:
+  ipv6:
+    runs-on: docker
+    container:
+      image: debian:bookworm
+    steps:
+      - run: |
+          apt update -qq ; apt --quiet install -qq --yes iputils-ping
+          ping -c 1 -6 ::1
