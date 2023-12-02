@@ -1,5 +1,11 @@
 # Release Notes
 
+## 3.3.0
+
+* Support IPv6 with addresses from a private range and NAT for
+    docker:// with --enable-ipv6 and [container].enable_ipv6
+    lxc:// always
+
 ## 3.2.0
 
 * Support LXC container capabilities via `lxc:lxc://debian:bookworm:k8s` or  `lxc:lxc://debian:bookworm:docker lxc k8s`
