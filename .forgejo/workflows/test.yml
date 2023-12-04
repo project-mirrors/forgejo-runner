@@ -15,14 +15,14 @@ env:
   GOPROXY: https://goproxy.io,direct
 
 jobs:
-  tests:
-    name: check and test
+  build-and-tests:
+    name: build and test
     if: github.repository_owner != 'forgejo-integration' && github.repository_owner != 'forgejo-experimental' && github.repository_owner != 'forgejo-release'
     runs-on: docker
 
     services:
       forgejo:
-        image: codeberg.org/forgejo/forgejo:1.20.4-1
+        image: codeberg.org/forgejo/forgejo:1.21
         env:
           FORGEJO__security__INSTALL_LOCK: "true"
           FORGEJO__log__LEVEL: "debug"
@@ -40,17 +40,69 @@ jobs:
         with:
           go-version: '1.21'
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - run: make vet
 
       - run: make build
 
+      - uses: https://code.forgejo.org/actions/upload-artifact@v3
+        with:
+          name: forgejo-runner
+          path: forgejo-runner
+
       - name: check the forgejo server is responding
         run: |
-          set -x
           apt-get update -qq
           apt-get install -y -qq jq curl
           test $FORGEJO_ADMIN_USER = $(curl -sS http://$FORGEJO_ADMIN_USER:$FORGEJO_ADMIN_PASSWORD@$FORGEJO_HOST_PORT/api/v1/user | jq --raw-output .login)
 
       - run: make FORGEJO_URL=http://$FORGEJO_HOST_PORT test
+
+  runner-exec-tests:
+    needs: [build-and-tests]
+    name: runner exec tests
+    if: github.repository_owner != 'forgejo-integration' && github.repository_owner != 'forgejo-experimental' && github.repository_owner != 'forgejo-release'
+    runs-on: self-hosted
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      - uses: https://code.forgejo.org/actions/download-artifact@v3
+        with:
+          name: forgejo-runner
+
+      - name: install docker
+        run: |
+          mkdir /etc/docker
+          cat > /etc/docker/daemon.json  <<EOF
+          {
+            "ipv6": true,
+            "experimental": true,
+            "ip6tables": true,
+            "fixed-cidr-v6": "fd05:d0ca:1::/64",
+            "default-address-pools": [
+              {
+                "base": "172.19.0.0/16",
+                "size": 24
+              },
+              {
+                "base": "fd05:d0ca:2::/104",
+                "size": 112
+              }
+            ]
+          }
+          EOF
+          apt --quiet install --yes -qq docker.io
+
+      - name: forgejo-runner exec --enable-ipv6
+        run: |
+          set -x
+          chmod +x forgejo-runner
+          ./forgejo-runner exec --enable-ipv6 --workflows .forgejo/testdata/ipv6.yml
+          if ./forgejo-runner exec --workflows .forgejo/testdata/ipv6.yml >& /tmp/out ; then
+             cat /tmp/out
+             echo "IPv6 not enabled, should fail"
+             exit 1
+          fi
