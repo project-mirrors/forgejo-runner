@@ -24,19 +24,18 @@ services:
     command: [ "dockerd", "-H", "tcp://0.0.0.0:2375", "--tls=false" ]
 
   forgejo:
-    image: codeberg.org/forgejo/forgejo:1.20.4-1
+    image: codeberg.org/forgejo/forgejo:1.21
     command: >-
       bash -c '
       /bin/s6-svscan /etc/s6 &
       sleep 10 ;
-      su -c "forgejo forgejo-cli actions register --secret {SHARED_SECRET} --labels docker --version 3.0.1" git ;
+      su -c "forgejo forgejo-cli actions register --secret {SHARED_SECRET} --labels docker --version 3.3.0" git ;
       su -c "forgejo admin user create --admin --username root --password {ROOT_PASSWORD} --email root@example.com" git ;
       sleep infinity
       '
     environment:
       FORGEJO__security__INSTALL_LOCK: "true"
       FORGEJO__log__LEVEL: "debug"
-      FORGEJO__actions__ENABLED: "true"
       FORGEJO__repository__ENABLE_PUSH_CREATE_USER: "true"
       FORGEJO__repository__DEFAULT_PUSH_CREATE_PRIVATE: "false"
       FORGEJO__repository__DEFAULT_REPO_UNITS: "repo.code,repo.actions"
@@ -46,7 +45,7 @@ services:
       - 8080:3000
 
   runner-register:
-    image: code.forgejo.org/forgejo/runner:3.0.1
+    image: code.forgejo.org/forgejo/runner:3.3.0
     links:
       - docker-in-docker
       - forgejo
@@ -58,7 +57,7 @@ services:
     command: >-
       bash -ec '
       while : ; do
-        forgejo-runner create-runner-file --instance http://forgejo:3000 --name runner --secret {SHARED_SECRET} && break ;
+        forgejo-runner create-runner-file --connect --instance http://forgejo:3000 --name runner --secret {SHARED_SECRET} && break ;
         sleep 1 ;
       done ;
       forgejo-runner generate-config > config.yml ;
@@ -68,7 +67,7 @@ services:
       '
 
   runner-daemon:
-    image: code.forgejo.org/forgejo/runner:3.0.1
+    image: code.forgejo.org/forgejo/runner:3.3.0
     links:
       - docker-in-docker
       - forgejo
