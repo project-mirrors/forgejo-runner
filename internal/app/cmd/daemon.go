@@ -45,6 +45,8 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 			return fmt.Errorf("failed to load registration file: %w", err)
 		}
 
+		cfg.Tune(reg.Address)
+
 		lbls := reg.Labels
 		if len(cfg.Runner.Labels) > 0 {
 			lbls = cfg.Runner.Labels
