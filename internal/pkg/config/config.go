@@ -68,6 +68,16 @@ type Config struct {
 	Host      Host      `yaml:"host"`      // Host represents the configuration for the host.
 }
 
+// Tune the config settings accordingly to the Forgejo instance that will be used.
+func (c *Config) Tune(instanceURL string) {
+	if instanceURL == "https://codeberg.org" {
+		if c.Runner.FetchInterval < 30*time.Second {
+			log.Info("The runner is configured to be used by a public instance, fetch interval is set to 30 seconds.")
+			c.Runner.FetchInterval = 30 * time.Second
+		}
+	}
+}
+
 // LoadDefault returns the default configuration.
 // If file is not empty, it will be used to load the configuration.
 func LoadDefault(file string) (*Config, error) {
