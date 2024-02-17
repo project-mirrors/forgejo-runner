@@ -14,6 +14,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/adrg/xdg"
 	"github.com/andreaskoch/go-fswatch"
+	docker_container "github.com/docker/docker/api/types/container"
 	"github.com/joho/godotenv"
 	gitignore "github.com/sabhiram/go-gitignore"
 	log "github.com/sirupsen/logrus"
@@ -96,6 +97,9 @@ func Execute(ctx context.Context, version string) {
 	rootCmd.PersistentFlags().StringVarP(&input.cacheServerAddr, "cache-server-addr", "", common.GetOutboundIP().String(), "Defines the address to which the cache server binds.")
 	rootCmd.PersistentFlags().Uint16VarP(&input.cacheServerPort, "cache-server-port", "", 0, "Defines the port where the artifact server listens. 0 means a randomly available port.")
 	rootCmd.PersistentFlags().StringVarP(&input.actionCachePath, "action-cache-path", "", filepath.Join(CacheHomeDir, "act"), "Defines the path where the actions get cached and host workspaces created.")
+	rootCmd.PersistentFlags().BoolVarP(&input.actionOfflineMode, "action-offline-mode", "", false, "If action contents exists, it will not be fetch and pull again. If turn on this,will turn off force pull")
+	rootCmd.PersistentFlags().StringVarP(&input.networkName, "network", "", "host", "Sets a docker network name. Defaults to host.")
+	rootCmd.PersistentFlags().BoolVarP(&input.useNewActionCache, "use-new-action-cache", "", false, "Enable using the new Action Cache for storing Actions locally")
 	rootCmd.SetArgs(args())
 
 	if err := rootCmd.Execute(); err != nil {
@@ -103,23 +107,22 @@ func Execute(ctx context.Context, version string) {
 	}
 }
 
+// Return locations where Act's config can be found in order: XDG spec, .actrc in HOME directory, .actrc in invocation directory
 func configLocations() []string {
 	configFileName := ".actrc"
 
-	// reference: https://specifications.freedesktop.org/basedir-spec/latest/ar01s03.html
-	var actrcXdg string
-	for _, fileName := range []string{"act/actrc", configFileName} {
-		if foundConfig, err := xdg.SearchConfigFile(fileName); foundConfig != "" && err == nil {
-			actrcXdg = foundConfig
-			break
-		}
+	homePath := filepath.Join(UserHomeDir, configFileName)
+	invocationPath := filepath.Join(".", configFileName)
+
+	// Though named xdg, adrg's lib support macOS and Windows config paths as well
+	// It also takes cares of creating the parent folder so we don't need to bother later
+	specPath, err := xdg.ConfigFile("act/actrc")
+	if err != nil {
+		specPath = homePath
 	}
 
-	return []string{
-		filepath.Join(UserHomeDir, configFileName),
-		actrcXdg,
-		filepath.Join(".", configFileName),
-	}
+	// This order should be enforced since the survey part relies on it
+	return []string{specPath, homePath, invocationPath}
 }
 
 var commonSocketPaths = []string{
@@ -265,7 +268,8 @@ func readArgsFile(file string, split bool) []string {
 	}()
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		arg := strings.TrimSpace(scanner.Text())
+		arg := os.ExpandEnv(strings.TrimSpace(scanner.Text()))
+
 		if strings.HasPrefix(arg, "-") && split {
 			args = append(args, regexp.MustCompile(`\s`).Split(arg, 2)...)
 		} else if !split {
@@ -291,19 +295,17 @@ func cleanup(inputs *Input) func(*cobra.Command, []string) {
 	}
 }
 
-func parseEnvs(env []string, envs map[string]string) bool {
-	if env != nil {
-		for _, envVar := range env {
-			e := strings.SplitN(envVar, `=`, 2)
-			if len(e) == 2 {
-				envs[e[0]] = e[1]
-			} else {
-				envs[e[0]] = ""
-			}
+func parseEnvs(env []string) map[string]string {
+	envs := make(map[string]string, len(env))
+	for _, envVar := range env {
+		e := strings.SplitN(envVar, `=`, 2)
+		if len(e) == 2 {
+			envs[e[0]] = e[1]
+		} else {
+			envs[e[0]] = ""
 		}
-		return true
 	}
-	return false
+	return envs
 }
 
 func readYamlFile(file string) (map[string]string, error) {
@@ -409,13 +411,11 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 		}
 
 		log.Debugf("Loading environment from %s", input.Envfile())
-		envs := make(map[string]string)
-		_ = parseEnvs(input.envs, envs)
+		envs := parseEnvs(input.envs)
 		_ = readEnvs(input.Envfile(), envs)
 
 		log.Debugf("Loading action inputs from %s", input.Inputfile())
-		inputs := make(map[string]string)
-		_ = parseEnvs(input.inputs, inputs)
+		inputs := parseEnvs(input.inputs)
 		_ = readEnvs(input.Inputfile(), inputs)
 
 		log.Debugf("Loading secrets from %s", input.Secretfile())
@@ -552,6 +552,7 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 				}
 			}
 			if !cfgFound && len(cfgLocations) > 0 {
+				// The first config location refers to the global config folder one
 				if err := defaultImageSurvey(cfgLocations[0]); err != nil {
 					log.Fatal(err)
 				}
@@ -578,11 +579,12 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 			EventName:                          eventName,
 			EventPath:                          input.EventPath(),
 			DefaultBranch:                      defaultbranch,
-			ForcePull:                          input.forcePull,
+			ForcePull:                          !input.actionOfflineMode && input.forcePull,
 			ForceRebuild:                       input.forceRebuild,
 			ReuseContainers:                    input.reuseContainers,
 			Workdir:                            input.Workdir(),
 			ActionCacheDir:                     input.actionCachePath,
+			ActionOfflineMode:                  input.actionOfflineMode,
 			BindWorkdir:                        input.bindWorkdir,
 			LogOutput:                          !input.noOutput,
 			JSONLogger:                         input.jsonLogger,
@@ -612,6 +614,12 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 			ReplaceGheActionWithGithubCom:      input.replaceGheActionWithGithubCom,
 			ReplaceGheActionTokenWithGithubCom: input.replaceGheActionTokenWithGithubCom,
 			Matrix:                             matrixes,
+			ContainerNetworkMode:               docker_container.NetworkMode(input.networkName),
+		}
+		if input.useNewActionCache {
+			config.ActionCache = &runner.GoGitActionCache{
+				Path: config.ActionCacheDir,
+			}
 		}
 		r, err := runner.New(config)
 		if err != nil {
