@@ -431,7 +431,12 @@ func findCache(db *bolthold.Store, repo string, keys []string, version string) (
 				return nil, fmt.Errorf("find cache: %w", err)
 			}
 			return cache, nil
+		} else if cache.Complete {
+			return cache, nil
 		}
+	}
+
+	for _, prefix := range keys {
 		prefixPattern := fmt.Sprintf("^%s", regexp.QuoteMeta(prefix))
 		re, err := regexp.Compile(prefixPattern)
 		if err != nil {
