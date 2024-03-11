@@ -1,5 +1,19 @@
 # Release Notes
 
+## 3.4.0
+
+* Upgrade ACT v1.20.0 which brings:
+  * `[container].options` from the config file is exposed in containers created by the workflows
+  * the expressions in the value of `jobs.<job-id>.runs-on` are evaluated
+  * fix a bug causing the evaluated expression of `jobs.<job-id>.runs-on` to fail if it was an array
+  * mount `act-toolcache:/opt/hostedtoolcache` instead of `act-toolcache:/toolcache`
+  * a few improvements to the readability of the error messages displayed in the logs
+  * `amd64` can be used instead of `x86_64` and `arm64` intead of `aarch64` when specifying the architecture
+  * fixed YAML parsing bugs preventing dispatch workflows to be parsed correctly
+  * add support for `runs-on.labels` which is equivalent to `runs-on` followed by a list of labels
+  * the expressions in the service `ports` and `volumes` values are evaluated
+  * network aliases are only supported when the network is user specified, not when it is provided by the runner
+
 ## 3.3.0
 
 * Support IPv6 with addresses from a private range and NAT for
