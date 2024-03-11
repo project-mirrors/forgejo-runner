@@ -81,6 +81,7 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 	// set artifact gitea api
 	artifactGiteaAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
 	envs["ACTIONS_RUNTIME_URL"] = artifactGiteaAPI
+	envs["ACTIONS_RESULTS_URL"] = strings.TrimSuffix(cli.Address(), "/")
 
 	// Set specific environments to distinguish between Gitea and GitHub
 	envs["GITEA_ACTIONS"] = "true"
@@ -169,8 +170,12 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		preset.Token = t
 	}
 
-	// use task token to action api token
-	r.envs["ACTIONS_RUNTIME_TOKEN"] = preset.Token
+	giteaRuntimeToken := taskContext["gitea_runtime_token"].GetStringValue()
+	if giteaRuntimeToken == "" {
+		// use task token to action api token for previous Gitea Server Versions
+		giteaRuntimeToken = preset.Token
+	}
+	r.envs["ACTIONS_RUNTIME_TOKEN"] = giteaRuntimeToken
 
 	eventJSON, err := json.Marshal(preset.Event)
 	if err != nil {
@@ -212,6 +217,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		PlatformPicker:             r.labels.PickPlatform,
 		Vars:                       task.Vars,
 		ValidVolumes:               r.cfg.Container.ValidVolumes,
+		InsecureSkipTLS:            r.cfg.Runner.Insecure,
 	}
 
 	rr, err := runner.New(runnerConfig)

@@ -13,6 +13,8 @@
   * add support for `runs-on.labels` which is equivalent to `runs-on` followed by a list of labels
   * the expressions in the service `ports` and `volumes` values are evaluated
   * network aliases are only supported when the network is user specified, not when it is provided by the runner
+* Fix compatibility issue with actions/{upload,download}-artifact@v4
+* If `[runner].insecure` is true in the configuration, insecure cloning actions is allowed
 
 ## 3.3.0
 
