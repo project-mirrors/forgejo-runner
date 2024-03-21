@@ -9,6 +9,7 @@ Although this version is able to run [actions/upload-artifact@v4](https://code.f
 
 and they can be used as shown in [an example from the end-to-end test suite](https://code.forgejo.org/forgejo/end-to-end/src/branch/main/actions/example-artifacts-v4/.forgejo/workflows/test.yml).
 
+* When running against codeberg.org, the default poll frequency is 30s instead of 2s.
 * Fix compatibility issue with actions/{upload,download}-artifact@v4.
 * Upgrade ACT v1.20.0 which brings:
   * `[container].options` from the config file is exposed in containers created by the workflows
