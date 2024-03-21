@@ -2,6 +2,14 @@
 
 ## 3.4.0
 
+Although this version is able to run [actions/upload-artifact@v4](https://code.forgejo.org/actions/upload-artifact/src/tag/v4) and [actions/download-artifact@v4](https://code.forgejo.org/actions/download-artifact/src/tag/v4), these actions will fail because it does not run against GitHub.com. A fork of those two actions with this check disabled is made available at:
+
+* https://code.forgejo.org/forgejo/upload-artifact/src/tag/v4
+* https://code.forgejo.org/forgejo/download-artifact/src/tag/v4
+
+and they can be used as shown in [an example from the end-to-end test suite](https://code.forgejo.org/forgejo/end-to-end/src/branch/main/actions/example-artifacts-v4/.forgejo/workflows/test.yml).
+
+* Fix compatibility issue with actions/{upload,download}-artifact@v4.
 * Upgrade ACT v1.20.0 which brings:
   * `[container].options` from the config file is exposed in containers created by the workflows
   * the expressions in the value of `jobs.<job-id>.runs-on` are evaluated
@@ -13,7 +21,6 @@
   * add support for `runs-on.labels` which is equivalent to `runs-on` followed by a list of labels
   * the expressions in the service `ports` and `volumes` values are evaluated
   * network aliases are only supported when the network is user specified, not when it is provided by the runner
-* Fix compatibility issue with actions/{upload,download}-artifact@v4
 * If `[runner].insecure` is true in the configuration, insecure cloning actions is allowed
 
 ## 3.3.0
