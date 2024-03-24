@@ -535,13 +535,6 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			return nil
 		}
 
-		jobContainerNetwork := rc.Config.ContainerNetworkMode.NetworkName()
-		if rc.containerImage(ctx) != "" {
-			jobContainerNetwork = networkName
-		} else if jobContainerNetwork == "" {
-			jobContainerNetwork = "host"
-		}
-
 		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
 			Cmd:            nil,
 			Entrypoint:     []string{"tail", "-f", "/dev/null"},
@@ -552,7 +545,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			Name:           name,
 			Env:            envList,
 			Mounts:         mounts,
-			NetworkMode:    jobContainerNetwork,
+			NetworkMode:    networkName,
 			NetworkAliases: []string{rc.Name},
 			Binds:          binds,
 			Stdout:         logWriter,
