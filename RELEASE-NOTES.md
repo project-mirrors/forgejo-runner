@@ -1,5 +1,11 @@
 # Release Notes
 
+## 3.4.1
+
+* Fixes a regression introduced in 3.4.0 by which a job with no image explicitly set would
+  [be bound to the host](https://code.forgejo.org/forgejo/runner/issues/165)
+  network instead of a custom network (empty string in the configuration file).
+
 ## 3.4.0
 
 Although this version is able to run [actions/upload-artifact@v4](https://code.forgejo.org/actions/upload-artifact/src/tag/v4) and [actions/download-artifact@v4](https://code.forgejo.org/actions/download-artifact/src/tag/v4), these actions will fail because it does not run against GitHub.com. A fork of those two actions with this check disabled is made available at:
