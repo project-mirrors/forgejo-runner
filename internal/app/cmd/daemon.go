@@ -64,6 +64,7 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 		if len(ls) == 0 {
 			log.Warn("no labels configured, runner may not be able to pick up jobs")
 		}
+		reg.Labels = ls.ToStrings()
 
 		if ls.RequireDocker() {
 			dockerSocketPath, err := getDockerSocketPath(cfg.Container.DockerHost)
