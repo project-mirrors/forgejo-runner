@@ -34,11 +34,18 @@ jobs:
           cd examples/docker-compose
           secret=$(openssl rand -hex 20)
           sed -i -e "s/{SHARED_SECRET}/$secret/" compose-forgejo-and-runner.yml
-          cli="docker compose --progress quiet -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml"
+          cli="docker compose --progress quiet -f compose-forgejo-and-runner.yml"
           #
-          # Launch
+          # Launch Forgejo & the runner
           #
           $cli up -d
+          for delay in $(seq 60) ; do test -f /srv/runner-data/.runner && break ; sleep 30 ; done
+          test -f /srv/runner-data/.runner
+          #
+          # Run the demo workflow
+          #
+          cli="$cli -f compose-demo-workflow.yml"
+          $cli up -d demo-workflow
           #
           # Wait for the demo workflow to complete
           #
@@ -49,13 +56,14 @@ jobs:
             grep --quiet "$success" /tmp/out && break
             grep --quiet "$failure" /tmp/out && break
             $cli ps --all
-            tail /tmp/out
-            sleep 10
+            $cli logs --tail=20 runner-daemon demo-workflow
+            sleep 30
           done
-          tail /tmp/out
           grep --quiet "$success" /tmp/out
+          $cli logs runner-daemon > /tmp/runner.log
+          grep --quiet 'Start image=node:20-bookworm' /tmp/runner.log
 
-      - name: docker compose logs
+      - name: full docker compose logs
         if: always()
         run: |
           cd examples/docker-compose

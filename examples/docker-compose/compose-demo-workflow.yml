@@ -1,15 +1,12 @@
-# Copyright 2023 The Forgejo Authors.
+# Copyright 2024 The Forgejo Authors.
 # SPDX-License-Identifier: MIT
 
 services:
 
   demo-workflow:
-    image: alpine:3.18
+    image: alpine:3.19
     links:
       - forgejo
-    depends_on:
-      runner-register:
-        condition: service_completed_successfully
     command: >-
       sh -ec '
       apk add --quiet git curl jq ;
