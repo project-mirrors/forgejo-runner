@@ -13,9 +13,18 @@ rm -fr /srv/runner-data /srv/forgejo-data
 secret=$(openssl rand -hex 20)
 sed -i -e "s/{SHARED_SECRET}/$secret/" compose-forgejo-and-runner.yml
 docker compose -f compose-forgejo-and-runner.yml up -d
-docker compose -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml up demo-workflow
-firefox http://0.0.0.0:8080/root/test/actions/runs/1 # login root, password {ROOT_PASSWORD}
 ```
+
+Visit http://0.0.0.0:8080/admin/actions/runners with login `root` and password `{ROOT_PASSWORD}` and see the runner is registered with the label `docker`.
+
+> NOTE: the `Your ROOT_URL in app.ini is "http://localhost:3000/", it's unlikely matching the site you are visiting.` message is a warning that can be ignored in the context of this example.
+
+```sh
+docker compose -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml up demo-workflow
+```
+
+Visit http://0.0.0.0:8080/root/test/actions/runs/1 and see that the job ran.
+
 
 ### Running
 
@@ -34,7 +43,7 @@ Replace {ROOT_PASSWORD} with a secure password in
 [compose-forgejo-and-runner.yml](compose-forgejo-and-runner.yml).
 
 ```sh
-docker-compose -f compose-forgejo-and-runner.yml up
+docker compose -f compose-forgejo-and-runner.yml up
 Creating docker-compose_docker-in-docker_1 ... done
 Creating docker-compose_forgejo_1          ... done
 Creating docker-compose_runner-register_1  ... done
@@ -51,8 +60,8 @@ runner-daemon_1     | time="2023-08-24T10:22:16Z" level=info msg="Starting runne
 To login the Forgejo instance:
 
 * URL: http://0.0.0.0:8080
-* user: root
-* password: {ROOT_PASSWORD}
+* user: `root`
+* password: `{ROOT_PASSWORD}`
 
 `Forgejo Actions` is enabled by default when creating a repository.
 
