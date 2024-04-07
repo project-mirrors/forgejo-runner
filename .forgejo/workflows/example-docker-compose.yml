@@ -34,11 +34,18 @@ jobs:
           cd examples/docker-compose
           secret=$(openssl rand -hex 20)
           sed -i -e "s/{SHARED_SECRET}/$secret/" compose-forgejo-and-runner.yml
-          cli="docker compose --progress quiet -f compose-forgejo-and-runner.yml -f compose-demo-workflow.yml"
+          cli="docker compose --progress quiet -f compose-forgejo-and-runner.yml"
           #
-          # Launch
+          # Launch Forgejo & the runner
           #
           $cli up -d
+          for delay in $(seq 60) ; do test -f /srv/runner-data/.runner && break ; sleep 30 ; done
+          test -f /srv/runner-data/.runner
+          #
+          # Run the demo workflow
+          #
+          cli="$cli -f compose-demo-workflow.yml"
+          $cli up -d demo-workflow
           #
           # Wait for the demo workflow to complete
           #
