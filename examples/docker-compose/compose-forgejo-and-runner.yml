@@ -84,10 +84,10 @@ services:
       DOCKER_HOST: tcp://docker:2376
       DOCKER_CERT_PATH: /certs/client
       DOCKER_TLS_VERIFY: "1"
-    depends_on:
-      runner-register:
-        condition: service_completed_successfully
     volumes:
       - /srv/runner-data:/data
       - docker_certs:/certs
-    command: "forgejo-runner --config config.yml daemon"
+    command: >-
+      bash -c '
+      while : ; do test -w .runner && forgejo-runner --config config.yml daemon ; sleep 1 ; done
+      '
