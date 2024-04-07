@@ -56,13 +56,12 @@ jobs:
             grep --quiet "$success" /tmp/out && break
             grep --quiet "$failure" /tmp/out && break
             $cli ps --all
-            tail /tmp/out
-            sleep 10
+            $cli logs --tail=20 runner-daemon demo-workflow
+            sleep 30
           done
-          tail /tmp/out
           grep --quiet "$success" /tmp/out
 
-      - name: docker compose logs
+      - name: full docker compose logs
         if: always()
         run: |
           cd examples/docker-compose
