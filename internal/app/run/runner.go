@@ -242,3 +242,7 @@ func (r *Runner) Declare(ctx context.Context, labels []string) (*connect.Respons
 		Labels:  labels,
 	}))
 }
+
+func (r *Runner) Update(ctx context.Context, labels labels.Labels) {
+	r.labels = labels
+}
