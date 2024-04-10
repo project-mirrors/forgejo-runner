@@ -111,6 +111,7 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 			log.Infof("runner: %s, with version: %s, with labels: %v, declared successfully",
 				resp.Msg.Runner.Name, resp.Msg.Runner.Version, resp.Msg.Runner.Labels)
 			// if declared successfully, override the labels in the.runner file with valid labels in the config file (if specified)
+			runner.Update(ctx, ls)
 			reg.Labels = ls.ToStrings()
 			if err := config.SaveRegistration(cfg.Runner.File, reg); err != nil {
 				return fmt.Errorf("failed to save runner config: %w", err)
