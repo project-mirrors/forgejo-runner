@@ -13,13 +13,13 @@ func TestLabelUpdate(t *testing.T) {
 	ls := labels.Labels{}
 
 	initialLabel, err := labels.Parse("testlabel:docker://alpine")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	ls = append(ls, initialLabel)
 
 	newLs := labels.Labels{}
 
 	newLabel, err := labels.Parse("next label:host")
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	newLs = append(newLs, initialLabel)
 	newLs = append(newLs, newLabel)
 
@@ -34,5 +34,4 @@ func TestLabelUpdate(t *testing.T) {
 
 	assert.Contains(t, runner.labels, initialLabel)
 	assert.Contains(t, runner.labels, newLabel)
-
 }
