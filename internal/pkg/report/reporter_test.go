@@ -96,8 +96,8 @@ func TestReporter_parseLogRow(t *testing.T) {
 				"::endgroup::",
 			},
 			[]string{
-				"::group::",
-				"::endgroup::",
+				"##[group]",
+				"##[endgroup]",
 			},
 		},
 		{
