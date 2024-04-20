@@ -392,12 +392,13 @@ func (r *Reporter) handleCommand(originalContent, command, parameters, value str
 		// Not implemented yet, so just return the original content.
 		return &originalContent
 	case "group":
-		// Returning the original content, because I think the frontend
-		// will use it when rendering the output.
-		return &originalContent
+		// Rewriting into ##[] syntax which the frontend understands
+		content := "##[group]" + value
+		return &content
 	case "endgroup":
 		// Ditto
-		return &originalContent
+		content := "##[endgroup]"
+		return &content
 	case "stop-commands":
 		r.stopCommandEndToken = value
 		return nil
