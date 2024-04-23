@@ -5,6 +5,7 @@
 * [Fix label declaration](https://code.forgejo.org/forgejo/runner/pulls/176): Runner in daemon mode now takes labels found in config.yml into account when declaration was successful.
 * [Fix the docker compose example](https://code.forgejo.org/forgejo/runner/pulls/175) to workaround the race on labels.
 * [Fix the kubernetes dind example](https://code.forgejo.org/forgejo/runner/pulls/169).
+* [Rewrite ::group:: and ::endgroup:: commands like github](https://code.forgejo.org/forgejo/runner/pulls/183).
 
 ## 3.4.1
 
