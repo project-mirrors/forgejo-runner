@@ -1,7 +1,13 @@
 name: Integration tests for the release process
 
-on: 
+on:
   push:
+    paths:
+      - go.mod
+      - Dockerfile
+      - .forgejo/workflows/build-release.yml
+      - .forgejo/workflows/build-release-integration.yml
+  pull_request:
     paths:
       - go.mod
       - Dockerfile

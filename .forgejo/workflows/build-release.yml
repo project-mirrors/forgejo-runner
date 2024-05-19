@@ -35,8 +35,7 @@ jobs:
       - name: Sanitize the name of the repository
         id: repository
         run: |
-          repository="${{ github.repository }}"
-          echo "value=${repository##*/}" >> "$GITHUB_OUTPUT"
+          echo "value=${GITHUB_REPOSITORY##*/}" >> "$GITHUB_OUTPUT"
 
       - name: create test TOKEN
         id: token
@@ -55,8 +54,7 @@ jobs:
       - name: version from ref_name
         id: tag-version
         run: |
-          version="${{ github.ref_name }}"
-          version=${version##*v}
+          version=${GITHUB_REF_NAME##*v}
           echo "value=$version" >> "$GITHUB_OUTPUT"
 
       - name: release notes
@@ -72,13 +70,14 @@ jobs:
 
       - name: build without TOKEN
         if: ${{ secrets.TOKEN == '' }}
-        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/build@v1
+        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/build@v5
         with:
           forgejo: "${{ env.GITHUB_SERVER_URL }}"
           owner: "${{ env.GITHUB_REPOSITORY_OWNER }}"
           repository: "${{ steps.repository.outputs.value }}"
           doer: root
-          tag-version: "${{ steps.tag-version.outputs.value }}"
+          sha: "${{ github.sha }}"
+          release-version: "${{ steps.tag-version.outputs.value }}"
           token: ${{ steps.token.outputs.value }}
           platforms: linux/amd64,linux/arm64
           release-notes: "${{ steps.release-notes.outputs.value }}"
@@ -88,13 +87,14 @@ jobs:
 
       - name: build with TOKEN
         if: ${{ secrets.TOKEN != '' }}
-        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/build@v1
+        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/build@v5
         with:
           forgejo: "${{ env.GITHUB_SERVER_URL }}"
           owner: "${{ env.GITHUB_REPOSITORY_OWNER }}"
           repository: "${{ steps.repository.outputs.value }}"
           doer: "${{ secrets.DOER }}"
-          tag-version: "${{ steps.tag-version.outputs.value }}"
+          sha: "${{ github.sha }}"
+          release-version: "${{ steps.tag-version.outputs.value }}"
           token: "${{ secrets.TOKEN }}"
           platforms: linux/amd64,linux/arm64
           release-notes: "${{ steps.release-notes.outputs.value }}"
