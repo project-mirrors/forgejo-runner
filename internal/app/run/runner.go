@@ -187,6 +187,13 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		maxLifetime = time.Until(deadline)
 	}
 
+	var inputs map[string]string
+	if preset.EventName == "workflow_dispatch" {
+		if inputsRaw, ok := preset.Event["inputs"]; ok {
+			inputs, _ = inputsRaw.(map[string]string)
+		}
+	}
+
 	runnerConfig := &runner.Config{
 		// On Linux, Workdir will be like "/<parent_directory>/<owner>/<repo>"
 		// On Windows, Workdir will be like "\<parent_directory>\<owner>\<repo>"
@@ -218,6 +225,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		Vars:                       task.Vars,
 		ValidVolumes:               r.cfg.Container.ValidVolumes,
 		InsecureSkipTLS:            r.cfg.Runner.Insecure,
+		Inputs:                     inputs,
 	}
 
 	rr, err := runner.New(runnerConfig)
