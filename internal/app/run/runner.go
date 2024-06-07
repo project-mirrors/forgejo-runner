@@ -41,6 +41,10 @@ type Runner struct {
 	runningTasks sync.Map
 }
 
+type RunnerInterface interface {
+	Run(ctx context.Context, task *runnerv1.Task) error
+}
+
 func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) *Runner {
 	ls := labels.Labels{}
 	for _, v := range reg.Labels {

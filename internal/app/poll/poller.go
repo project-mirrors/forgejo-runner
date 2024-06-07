@@ -20,49 +20,100 @@ import (
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 )
 
-type Poller struct {
+const PollerID = "PollerID"
+
+type Poller interface {
+	Poll()
+	Shutdown(ctx context.Context) error
+}
+
+type poller struct {
 	client       client.Client
-	runner       *run.Runner
+	runner       run.RunnerInterface
 	cfg          *config.Config
 	tasksVersion atomic.Int64 // tasksVersion used to store the version of the last task fetched from the Gitea.
+
+	pollingCtx      context.Context
+	shutdownPolling context.CancelFunc
+
+	jobsCtx      context.Context
+	shutdownJobs context.CancelFunc
+
+	done chan any
 }
 
-func New(cfg *config.Config, client client.Client, runner *run.Runner) *Poller {
-	return &Poller{
-		client: client,
-		runner: runner,
-		cfg:    cfg,
-	}
+func New(cfg *config.Config, client client.Client, runner run.RunnerInterface) Poller {
+	return (&poller{}).init(cfg, client, runner)
 }
 
-func (p *Poller) Poll(ctx context.Context) {
+func (p *poller) init(cfg *config.Config, client client.Client, runner run.RunnerInterface) Poller {
+	pollingCtx, shutdownPolling := context.WithCancel(context.Background())
+
+	jobsCtx, shutdownJobs := context.WithCancel(context.Background())
+
+	done := make(chan any)
+
+	p.client = client
+	p.runner = runner
+	p.cfg = cfg
+
+	p.pollingCtx = pollingCtx
+	p.shutdownPolling = shutdownPolling
+
+	p.jobsCtx = jobsCtx
+	p.shutdownJobs = shutdownJobs
+	p.done = done
+
+	return p
+}
+
+func (p *poller) Poll() {
 	limiter := rate.NewLimiter(rate.Every(p.cfg.Runner.FetchInterval), 1)
 	wg := &sync.WaitGroup{}
 	for i := 0; i < p.cfg.Runner.Capacity; i++ {
 		wg.Add(1)
-		go p.poll(ctx, wg, limiter)
+		go p.poll(i, wg, limiter)
 	}
 	wg.Wait()
+
+	// signal the poller is finished
+	close(p.done)
 }
 
-func (p *Poller) poll(ctx context.Context, wg *sync.WaitGroup, limiter *rate.Limiter) {
+func (p *poller) Shutdown(ctx context.Context) error {
+	p.shutdownPolling()
+
+	select {
+	case <-p.done:
+		log.Trace("all jobs are complete")
+		return nil
+
+	case <-ctx.Done():
+		log.Trace("forcing the jobs to shutdown")
+		p.shutdownJobs()
+		<-p.done
+		log.Trace("all jobs have been shutdown")
+		return ctx.Err()
+	}
+}
+
+func (p *poller) poll(id int, wg *sync.WaitGroup, limiter *rate.Limiter) {
+	log.Infof("[poller %d] launched", id)
 	defer wg.Done()
 	for {
-		if err := limiter.Wait(ctx); err != nil {
-			if ctx.Err() != nil {
-				log.WithError(err).Debug("limiter wait failed")
-			}
+		if err := limiter.Wait(p.pollingCtx); err != nil {
+			log.Infof("[poller %d] shutdown", id)
 			return
 		}
-		task, ok := p.fetchTask(ctx)
+		task, ok := p.fetchTask(p.pollingCtx)
 		if !ok {
 			continue
 		}
-		p.runTaskWithRecover(ctx, task)
+		p.runTaskWithRecover(p.jobsCtx, task)
 	}
 }
 
-func (p *Poller) runTaskWithRecover(ctx context.Context, task *runnerv1.Task) {
+func (p *poller) runTaskWithRecover(ctx context.Context, task *runnerv1.Task) {
 	defer func() {
 		if r := recover(); r != nil {
 			err := fmt.Errorf("panic: %v", r)
@@ -75,7 +126,7 @@ func (p *Poller) runTaskWithRecover(ctx context.Context, task *runnerv1.Task) {
 	}
 }
 
-func (p *Poller) fetchTask(ctx context.Context) (*runnerv1.Task, bool) {
+func (p *poller) fetchTask(ctx context.Context) (*runnerv1.Task, bool) {
 	reqCtx, cancel := context.WithTimeout(ctx, p.cfg.Runner.FetchTimeout)
 	defer cancel()
 
@@ -85,10 +136,15 @@ func (p *Poller) fetchTask(ctx context.Context) (*runnerv1.Task, bool) {
 		TasksVersion: v,
 	}))
 	if errors.Is(err, context.DeadlineExceeded) {
+		log.Trace("deadline exceeded")
 		err = nil
 	}
 	if err != nil {
-		log.WithError(err).Error("failed to fetch task")
+		if errors.Is(err, context.Canceled) {
+			log.WithError(err).Debugf("shutdown, fetch task canceled")
+		} else {
+			log.WithError(err).Error("failed to fetch task")
+		}
 		return nil, false
 	}
 
