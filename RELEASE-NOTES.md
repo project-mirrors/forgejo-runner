@@ -7,6 +7,7 @@
 * [Fix the kubernetes dind example](https://code.forgejo.org/forgejo/runner/pulls/169).
 * [Rewrite ::group:: and ::endgroup:: commands like github](https://code.forgejo.org/forgejo/runner/pulls/183).
 * [Added opencontainers labels to the image](https://code.forgejo.org/forgejo/runner/pulls/195)
+* [Upgrade the default container to node:20](https://code.forgejo.org/forgejo/runner/pulls/203)
 
 ## 3.4.1
 

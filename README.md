@@ -63,7 +63,7 @@ The user is `root` with password `admin1234`. The runner is registered with:
 ```
 cd setup-forgejo
 docker exec --user 1000 forgejo forgejo actions generate-runner-token > forgejo-runner-token
-../runner/forgejo-runner register --no-interactive --instance "$(cat forgejo-url)" --name runner --token $(cat forgejo-runner-token) --labels docker:docker://node:16-bullseye,self-hosted:host://-self-hosted,lxc:lxc://debian:bullseye
+../runner/forgejo-runner register --no-interactive --instance "$(cat forgejo-url)" --name runner --token $(cat forgejo-runner-token) --labels docker:docker://node:20-bullseye,self-hosted:host://-self-hosted,lxc:lxc://debian:bullseye
 ```
 
 And launched with:
