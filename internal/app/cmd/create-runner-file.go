@@ -38,7 +38,7 @@ func createRunnerFileCmd(ctx context.Context, configFile *string) *cobra.Command
 	cmd.Flags().BoolVar(&argsVar.Connect, "connect", false, "tries to connect to the instance using the secret (Forgejo v1.21 instance or greater)")
 	cmd.Flags().StringVar(&argsVar.InstanceAddr, "instance", "", "Forgejo instance address")
 	cmd.MarkFlagRequired("instance")
-	cmd.Flags().StringVar(&argsVar.Secret, "secret", "", "secret shared with the Frogejo instance via forgejo-cli actions register")
+	cmd.Flags().StringVar(&argsVar.Secret, "secret", "", "secret shared with the Forgejo instance via forgejo-cli actions register")
 	cmd.MarkFlagRequired("secret")
 	cmd.Flags().StringVar(&argsVar.Name, "name", "", "Runner name")
 
