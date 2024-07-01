@@ -18,6 +18,11 @@ func TestParse(t *testing.T) {
 		wantErr bool
 	}{
 		{
+			name:    "multiple_named_matrix",
+			options: nil,
+			wantErr: false,
+		},
+		{
 			name:    "multiple_jobs",
 			options: nil,
 			wantErr: false,

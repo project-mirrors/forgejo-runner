@@ -48,12 +48,15 @@ func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
 		}
 		for _, matrix := range matricxes {
 			job := job.Clone()
-			if job.Name == "" {
-				job.Name = id
-			}
-			job.Name = nameWithMatrix(job.Name, matrix)
-			job.Strategy.RawMatrix = encodeMatrix(matrix)
 			evaluator := NewExpressionEvaluator(NewInterpeter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars))
+			if job.Name == "" {
+				job.Name = nameWithMatrix(id, matrix)
+			} else {
+				job.Name = evaluator.Interpolate(job.Name)
+			}
+
+			job.Strategy.RawMatrix = encodeMatrix(matrix)
+
 			runsOn := origin.GetJob(id).RunsOn()
 			for i, v := range runsOn {
 				runsOn[i] = evaluator.Interpolate(v)
