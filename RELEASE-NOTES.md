@@ -1,5 +1,9 @@
 # Release Notes
 
+## 3.5.1
+
+* [Add report_interval option to config](https://code.forgejo.org/forgejo/runner/pulls/220) to allow setting the interval of status and log reports
+
 ## 3.5.0
 
 * [Allow graceful shutdowns](https://code.forgejo.org/forgejo/runner/pulls/202): when receiving a signal (INT or TERM) wait for running jobs to complete (up to shutdown_timeout).

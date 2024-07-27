@@ -7,6 +7,7 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
 	connect_go "github.com/bufbuild/connect-go"
@@ -173,7 +174,7 @@ func TestReporter_Fire(t *testing.T) {
 		require.NoError(t, err)
 		reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
 			Context: taskCtx,
-		})
+		}, time.Second)
 		defer func() {
 			assert.NoError(t, reporter.Close(""))
 		}()
