@@ -35,6 +35,8 @@ runner:
   fetch_timeout: 5s
   # The interval for fetching the job from the Forgejo instance.
   fetch_interval: 2s
+  # The interval for reporting the job status and logs to the Forgejo instance.
+  report_interval: 1s
   # The labels of a runner are used to determine which jobs the runner can run, and how to run them.
   # Like: ["macos-arm64:host", "ubuntu-latest:docker://node:20-bookworm", "ubuntu-22.04:docker://node:20-bookworm"]
   # If it's empty when registering, it will ask for inputting labels.

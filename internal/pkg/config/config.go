@@ -30,6 +30,7 @@ type Runner struct {
 	Insecure        bool              `yaml:"insecure"`         // Insecure indicates whether the runner operates in an insecure mode.
 	FetchTimeout    time.Duration     `yaml:"fetch_timeout"`    // FetchTimeout specifies the timeout duration for fetching resources.
 	FetchInterval   time.Duration     `yaml:"fetch_interval"`   // FetchInterval specifies the interval duration for fetching resources.
+	ReportInterval  time.Duration     `yaml:"report_interval"`  // ReportInterval specifies the interval duration for reporting status and logs of a running job.
 	Labels          []string          `yaml:"labels"`           // Labels specify the labels of the runner. Labels are declared on each startup
 }
 
@@ -143,6 +144,9 @@ func LoadDefault(file string) (*Config, error) {
 	}
 	if cfg.Runner.FetchInterval <= 0 {
 		cfg.Runner.FetchInterval = 2 * time.Second
+	}
+	if cfg.Runner.ReportInterval <= 0 {
+		cfg.Runner.ReportInterval = time.Second
 	}
 
 	// although `container.network_mode` will be deprecated, but we have to be compatible with it for now.

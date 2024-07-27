@@ -29,10 +29,11 @@ type Reporter struct {
 	client  client.Client
 	clientM sync.Mutex
 
-	logOffset   int
-	logRows     []*runnerv1.LogRow
-	logReplacer *strings.Replacer
-	oldnew      []string
+	logOffset      int
+	logRows        []*runnerv1.LogRow
+	logReplacer    *strings.Replacer
+	oldnew         []string
+	reportInterval time.Duration
 
 	state   *runnerv1.TaskState
 	stateMu sync.RWMutex
@@ -42,7 +43,7 @@ type Reporter struct {
 	stopCommandEndToken string
 }
 
-func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *runnerv1.Task) *Reporter {
+func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *runnerv1.Task, reportInterval time.Duration) *Reporter {
 	var oldnew []string
 	if v := task.Context.Fields["token"].GetStringValue(); v != "" {
 		oldnew = append(oldnew, v, "***")
@@ -55,11 +56,12 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.C
 	}
 
 	rv := &Reporter{
-		ctx:         ctx,
-		cancel:      cancel,
-		client:      client,
-		oldnew:      oldnew,
-		logReplacer: strings.NewReplacer(oldnew...),
+		ctx:            ctx,
+		cancel:         cancel,
+		client:         client,
+		oldnew:         oldnew,
+		reportInterval: reportInterval,
+		logReplacer:    strings.NewReplacer(oldnew...),
 		state: &runnerv1.TaskState{
 			Id: task.Id,
 		},
@@ -180,7 +182,7 @@ func (r *Reporter) RunDaemon() {
 	_ = r.ReportLog(false)
 	_ = r.ReportState()
 
-	time.AfterFunc(time.Second, r.RunDaemon)
+	time.AfterFunc(r.reportInterval, r.RunDaemon)
 }
 
 func (r *Reporter) Logf(format string, a ...interface{}) {
