@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
+	"connectrpc.com/connect"
 	"gitea.com/gitea/act_runner/internal/pkg/client"
 	"gitea.com/gitea/act_runner/internal/pkg/config"
 	"gitea.com/gitea/act_runner/internal/pkg/ver"
-	"github.com/bufbuild/connect-go"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"

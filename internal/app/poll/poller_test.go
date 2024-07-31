@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 
 	"code.gitea.io/actions-proto-go/ping/v1/pingv1connect"
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"

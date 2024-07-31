@@ -9,7 +9,7 @@ import (
 	"os"
 
 	pingv1 "code.gitea.io/actions-proto-go/ping/v1"
-	"github.com/bufbuild/connect-go"
+	"connectrpc.com/connect"
 	gouuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"

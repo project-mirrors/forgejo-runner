@@ -10,7 +10,7 @@ import (
 	"time"
 
 	runnerv1 "code.gitea.io/actions-proto-go/runner/v1"
-	connect_go "github.com/bufbuild/connect-go"
+	connect_go "connectrpc.com/connect"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
