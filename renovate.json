@@ -1,3 +1,17 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json"
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":approveMajorUpdates",
+    ":maintainLockFilesWeekly",
+    "group:linters",
+    "schedule:daily",
+    "schedule:automergeDaily",
+    "local>forgejo-contrib/forgejo-renovate//go.json"
+  ],
+  "ignorePresets": [
+    ":semanticPrefixFixDepsChoreOthers",
+    "docker:pinDigests",
+    "helpers:pinGitHubActionDigests"
+  ]
 }
