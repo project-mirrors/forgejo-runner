@@ -13,5 +13,13 @@
     ":semanticPrefixFixDepsChoreOthers",
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
-  ]
+  ],
+  "semanticCommits": "disabled",
+  "automergeStrategy": "merge-commit",
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "internalChecksFilter": "strict",
+  "osvVulnerabilityAlerts": true
 }
