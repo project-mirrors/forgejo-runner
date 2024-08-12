@@ -13,5 +13,25 @@
     ":semanticPrefixFixDepsChoreOthers",
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
+  ],
+  "semanticCommits": "disabled",
+  "automergeStrategy": "merge-commit",
+  "postUpdateOptions": [
+    "gomodTidy",
+    "gomodUpdateImportPaths"
+  ],
+  "internalChecksFilter": "strict",
+  "osvVulnerabilityAlerts": true,
+  "packageRules": [
+    {
+      "description": "Disable actions/cascading-pr for now <https://github.com/renovatebot/renovate/issues/28120>",
+      "matchDepNames": [
+        "actions/cascading-pr"
+      ],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "enabled": false
+    }
   ]
 }
