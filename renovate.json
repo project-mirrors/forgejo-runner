@@ -14,6 +14,7 @@
     "docker:pinDigests",
     "helpers:pinGitHubActionDigests"
   ],
+  "reviewers": ["earl-warren"],
   "semanticCommits": "disabled",
   "automergeStrategy": "merge-commit",
   "postUpdateOptions": [
