@@ -4,7 +4,7 @@ jobs:
   ipv6:
     runs-on: docker
     container:
-      image: debian:bookworm
+      image: code.forgejo.org/oci/debian:bookworm
     steps:
       - run: |
           apt update -qq ; apt --quiet install -qq --yes iputils-ping
