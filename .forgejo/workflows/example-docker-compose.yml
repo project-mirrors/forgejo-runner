@@ -61,7 +61,7 @@ jobs:
           done
           grep --quiet "$success" /tmp/out
           $cli logs runner-daemon > /tmp/runner.log
-          grep --quiet 'Start image=node:20-bookworm' /tmp/runner.log
+          grep --quiet 'Start image=code.forgejo.org/oci/node:20-bookworm' /tmp/runner.log
 
       - name: full docker compose logs
         if: always()
