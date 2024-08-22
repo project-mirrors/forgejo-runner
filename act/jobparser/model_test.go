@@ -186,6 +186,14 @@ func TestParseRawOn(t *testing.T) {
 				},
 			},
 		},
+		{
+			input: "on:\n  workflow_dispatch:\n    inputs:\n      test:\n        type: string",
+			result: []*Event{
+				{
+					Name: "workflow_dispatch",
+				},
+			},
+		},
 	}
 	for _, kase := range kases {
 		t.Run(kase.input, func(t *testing.T) {

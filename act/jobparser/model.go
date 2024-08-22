@@ -259,6 +259,11 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 								return nil, fmt.Errorf("unknown on type: %#v", branches)
 							}
 						}
+					case map[string]interface{}:
+						if k != "workflow_dispatch" || act != "inputs" {
+							return nil, fmt.Errorf("unknown on type: %#v", v)
+						}
+						acts = nil
 					default:
 						return nil, fmt.Errorf("unknown on type: %#v", branches)
 					}
