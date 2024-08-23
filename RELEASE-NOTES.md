@@ -2,6 +2,7 @@
 
 ## 3.5.1
 
+* Fix [CVE-2024-24557](https://nvd.nist.gov/vuln/detail/CVE-2024-24557)
 * [Add report_interval option to config](https://code.forgejo.org/forgejo/runner/pulls/220) to allow setting the interval of status and log reports
 
 ## 3.5.0
