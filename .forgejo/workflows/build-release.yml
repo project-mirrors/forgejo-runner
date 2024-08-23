@@ -5,8 +5,8 @@
 #  Build the runner binaries and OCI images
 #
 #  ROLE: forgejo-integration
-#  DOER: release-team
-#  TOKEN: <generated from codeberg.org/release-team>
+#  DOER: forgejo-ci
+#  TOKEN: <generated from https://code.forgejo.org/forgejo-ci>
 #
 name: Build release
 
