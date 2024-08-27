@@ -1,4 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>forgejo/renovate-config"]
+  "extends": ["local>forgejo/renovate-config"],
+  "packageRules": [
+    {
+      "description": "Disable nektos/act, it's replaced",
+      "matchDepNames": ["github.com/nektos/act"],
+      "enabled": false
+    }
+  ]
 }
