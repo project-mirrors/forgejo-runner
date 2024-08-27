@@ -13,7 +13,7 @@
 #  GPG_PRIVATE_KEY: <XYZ>
 #  GPG_PASSPHRASE: <ABC>
 #
-name: pubish
+name: publish
 
 on:
   push:
