@@ -1,5 +1,9 @@
 # Release Notes
 
+## 3.5.2
+
+* Fix [crash in some cases when the YAML structure is not as expected](https://code.forgejo.org/forgejo/runner/issues/267).
+
 ## 3.5.1
 
 * Fix [CVE-2024-24557](https://nvd.nist.gov/vuln/detail/CVE-2024-24557)
