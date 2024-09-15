@@ -153,6 +153,25 @@ jobs:
 	assert.Contains(t, workflow.On(), "pull_request")
 }
 
+func TestReadWorkflow_DecodeNodeError(t *testing.T) {
+	yaml := `
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo
+        env:
+          foo: {{ a }}
+`
+
+	workflow, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.NoError(t, err, "read workflow should succeed")
+	assert.Nil(t, workflow.GetJob("test").Steps[0].GetEnv())
+}
+
 func TestReadWorkflow_RunsOnLabels(t *testing.T) {
 	yaml := `
 name: local-action-docker-url
