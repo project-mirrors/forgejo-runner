@@ -749,7 +749,7 @@ func (w *Workflow) GetJobIDs() []string {
 }
 
 var OnDecodeNodeError = func(node yaml.Node, out interface{}, err error) {
-	log.Fatalf("Failed to decode node %v into %T: %v", node, out, err)
+	log.Errorf("Failed to decode node %v into %T: %v", node, out, err)
 }
 
 func decodeNode(node yaml.Node, out interface{}) bool {
