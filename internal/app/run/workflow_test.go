@@ -19,7 +19,7 @@ func Test_generateWorkflow(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		assert  func(t *testing.T, wf *model.Workflow)
+		assert  func(t *testing.T, wf *model.Workflow, err error)
 		want1   string
 		wantErr bool
 	}{
@@ -56,19 +56,41 @@ jobs:
 					},
 				},
 			},
-			assert: func(t *testing.T, wf *model.Workflow) {
+			assert: func(t *testing.T, wf *model.Workflow, err error) {
 				assert.DeepEqual(t, wf.GetJob("job9").Needs(), []string{"job1", "job2"})
 			},
 			want1:   "job9",
 			wantErr: false,
 		},
+		{
+			name: "valid YAML syntax in top level env but wrong value type",
+			args: args{
+				task: &runnerv1.Task{
+					WorkflowPayload: []byte(`
+on: push
+
+env:
+  value: {{ }}
+`),
+				},
+			},
+			assert: func(t *testing.T, wf *model.Workflow, err error) {
+				require.Nil(t, wf)
+				assert.ErrorContains(t, err, "cannot unmarshal")
+			},
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, got1, err := generateWorkflow(tt.args.task)
-			require.NoError(t, err)
-			tt.assert(t, got)
-			assert.Equal(t, got1, tt.want1)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, got1, tt.want1)
+			}
+			tt.assert(t, got, err)
 		})
 	}
 }
