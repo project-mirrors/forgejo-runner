@@ -22,7 +22,6 @@ func NewDockerNetworkCreateExecutor(name string, config *types.NetworkCreate) co
 		if err != nil {
 			return err
 		}
-		common.Logger(ctx).Debugf("%v", networks)
 		for _, network := range networks {
 			if network.Name == name {
 				common.Logger(ctx).Debugf("Network %v exists", name)
