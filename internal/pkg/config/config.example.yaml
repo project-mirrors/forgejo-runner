@@ -6,6 +6,8 @@
 log:
   # The level of logging, can be trace, debug, info, warn, error, fatal
   level: info
+  # The level of logging for jobs, can be trace, debug, info, earn, error, fatal
+  job_level: info
 
 runner:
   # Where to store the registration result.
