@@ -1,6 +1,9 @@
 package cacheproxy
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,9 +38,10 @@ type Handler struct {
 	cacheServerPort uint16
 
 	repositoryName string
+	cacheKey       string
 }
 
-func StartHandler(repoName string, targetHost string, targetPort uint16, outboundIP string, port uint16, logger logrus.FieldLogger) (*Handler, error) {
+func StartHandler(repoName string, targetHost string, targetPort uint16, outboundIP string, port uint16, cacheKey string, logger logrus.FieldLogger) (*Handler, error) {
 	h := &Handler{}
 
 	if logger == nil {
@@ -49,6 +53,7 @@ func StartHandler(repoName string, targetHost string, targetPort uint16, outboun
 	h.logger = logger
 
 	h.repositoryName = repoName
+	h.cacheKey = h.cacheKey
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -117,6 +122,13 @@ func (h *Handler) Close() error {
 		h.listener = nil
 	}
 	return retErr
+}
+
+func (h *Handler) calculateMAC() string {
+	mac := hmac.New(sha256.New, []byte(h.cacheKey))
+	mac.Write([]byte(h.repositoryName))
+	macBytes := mac.Sum(nil)
+	return hex.EncodeToString(macBytes)
 }
 
 // GET /_apis/artifactcache/cache
