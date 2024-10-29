@@ -1,7 +1,9 @@
 # Release Notes
 
-## 3.5.2
+## 4.0.0
 
+* Breaking change: fix the default configuration for `docker_host` is changed to [not mounting the docker server socket](https://code.forgejo.org/forgejo/runner/pulls/305).
+* [Remove debug information from the setup of a workflow](https://code.forgejo.org/forgejo/runner/pulls/297).
 * Fix [crash in some cases when the YAML structure is not as expected](https://code.forgejo.org/forgejo/runner/issues/267).
 
 ## 3.5.1
