@@ -1,5 +1,9 @@
 # Release Notes
 
+## 4.0.1
+
+* Do not panic when [the number of arguments of a function evaluated in an expression is incorect](https://code.forgejo.org/forgejo/act/pulls/59/files).
+
 ## 4.0.0
 
 * Breaking change: fix the default configuration for `docker_host` is changed to [not mounting the docker server socket](https://code.forgejo.org/forgejo/runner/pulls/305).
