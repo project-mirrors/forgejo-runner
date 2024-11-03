@@ -16,7 +16,8 @@ import (
 
 // Log represents the configuration for logging.
 type Log struct {
-	Level string `yaml:"level"` // Level indicates the logging level.
+	Level    string `yaml:"level"`     // Level indicates the logging level.
+	JobLevel string `yaml:"job_level"` // JobLevel indicates the job logging level.
 }
 
 // Runner represents the configuration for the runner.
@@ -112,6 +113,9 @@ func LoadDefault(file string) (*Config, error) {
 
 	if cfg.Log.Level == "" {
 		cfg.Log.Level = "info"
+	}
+	if cfg.Log.JobLevel == "" {
+		cfg.Log.JobLevel = "info"
 	}
 	if cfg.Runner.File == "" {
 		cfg.Runner.File = ".runner"

@@ -35,3 +35,10 @@ func TestConfigTune(t *testing.T) {
 		assert.EqualValues(t, 2*time.Second, c.Runner.FetchInterval)
 	})
 }
+
+func TestDefaultSettings(t *testing.T) {
+	config, err := LoadDefault("")
+	assert.NoError(t, err)
+
+	assert.EqualValues(t, config.Log.JobLevel, "info")
+}

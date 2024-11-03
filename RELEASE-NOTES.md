@@ -1,5 +1,9 @@
 # Release Notes
 
+## 4.1.0
+
+* [Add job_level logging option to config](https://code.forgejo.org/forgejo/runner/pulls/299) to make the logging level of jobs configurable. Change default from "trace" to "info".
+
 ## 4.0.1
 
 * Do not panic when [the number of arguments of a function evaluated in an expression is incorect](https://code.forgejo.org/forgejo/act/pulls/59/files).

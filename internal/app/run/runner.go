@@ -232,6 +232,15 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		Inputs:                     inputs,
 	}
 
+	if r.cfg.Log.JobLevel != "" {
+		level, err := log.ParseLevel(r.cfg.Log.JobLevel)
+		if err != nil {
+			return err
+		}
+
+		runnerConfig.JobLoggerLevel = &level
+	}
+
 	rr, err := runner.New(runnerConfig)
 	if err != nil {
 		return err
