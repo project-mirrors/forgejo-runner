@@ -71,9 +71,12 @@ func StartHandler(repoName string, targetHost string, outboundIP string, port ui
 	}
 
 	router := httprouter.New()
-	router.HandlerFunc("GET", urlBase, proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", urlBase, proxyRequestHandler(proxy))
-	router.HandlerFunc("PATCH", urlBase, proxyRequestHandler(proxy))
+	router.HandlerFunc("GET", urlBase+"/cache", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", urlBase+"/caches", proxyRequestHandler(proxy))
+	router.HandlerFunc("PATCH", urlBase+"/caches/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", urlBase+"/caches/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("GET", urlBase+"/artifacts/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", urlBase+"/clean", proxyRequestHandler(proxy))
 
 	h.router = router
 
@@ -108,8 +111,13 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 		return nil, err
 	}
 
-	proxy := httputil.NewSingleHostReverseProxy(url)
-	proxy.Rewrite = func(r *httputil.ProxyRequest) { h.injectAuth(r) }
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(url)
+			r.Out.Host = r.In.Host // if desired
+			h.injectAuth(r)
+		},
+	}
 	return proxy, nil
 }
 
