@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["local>forgejo/renovate-config"],
+  "prConcurrentLimit": 1,
   "packageRules": [
     {
       "description": "Disable nektos/act, it's replaced",
