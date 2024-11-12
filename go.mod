@@ -1,6 +1,6 @@
 module gitea.com/gitea/act_runner
 
-go 1.21.13
+go 1.22.9
 
 toolchain go1.23.3
 
