@@ -54,8 +54,8 @@ jobs:
       - name: check the forgejo server is responding
         run: |
           apt-get update -qq
-          apt-get install -y -qq jq curl
-          test $FORGEJO_ADMIN_USER = $(curl -sS http://$FORGEJO_ADMIN_USER:$FORGEJO_ADMIN_PASSWORD@$FORGEJO_HOST_PORT/api/v1/user | jq --raw-output .login)
+          apt-get install -y -qq jq curl retry
+          retry --delay=1 --times=60 bash -c 'test $FORGEJO_ADMIN_USER = $(curl -sS http://$FORGEJO_ADMIN_USER:$FORGEJO_ADMIN_PASSWORD@$FORGEJO_HOST_PORT/api/v1/user | jq --raw-output .login)'
 
       - run: make FORGEJO_URL=http://$FORGEJO_HOST_PORT test
 
