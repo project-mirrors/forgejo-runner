@@ -24,7 +24,7 @@ jobs:
     runs-on: self-hosted
     if: secrets.DOER != '' && secrets.FORGEJO != '' && secrets.TO_OWNER != '' && secrets.FROM_OWNER != '' && secrets.TOKEN != ''
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: copy & sign
         uses: https://code.forgejo.org/forgejo/forgejo-build-publish/publish@v1
