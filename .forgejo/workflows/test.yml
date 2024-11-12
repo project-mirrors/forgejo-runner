@@ -11,7 +11,7 @@ env:
   FORGEJO_ADMIN_PASSWORD: 'admin1234'
   FORGEJO_RUNNER_SECRET: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
   FORGEJO_SCRIPT: |
-    /bin/s6-svscan /etc/s6 & sleep 10 ; su -c "forgejo admin user create --admin --username $FORGEJO_ADMIN_USER --password $FORGEJO_ADMIN_PASSWORD --email root@example.com" git && su -c "forgejo forgejo-cli actions register --labels docker --name therunner --secret $FORGEJO_RUNNER_SECRET" git && sleep infinity  
+    /bin/s6-svscan /etc/s6 & sleep 10 ; su -c "forgejo admin user create --admin --username $FORGEJO_ADMIN_USER --password $FORGEJO_ADMIN_PASSWORD --email root@example.com" git && su -c "forgejo forgejo-cli actions register --labels docker --name therunner --secret $FORGEJO_RUNNER_SECRET" git && sleep infinity
   GOPROXY: https://goproxy.io,direct
 
 jobs:
@@ -36,11 +36,11 @@ jobs:
           - ${{ env.FORGEJO_SCRIPT }}
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21'
-
-      - uses: actions/checkout@v4
+          go-version-file: go.mod
 
       - run: make vet
 
