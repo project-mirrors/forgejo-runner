@@ -153,6 +153,10 @@ func LoadDefault(file string) (*Config, error) {
 		cfg.Runner.ReportInterval = time.Second
 	}
 
+	if cfg.Container.DockerHost == "" {
+		cfg.Container.DockerHost = "-"
+	}
+
 	// although `container.network_mode` will be deprecated, but we have to be compatible with it for now.
 	if cfg.Container.NetworkMode != "" && cfg.Container.Network == "" {
 		log.Warn("You are trying to use deprecated configuration item of `container.network_mode`, please use `container.network` instead.")
