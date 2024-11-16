@@ -30,14 +30,17 @@ jobs:
       - name: copy & sign
         uses: https://code.forgejo.org/forgejo/forgejo-build-publish/publish@v5
         with:
-          forgejo: ${{ secrets.FORGEJO }}
+          from-forgejo: ${{ secrets.FORGEJO }}
+          to-forgejo: ${{ secrets.FORGEJO }}
           from-owner: ${{ secrets.FROM_OWNER }}
           to-owner: ${{ secrets.TO_OWNER }}
           repo: "runner"
           ref-name: ${{ github.ref_name }}
+          sha: ${{ github.sha }}
           container-suffixes: " "
-          doer: ${{ secrets.DOER }}
-          token: ${{ secrets.TOKEN }}
+          from-token: ${{ secrets.TOKEN }}
+          to-doer: ${{ secrets.DOER }}
+          to-token: ${{ secrets.TOKEN }}
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
           verbose: ${{ secrets.VERBOSE }}
