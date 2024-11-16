@@ -22,7 +22,7 @@ jobs:
 
     services:
       forgejo:
-        image: codeberg.org/forgejo/forgejo:1.21
+        image: codeberg.org/forgejo/forgejo:9
         env:
           FORGEJO__security__INSTALL_LOCK: "true"
           FORGEJO__log__LEVEL: "debug"
@@ -55,7 +55,9 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq jq curl retry
-          retry --delay=1 --times=60 bash -c 'test $FORGEJO_ADMIN_USER = $(curl -sS http://$FORGEJO_ADMIN_USER:$FORGEJO_ADMIN_PASSWORD@$FORGEJO_HOST_PORT/api/v1/user | jq --raw-output .login)'
+          sleep 10 # matches the sleep 10 in the bootstrap of the Forgejo instance
+          # in case of a slow machine, give it time to bootstrap
+          retry --delay=10 --times=6 bash -c 'test $FORGEJO_ADMIN_USER = $(curl -sS http://$FORGEJO_ADMIN_USER:$FORGEJO_ADMIN_PASSWORD@$FORGEJO_HOST_PORT/api/v1/user | jq --raw-output .login)'
 
       - run: make FORGEJO_URL=http://$FORGEJO_HOST_PORT test
 
