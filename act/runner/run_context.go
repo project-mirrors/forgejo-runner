@@ -140,8 +140,7 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string) {
 	ext := container.LinuxContainerEnvironmentExtensions{}
 
 	mounts := map[string]string{
-		"act-toolcache": "/opt/hostedtoolcache",
-		name + "-env":   ext.GetActPath(),
+		name + "-env": ext.GetActPath(),
 	}
 
 	if job := rc.Run.Job(); job != nil {
@@ -172,9 +171,7 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string) {
 		mounts[name] = ext.ToContainerPath(rc.Config.Workdir)
 	}
 
-	// For Gitea
 	// add some default binds and mounts to ValidVolumes
-	rc.Config.ValidVolumes = append(rc.Config.ValidVolumes, "act-toolcache")
 	rc.Config.ValidVolumes = append(rc.Config.ValidVolumes, name)
 	rc.Config.ValidVolumes = append(rc.Config.ValidVolumes, name+"-env")
 	// TODO: add a new configuration to control whether the docker daemon can be mounted
