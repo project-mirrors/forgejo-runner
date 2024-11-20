@@ -1,5 +1,9 @@
 # Release Notes
 
+## 5.0.1
+
+* Security: the `/opt/hostedtoolcache` directory is now unique to each job instead of being shared to avoid a risk of corruption. It is still advertised in the `RUNNER_TOOL_CACHE` environment variable. Custom container images can be built to pre-populate this directory with frequently used tools and some actions (such as `setup-go`) will benefit from that.
+
 ## 5.0.0
 
 * Breaking change: the default configuration for `docker_host` is changed to [not mounting the docker server socket](https://code.forgejo.org/forgejo/runner/pulls/305) even when no configuration file is provided.
