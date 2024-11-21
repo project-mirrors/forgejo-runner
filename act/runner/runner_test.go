@@ -187,6 +187,7 @@ func (j *TestJobFileInfo) runTest(ctx context.Context, t *testing.T, cfg *Config
 		GitHubInstance:        "github.com",
 		ContainerArchitecture: cfg.ContainerArchitecture,
 		Matrix:                cfg.Matrix,
+		JobLoggerLevel:        cfg.JobLoggerLevel,
 	}
 
 	runner, err := New(runnerConfig)
@@ -488,6 +489,43 @@ func TestRunDifferentArchitecture(t *testing.T) {
 	}
 
 	tjfi.runTest(context.Background(), t, &Config{ContainerArchitecture: "linux/arm64"})
+}
+
+type runSkippedHook struct {
+	found bool
+}
+
+func (h *runSkippedHook) Levels() []log.Level {
+	return []log.Level{log.InfoLevel}
+}
+
+func (h *runSkippedHook) Fire(entry *log.Entry) error {
+	if v, ok := entry.Data["stepResult"]; ok {
+		h.found = (v == model.StepStatusSkipped)
+	}
+	return nil
+}
+
+func TestRunSkipped(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	tjfi := TestJobFileInfo{
+		workdir:      workdir,
+		workflowPath: "skip",
+		eventName:    "push",
+		errorMessage: "",
+		platforms:    platforms,
+	}
+
+	h := &runSkippedHook{}
+	ctx := common.WithLoggerHook(context.Background(), h)
+
+	jobLoggerLevel := log.InfoLevel
+	tjfi.runTest(ctx, t, &Config{ContainerArchitecture: "linux/arm64", JobLoggerLevel: &jobLoggerLevel})
+
+	assert.True(t, h.found)
 }
 
 type maskJobLoggerFactory struct {
