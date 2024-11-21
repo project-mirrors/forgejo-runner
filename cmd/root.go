@@ -632,7 +632,7 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 		var cacheHandler *artifactcache.Handler
 		if !input.noCacheServer && envs[cacheURLKey] == "" {
 			var err error
-			cacheHandler, err = artifactcache.StartHandler(input.cacheServerPath, input.cacheServerAddr, input.cacheServerPort, common.Logger(ctx))
+			cacheHandler, err = artifactcache.StartHandler(input.cacheServerPath, input.cacheServerAddr, input.cacheServerPort, input.secret, common.Logger(ctx))
 			if err != nil {
 				return err
 			}

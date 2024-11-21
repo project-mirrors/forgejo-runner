@@ -34,6 +34,7 @@ type Handler struct {
 	listener net.Listener
 	server   *http.Server
 	logger   logrus.FieldLogger
+	secret   string
 
 	gcing atomic.Bool
 	gcAt  time.Time
@@ -41,8 +42,10 @@ type Handler struct {
 	outboundIP string
 }
 
-func StartHandler(dir, outboundIP string, port uint16, logger logrus.FieldLogger) (*Handler, error) {
-	h := &Handler{}
+func StartHandler(dir, outboundIP string, port uint16, secret string, logger logrus.FieldLogger) (*Handler, error) {
+	h := &Handler{
+		secret: secret,
+	}
 
 	if logger == nil {
 		discard := logrus.New()
@@ -80,12 +83,12 @@ func StartHandler(dir, outboundIP string, port uint16, logger logrus.FieldLogger
 	}
 
 	router := httprouter.New()
-	router.GET(urlBase+"/cache", h.middleware(h.find))
-	router.POST(urlBase+"/caches", h.middleware(h.reserve))
-	router.PATCH(urlBase+"/caches/:id", h.middleware(h.upload))
-	router.POST(urlBase+"/caches/:id", h.middleware(h.commit))
-	router.GET(urlBase+"/artifacts/:id", h.middleware(h.get))
-	router.POST(urlBase+"/clean", h.middleware(h.clean))
+	router.GET(cachePrefixPath+urlBase+"/cache", h.middleware(h.find))
+	router.POST(cachePrefixPath+urlBase+"/caches", h.middleware(h.reserve))
+	router.PATCH(cachePrefixPath+urlBase+"/caches/:id", h.middleware(h.upload))
+	router.POST(cachePrefixPath+urlBase+"/caches/:id", h.middleware(h.commit))
+	router.GET(cachePrefixPath+urlBase+"/artifacts/:id", h.middleware(h.get))
+	router.POST(cachePrefixPath+urlBase+"/clean", h.middleware(h.clean))
 
 	h.router = router
 
@@ -155,7 +158,13 @@ func (h *Handler) openDB() (*bolthold.Store, error) {
 }
 
 // GET /_apis/artifactcache/cache
-func (h *Handler) find(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) find(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	repo, err := h.validateMac(params)
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+
 	keys := strings.Split(r.URL.Query().Get("keys"), ",")
 	// cache keys are case insensitive
 	for i, key := range keys {
@@ -170,7 +179,7 @@ func (h *Handler) find(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 	}
 	defer db.Close()
 
-	cache, err := findCache(db, keys, version)
+	cache, err := findCache(db, repo, keys, version)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -196,7 +205,13 @@ func (h *Handler) find(w http.ResponseWriter, r *http.Request, _ httprouter.Para
 }
 
 // POST /_apis/artifactcache/caches
-func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	repo, err := h.validateMac(params)
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+
 	api := &Request{}
 	if err := json.NewDecoder(r.Body).Decode(api); err != nil {
 		h.responseJSON(w, r, 400, err)
@@ -216,6 +231,7 @@ func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, _ httprouter.P
 	now := time.Now().Unix()
 	cache.CreatedAt = now
 	cache.UsedAt = now
+	cache.Repo = repo
 	if err := insertCache(db, cache); err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -227,6 +243,12 @@ func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, _ httprouter.P
 
 // PATCH /_apis/artifactcache/caches/:id
 func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	repo, err := h.validateMac(params)
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+
 	id, err := strconv.ParseUint(params.ByName("id"), 10, 64)
 	if err != nil {
 		h.responseJSON(w, r, 400, err)
@@ -249,11 +271,17 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
+	// Should not happen
+	if cache.Repo != repo {
+		h.responseJSON(w, r, 500, ErrValidation)
+		return
+	}
+
 	if cache.Complete {
 		h.responseJSON(w, r, 400, fmt.Errorf("cache %v %q: already complete", cache.ID, cache.Key))
 		return
 	}
-	db.Close()
+	defer db.Close()
 	start, _, err := parseContentRange(r.Header.Get("Content-Range"))
 	if err != nil {
 		h.responseJSON(w, r, 400, err)
@@ -262,12 +290,18 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 	if err := h.storage.Write(cache.ID, start, r.Body); err != nil {
 		h.responseJSON(w, r, 500, err)
 	}
-	h.useCache(id)
+	h.useCache(db, cache)
 	h.responseJSON(w, r, 200)
 }
 
 // POST /_apis/artifactcache/caches/:id
 func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	repo, err := h.validateMac(params)
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+
 	id, err := strconv.ParseUint(params.ByName("id"), 10, 64)
 	if err != nil {
 		h.responseJSON(w, r, 400, err)
@@ -287,6 +321,12 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 			return
 		}
 		h.responseJSON(w, r, 500, err)
+		return
+	}
+
+	// Should not happen
+	if cache.Repo != repo {
+		h.responseJSON(w, r, 500, ErrValidation)
 		return
 	}
 
@@ -323,17 +363,51 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 
 // GET /_apis/artifactcache/artifacts/:id
 func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	repo, err := h.validateMac(params)
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+
 	id, err := strconv.ParseUint(params.ByName("id"), 10, 64)
 	if err != nil {
 		h.responseJSON(w, r, 400, err)
 		return
 	}
-	h.useCache(id)
+
+	cache := &Cache{}
+	db, err := h.openDB()
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+	defer db.Close()
+	if err := db.Get(id, cache); err != nil {
+		if errors.Is(err, bolthold.ErrNotFound) {
+			h.responseJSON(w, r, 400, fmt.Errorf("cache %d: not reserved", id))
+			return
+		}
+		h.responseJSON(w, r, 500, err)
+		return
+	}
+
+	// Should not happen
+	if cache.Repo != repo {
+		h.responseJSON(w, r, 500, ErrValidation)
+		return
+	}
+
+	h.useCache(db, cache)
 	h.storage.Serve(w, r, id)
 }
 
 // POST /_apis/artifactcache/clean
-func (h *Handler) clean(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (h *Handler) clean(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	_, err := h.validateMac(params)
+	if err != nil {
+		h.responseJSON(w, r, 500, err)
+		return
+	}
 	// TODO: don't support force deleting cache entries
 	// see: https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows#force-deleting-cache-entries
 
@@ -349,12 +423,13 @@ func (h *Handler) middleware(handler httprouter.Handle) httprouter.Handle {
 }
 
 // if not found, return (nil, nil) instead of an error.
-func findCache(db *bolthold.Store, keys []string, version string) (*Cache, error) {
+func findCache(db *bolthold.Store, repo string, keys []string, version string) (*Cache, error) {
 	cache := &Cache{}
 	for _, prefix := range keys {
 		// if a key in the list matches exactly, don't return partial matches
 		if err := db.FindOne(cache,
-			bolthold.Where("Key").Eq(prefix).
+			bolthold.Where("Repo").Eq(repo).
+				And("Key").Eq(prefix).
 				And("Version").Eq(version).
 				And("Complete").Eq(true).
 				SortBy("CreatedAt").Reverse()); err == nil || !errors.Is(err, bolthold.ErrNotFound) {
@@ -369,7 +444,8 @@ func findCache(db *bolthold.Store, keys []string, version string) (*Cache, error
 			continue
 		}
 		if err := db.FindOne(cache,
-			bolthold.Where("Key").RegExp(re).
+			bolthold.Where("Repo").Eq(repo).
+				And("Key").RegExp(re).
 				And("Version").Eq(version).
 				And("Complete").Eq(true).
 				SortBy("CreatedAt").Reverse()); err != nil {
@@ -394,16 +470,7 @@ func insertCache(db *bolthold.Store, cache *Cache) error {
 	return nil
 }
 
-func (h *Handler) useCache(id uint64) {
-	db, err := h.openDB()
-	if err != nil {
-		return
-	}
-	defer db.Close()
-	cache := &Cache{}
-	if err := db.Get(id, cache); err != nil {
-		return
-	}
+func (h *Handler) useCache(db *bolthold.Store, cache *Cache) {
 	cache.UsedAt = time.Now().Unix()
 	_ = db.Update(cache.ID, cache)
 }
