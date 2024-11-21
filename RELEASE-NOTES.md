@@ -1,5 +1,9 @@
 # Release Notes
 
+## 5.0.2
+
+* Fixes a regression that was introduced in version 5.0.0 by which [skipped jobs were marked as failed instead](https://code.forgejo.org/forgejo/act/pulls/67). The workaround is to change the job log level to debug `[log].job_level: debug`.
+
 ## 5.0.1
 
 * Security: the `/opt/hostedtoolcache` directory is now unique to each job instead of being shared to avoid a risk of corruption. It is still advertised in the `RUNNER_TOOL_CACHE` environment variable. Custom container images can be built to pre-populate this directory with frequently used tools and some actions (such as `setup-go`) will benefit from that.
