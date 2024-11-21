@@ -1,0 +1,9 @@
+name: skip
+on: push
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - if: false
+        run: echo nothing
