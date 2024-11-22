@@ -16,13 +16,13 @@ import (
 
 var (
 	ErrValidation   = errors.New("validation error")
-	cachePrefixPath = "repo:/run:/ts:/mac:/"
+	cachePrefixPath = "org:/repo:/run:/ts:/mac:/"
 )
 
 func (h *Handler) validateMac(params httprouter.Params) (string, error) {
 	ts := params.ByName("ts")
 
-	repo := params.ByName("repo")
+	repo := params.ByName("org") + "/" + params.ByName("repo")
 	run := params.ByName("run")
 	messageMAC := params.ByName("mac")
 
