@@ -2,6 +2,7 @@ package cacheproxy
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -33,11 +34,20 @@ type Handler struct {
 
 	cacheServerHost string
 
-	repositoryName   string
-	repositorySecret string
+	cacheSecret string
+
+	workflows map[string]WorkflowData
 }
 
-func StartHandler(repoName string, targetHost string, outboundIP string, port uint16, cacheSecret string, logger logrus.FieldLogger) (*Handler, error) {
+type WorkflowData struct {
+	repositoryOwner string
+	repositoryName  string
+	runNumber       string
+	timestamp       string
+	repositoryMAC   string
+}
+
+func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret string, logger logrus.FieldLogger) (*Handler, error) {
 	h := &Handler{}
 
 	if logger == nil {
@@ -48,12 +58,7 @@ func StartHandler(repoName string, targetHost string, outboundIP string, port ui
 	logger = logger.WithField("module", "artifactcache")
 	h.logger = logger
 
-	h.repositoryName = repoName
-	repoSecret, err := calculateMAC(repoName, cacheSecret)
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode cacheSecret")
-	}
-	h.repositorySecret = repoSecret
+	h.cacheSecret = cacheSecret
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -122,7 +127,7 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 }
 
 func (h *Handler) injectAuth(r *httputil.ProxyRequest) {
-	r.Out.SetBasicAuth(h.repositoryName, h.repositorySecret)
+	// TODO: re-implement this one
 }
 
 func (h *Handler) ExternalURL() string {
@@ -130,6 +135,31 @@ func (h *Handler) ExternalURL() string {
 	return fmt.Sprintf("http://%s:%d",
 		h.outboundIP,
 		h.listener.Addr().(*net.TCPAddr).Port)
+}
+
+// Informs the proxy of a workflow that can make cache requests.
+// The WorkflowData contains the information about the repository.
+// The function returns the 32-bit random key which the workflow will use to identify itself.
+func (h *Handler) AddWorkflow(data WorkflowData) (string, error) {
+	keyBytes := make([]byte, 4)
+	_, err := rand.Read(keyBytes)
+	if err != nil {
+		return "", errors.New("Could not generate the workflow key")
+	}
+	key := hex.EncodeToString(keyBytes)
+
+	h.workflows[key] = data
+
+	return key, nil
+}
+
+func (h *Handler) RemoveWorkflow(workflowKey string) error {
+	_, exists := h.workflows[workflowKey]
+	if !exists {
+		return errors.New("The workflow key was not known to the proxy")
+	}
+	delete(h.workflows, workflowKey)
+	return nil
 }
 
 func (h *Handler) Close() error {
@@ -157,13 +187,10 @@ func (h *Handler) Close() error {
 	return retErr
 }
 
-func calculateMAC(repoName string, cacheSecret string) (string, error) {
-	sec, err := hex.DecodeString(cacheSecret)
-	if err != nil {
-		return "", err
-	}
-	mac := hmac.New(sha256.New, sec)
-	mac.Write([]byte(repoName))
-	macBytes := mac.Sum(nil)
-	return hex.EncodeToString(macBytes), nil
+func computeMac(key, repo, run, ts string) string {
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(repo))
+	mac.Write([]byte(run))
+	mac.Write([]byte(ts))
+	return string(mac.Sum(nil))
 }
