@@ -47,6 +47,18 @@ type WorkflowData struct {
 	repositoryMAC   string
 }
 
+func (h *Handler) CreateWorkflowData(owner string, name string, runnumber string, timestamp string) WorkflowData {
+	repo := owner + "/" + name
+	mac := computeMac(h.cacheSecret, repo, runnumber, timestamp)
+	return WorkflowData{
+		repositoryOwner: owner,
+		repositoryName:  name,
+		runNumber:       runnumber,
+		timestamp:       timestamp,
+		repositoryMAC:   mac,
+	}
+}
+
 func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret string, logger logrus.FieldLogger) (*Handler, error) {
 	h := &Handler{}
 
@@ -59,6 +71,7 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 	h.logger = logger
 
 	h.cacheSecret = cacheSecret
+	h.workflows = make(map[string]WorkflowData)
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -187,8 +200,8 @@ func (h *Handler) Close() error {
 	return retErr
 }
 
-func computeMac(key, repo, run, ts string) string {
-	mac := hmac.New(sha256.New, []byte(key))
+func computeMac(secret, repo, run, ts string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(repo))
 	mac.Write([]byte(run))
 	mac.Write([]byte(ts))
