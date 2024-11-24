@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"regexp"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -40,22 +41,19 @@ type Handler struct {
 }
 
 type WorkflowData struct {
-	repositoryOwner string
-	repositoryName  string
-	runNumber       string
-	timestamp       string
-	repositoryMAC   string
+	repositoryFullName string
+	runNumber          string
+	timestamp          string
+	repositoryMAC      string
 }
 
-func (h *Handler) CreateWorkflowData(owner string, name string, runnumber string, timestamp string) WorkflowData {
-	repo := owner + "/" + name
-	mac := computeMac(h.cacheSecret, repo, runnumber, timestamp)
+func (h *Handler) CreateWorkflowData(fullName string, runNumber string, timestamp string) WorkflowData {
+	mac := computeMac(h.cacheSecret, fullName, runNumber, timestamp)
 	return WorkflowData{
-		repositoryOwner: owner,
-		repositoryName:  name,
-		runNumber:       runnumber,
-		timestamp:       timestamp,
-		repositoryMAC:   mac,
+		repositoryFullName: fullName,
+		runNumber:          runNumber,
+		timestamp:          timestamp,
+		repositoryMAC:      mac,
 	}
 }
 
@@ -89,12 +87,12 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 	}
 
 	router := httprouter.New()
-	router.HandlerFunc("GET", urlBase+"/cache", proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", urlBase+"/caches", proxyRequestHandler(proxy))
-	router.HandlerFunc("PATCH", urlBase+"/caches/:id", proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", urlBase+"/caches/:id", proxyRequestHandler(proxy))
-	router.HandlerFunc("GET", urlBase+"/artifacts/:id", proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", urlBase+"/clean", proxyRequestHandler(proxy))
+	router.HandlerFunc("GET", "/:workflowId"+urlBase+"/cache", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", "/:workflowId"+urlBase+"/caches", proxyRequestHandler(proxy))
+	router.HandlerFunc("PATCH", "/:workflowId"+urlBase+"/caches/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", "/:workflowId"+urlBase+"/caches/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("GET", "/:workflowId"+urlBase+"/artifacts/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", "/:workflowId"+urlBase+"/clean", proxyRequestHandler(proxy))
 
 	h.router = router
 
@@ -133,14 +131,18 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 		Rewrite: func(r *httputil.ProxyRequest) {
 			r.SetURL(url)
 			r.Out.Host = r.In.Host // if desired
-			h.injectAuth(r)
+			re := regexp.MustCompile(`/(\w+)/_apis/artifactcache`)
+			matches := re.FindStringSubmatch(r.In.URL.Path)
+			id := matches[1]
+			data := h.workflows[id]
+
+			r.Out.Header.Add("Forgejo-Cache-Repo", data.repositoryFullName)
+			r.Out.Header.Add("Forgejo-Cache-RunNumber", data.runNumber)
+			r.Out.Header.Add("Forgejo-Cache-Timestamp", data.timestamp)
+			r.Out.Header.Add("Forgejo-Cache-MAC", data.repositoryMAC)
 		},
 	}
 	return proxy, nil
-}
-
-func (h *Handler) injectAuth(r *httputil.ProxyRequest) {
-	// TODO: re-implement this one
 }
 
 func (h *Handler) ExternalURL() string {
@@ -205,5 +207,5 @@ func computeMac(secret, repo, run, ts string) string {
 	mac.Write([]byte(repo))
 	mac.Write([]byte(run))
 	mac.Write([]byte(ts))
-	return string(mac.Sum(nil))
+	return hex.EncodeToString(mac.Sum(nil))
 }
