@@ -37,19 +37,19 @@ type Handler struct {
 
 	cacheSecret string
 
-	workflows map[string]WorkflowData
+	runs map[string]RunData
 }
 
-type WorkflowData struct {
+type RunData struct {
 	repositoryFullName string
 	runNumber          string
 	timestamp          string
 	repositoryMAC      string
 }
 
-func (h *Handler) CreateWorkflowData(fullName string, runNumber string, timestamp string) WorkflowData {
+func (h *Handler) CreateRunData(fullName string, runNumber string, timestamp string) RunData {
 	mac := computeMac(h.cacheSecret, fullName, runNumber, timestamp)
-	return WorkflowData{
+	return RunData{
 		repositoryFullName: fullName,
 		runNumber:          runNumber,
 		timestamp:          timestamp,
@@ -69,7 +69,7 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 	h.logger = logger
 
 	h.cacheSecret = cacheSecret
-	h.workflows = make(map[string]WorkflowData)
+	h.runs = make(map[string]RunData)
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -87,12 +87,12 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 	}
 
 	router := httprouter.New()
-	router.HandlerFunc("GET", "/:workflowId"+urlBase+"/cache", proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", "/:workflowId"+urlBase+"/caches", proxyRequestHandler(proxy))
-	router.HandlerFunc("PATCH", "/:workflowId"+urlBase+"/caches/:id", proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", "/:workflowId"+urlBase+"/caches/:id", proxyRequestHandler(proxy))
-	router.HandlerFunc("GET", "/:workflowId"+urlBase+"/artifacts/:id", proxyRequestHandler(proxy))
-	router.HandlerFunc("POST", "/:workflowId"+urlBase+"/clean", proxyRequestHandler(proxy))
+	router.HandlerFunc("GET", "/:runId"+urlBase+"/cache", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", "/:runId"+urlBase+"/caches", proxyRequestHandler(proxy))
+	router.HandlerFunc("PATCH", "/:runId"+urlBase+"/caches/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", "/:runId"+urlBase+"/caches/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("GET", "/:runId"+urlBase+"/artifacts/:id", proxyRequestHandler(proxy))
+	router.HandlerFunc("POST", "/:runId"+urlBase+"/clean", proxyRequestHandler(proxy))
 
 	h.router = router
 
@@ -134,7 +134,7 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 			re := regexp.MustCompile(`/(\w+)/_apis/artifactcache`)
 			matches := re.FindStringSubmatch(r.In.URL.Path)
 			id := matches[1]
-			data := h.workflows[id]
+			data := h.runs[id]
 
 			r.Out.Header.Add("Forgejo-Cache-Repo", data.repositoryFullName)
 			r.Out.Header.Add("Forgejo-Cache-RunNumber", data.runNumber)
@@ -152,28 +152,28 @@ func (h *Handler) ExternalURL() string {
 		h.listener.Addr().(*net.TCPAddr).Port)
 }
 
-// Informs the proxy of a workflow that can make cache requests.
-// The WorkflowData contains the information about the repository.
-// The function returns the 32-bit random key which the workflow will use to identify itself.
-func (h *Handler) AddWorkflow(data WorkflowData) (string, error) {
+// Informs the proxy of a workflow run that can make cache requests.
+// The RunData contains the information about the repository.
+// The function returns the 32-bit random key which the run will use to identify itself.
+func (h *Handler) AddRun(data RunData) (string, error) {
 	keyBytes := make([]byte, 4)
 	_, err := rand.Read(keyBytes)
 	if err != nil {
-		return "", errors.New("Could not generate the workflow key")
+		return "", errors.New("Could not generate the run id")
 	}
 	key := hex.EncodeToString(keyBytes)
 
-	h.workflows[key] = data
+	h.runs[key] = data
 
 	return key, nil
 }
 
-func (h *Handler) RemoveWorkflow(workflowKey string) error {
-	_, exists := h.workflows[workflowKey]
+func (h *Handler) RemoveRun(runID string) error {
+	_, exists := h.runs[runID]
 	if !exists {
-		return errors.New("The workflow key was not known to the proxy")
+		return errors.New("The run id was not known to the proxy")
 	}
-	delete(h.workflows, workflowKey)
+	delete(h.runs, runID)
 	return nil
 }
 
