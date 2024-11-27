@@ -13,10 +13,7 @@ import (
 func CheckIfDockerRunning(ctx context.Context, configDockerHost string) error {
 	opts := []client.Opt{
 		client.FromEnv,
-	}
-
-	if configDockerHost != "" {
-		opts = append(opts, client.WithHost(configDockerHost))
+		client.WithHost(configDockerHost),
 	}
 
 	cli, err := client.NewClientWithOpts(opts...)

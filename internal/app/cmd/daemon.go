@@ -73,11 +73,8 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 			if err := envcheck.CheckIfDockerRunning(ctx, dockerSocketPath); err != nil {
 				return err
 			}
-			// if dockerSocketPath passes the check, override DOCKER_HOST with dockerSocketPath
 			os.Setenv("DOCKER_HOST", dockerSocketPath)
-			// empty cfg.Container.DockerHost means act_runner need to find an available docker host automatically
-			// and assign the path to cfg.Container.DockerHost
-			if cfg.Container.DockerHost == "" {
+			if cfg.Container.DockerHost == "automount" {
 				cfg.Container.DockerHost = dockerSocketPath
 			}
 			// check the scheme, if the scheme is not npipe or unix
@@ -186,7 +183,7 @@ var commonSocketPaths = []string{
 
 func getDockerSocketPath(configDockerHost string) (string, error) {
 	// a `-` means don't mount the docker socket to job containers
-	if configDockerHost != "" && configDockerHost != "-" {
+	if configDockerHost != "automount" && configDockerHost != "-" {
 		return configDockerHost, nil
 	}
 
