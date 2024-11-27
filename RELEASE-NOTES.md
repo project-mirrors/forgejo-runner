@@ -1,5 +1,9 @@
 # Release Notes
 
+## 5.0.3
+
+* [Fixes a regression](https://code.forgejo.org/forgejo/runner/pulls/354) that was introduced in version 5.0.0 by which it was no longer possible to mount the docker socket in each container by specifying `[container].docker_host = ""`. This is now implemented when `[container].docker_host = "automount"` is specified.
+
 ## 5.0.2
 
 * Fixes a regression that was introduced in version 5.0.0 by which [skipped jobs were marked as failed instead](https://code.forgejo.org/forgejo/act/pulls/67). The workaround is to change the job log level to debug `[log].job_level: debug`.
