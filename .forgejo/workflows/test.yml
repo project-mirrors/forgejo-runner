@@ -44,6 +44,16 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: validate go version
+        run: |
+          set -ex
+          toolchain=$(grep -oP '(?<=toolchain ).+' go.mod)
+          version=$(go version | cut -d' ' -f3)
+          if [ "$toolchain" != "$version" ]; then
+            echo "go version mismatch: $toolchain <> $version"
+            exit 1
+          fi
+
       - run: make vet
 
       - run: make build
