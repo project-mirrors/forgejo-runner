@@ -16,6 +16,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -40,7 +41,7 @@ type Handler struct {
 
 	cacheSecret string
 
-	runs map[string]RunData
+	runs sync.Map
 }
 
 type RunData struct {
@@ -72,7 +73,7 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 	h.logger = logger
 
 	h.cacheSecret = cacheSecret
-	h.runs = make(map[string]RunData)
+	// h.runs = make(map[string]RunData)
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -137,12 +138,19 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 			re := regexp.MustCompile(`/(\w+)/_apis/artifactcache`)
 			matches := re.FindStringSubmatch(r.In.URL.Path)
 			id := matches[1]
-			data := h.runs[id]
+			data, ok := h.runs.Load(id)
+			var runData = data.(RunData)
+			if !ok {
+				// The ID doesn't exist.
+				// ! this should probably be handled more gracefully but i can't figure out how
+				// ! it really shouldn't happen anyway so it's fine for now
+				return
+			}
 
-			r.Out.Header.Add("Forgejo-Cache-Repo", data.repositoryFullName)
-			r.Out.Header.Add("Forgejo-Cache-RunNumber", data.runNumber)
-			r.Out.Header.Add("Forgejo-Cache-Timestamp", data.timestamp)
-			r.Out.Header.Add("Forgejo-Cache-MAC", data.repositoryMAC)
+			r.Out.Header.Add("Forgejo-Cache-Repo", runData.repositoryFullName)
+			r.Out.Header.Add("Forgejo-Cache-RunNumber", runData.runNumber)
+			r.Out.Header.Add("Forgejo-Cache-Timestamp", runData.timestamp)
+			r.Out.Header.Add("Forgejo-Cache-MAC", runData.repositoryMAC)
 		},
 	}
 	return proxy, nil
@@ -166,17 +174,16 @@ func (h *Handler) AddRun(data RunData) (string, error) {
 	}
 	key := hex.EncodeToString(keyBytes)
 
-	h.runs[key] = data
+	h.runs.Store(key, data)
 
 	return key, nil
 }
 
 func (h *Handler) RemoveRun(runID string) error {
-	_, exists := h.runs[runID]
-	if !exists {
+	_, existed := h.runs.LoadAndDelete(runID)
+	if !existed {
 		return errors.New("The run id was not known to the proxy")
 	}
-	delete(h.runs, runID)
 	return nil
 }
 
