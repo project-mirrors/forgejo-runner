@@ -6,36 +6,29 @@ package artifactcache
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/hex"
 	"errors"
-	"hash"
 	"strconv"
 	"time"
 
-	"github.com/julienschmidt/httprouter"
+	"github.com/nektos/act/pkg/cacheproxy"
 )
 
 var (
-	ErrValidation   = errors.New("validation error")
-	cachePrefixPath = "/:org/:repo/:run/:ts/:mac"
+	ErrValidation = errors.New("validation error")
 )
 
-func (h *Handler) validateMac(params httprouter.Params) (string, error) {
-	ts := params.ByName("ts")
-
-	repo := params.ByName("org") + "/" + params.ByName("repo")
-	run := params.ByName("run")
-	messageMAC := params.ByName("mac")
-
+func (h *Handler) validateMac(rundata cacheproxy.RunData) (string, error) {
 	// TODO: allow configurable max age
-	if !validateAge(ts) {
+	if !validateAge(rundata.Timestamp) {
 		return "", ErrValidation
 	}
 
-	expectedMAC := computeMac(h.secret, repo, run, ts).Sum(nil)
-	if hmac.Equal([]byte(messageMAC), expectedMAC) {
-		return repo, nil
+	expectedMAC := computeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp)
+	if expectedMAC == rundata.RepositoryMAC {
+		return rundata.RepositoryFullName, nil
 	}
-	return repo, ErrValidation
+	return rundata.RepositoryFullName, ErrValidation
 }
 
 func validateAge(ts string) bool {
@@ -49,15 +42,10 @@ func validateAge(ts string) bool {
 	return true
 }
 
-func computeMac(key, repo, run, ts string) hash.Hash {
-	mac := hmac.New(sha256.New, []byte(key))
+func computeMac(secret, repo, run, ts string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(repo))
 	mac.Write([]byte(run))
 	mac.Write([]byte(ts))
-	return mac
-}
-
-func ComputeMac(key, repo, run, ts string) string {
-	mac := computeMac(key, repo, run, ts)
-	return string(mac.Sum(nil))
+	return hex.EncodeToString(mac.Sum(nil))
 }

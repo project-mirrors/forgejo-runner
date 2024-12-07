@@ -20,6 +20,7 @@ import (
 	"github.com/timshannon/bolthold"
 	"go.etcd.io/bbolt"
 
+	"github.com/nektos/act/pkg/cacheproxy"
 	"github.com/nektos/act/pkg/common"
 )
 
@@ -83,12 +84,12 @@ func StartHandler(dir, outboundIP string, port uint16, secret string, logger log
 	}
 
 	router := httprouter.New()
-	router.GET(cachePrefixPath+urlBase+"/cache", h.middleware(h.find))
-	router.POST(cachePrefixPath+urlBase+"/caches", h.middleware(h.reserve))
-	router.PATCH(cachePrefixPath+urlBase+"/caches/:id", h.middleware(h.upload))
-	router.POST(cachePrefixPath+urlBase+"/caches/:id", h.middleware(h.commit))
-	router.GET(cachePrefixPath+urlBase+"/artifacts/:id", h.middleware(h.get))
-	router.POST(cachePrefixPath+urlBase+"/clean", h.middleware(h.clean))
+	router.GET(urlBase+"/cache", h.middleware(h.find))
+	router.POST(urlBase+"/caches", h.middleware(h.reserve))
+	router.PATCH(urlBase+"/caches/:id", h.middleware(h.upload))
+	router.POST(urlBase+"/caches/:id", h.middleware(h.commit))
+	router.GET(urlBase+"/artifacts/:id", h.middleware(h.get))
+	router.POST(urlBase+"/clean", h.middleware(h.clean))
 
 	h.router = router
 
@@ -159,7 +160,8 @@ func (h *Handler) openDB() (*bolthold.Store, error) {
 
 // GET /_apis/artifactcache/cache
 func (h *Handler) find(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	repo, err := h.validateMac(params)
+	rundata := runDataFromHeaders(r)
+	repo, err := h.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -206,7 +208,8 @@ func (h *Handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 
 // POST /_apis/artifactcache/caches
 func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	repo, err := h.validateMac(params)
+	rundata := runDataFromHeaders(r)
+	repo, err := h.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -243,7 +246,8 @@ func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, params httprou
 
 // PATCH /_apis/artifactcache/caches/:id
 func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	repo, err := h.validateMac(params)
+	rundata := runDataFromHeaders(r)
+	repo, err := h.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -296,7 +300,8 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 
 // POST /_apis/artifactcache/caches/:id
 func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	repo, err := h.validateMac(params)
+	rundata := runDataFromHeaders(r)
+	repo, err := h.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -363,7 +368,8 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 
 // GET /_apis/artifactcache/artifacts/:id
 func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	repo, err := h.validateMac(params)
+	rundata := runDataFromHeaders(r)
+	repo, err := h.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -403,7 +409,8 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 
 // POST /_apis/artifactcache/clean
 func (h *Handler) clean(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	_, err := h.validateMac(params)
+	rundata := runDataFromHeaders(r)
+	_, err := h.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -620,4 +627,13 @@ func parseContentRange(s string) (uint64, uint64, error) {
 		return 0, 0, fmt.Errorf("parse %q: %w", s, err)
 	}
 	return start, stop, nil
+}
+
+func runDataFromHeaders(r *http.Request) cacheproxy.RunData {
+	return cacheproxy.RunData{
+		RepositoryFullName: r.Header.Get("Forgejo-Cache-Repo"),
+		RunNumber:          r.Header.Get("Forgejo-Cache-RunNumber"),
+		Timestamp:          r.Header.Get("Forgejo-Cache-Timestamp"),
+		RepositoryMAC:      r.Header.Get("Forgejo-Cache-MAC"),
+	}
 }

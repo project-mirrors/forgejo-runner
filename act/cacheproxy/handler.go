@@ -45,19 +45,19 @@ type Handler struct {
 }
 
 type RunData struct {
-	repositoryFullName string
-	runNumber          string
-	timestamp          string
-	repositoryMAC      string
+	RepositoryFullName string
+	RunNumber          string
+	Timestamp          string
+	RepositoryMAC      string
 }
 
 func (h *Handler) CreateRunData(fullName string, runNumber string, timestamp string) RunData {
 	mac := computeMac(h.cacheSecret, fullName, runNumber, timestamp)
 	return RunData{
-		repositoryFullName: fullName,
-		runNumber:          runNumber,
-		timestamp:          timestamp,
-		repositoryMAC:      mac,
+		RepositoryFullName: fullName,
+		RunNumber:          runNumber,
+		Timestamp:          timestamp,
+		RepositoryMAC:      mac,
 	}
 }
 
@@ -126,16 +126,14 @@ func proxyRequestHandler(proxy *httputil.ReverseProxy) func(http.ResponseWriter,
 }
 
 func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, error) {
-	url, err := url.Parse(targetHost)
+	targetURL, err := url.Parse(targetHost)
 	if err != nil {
 		return nil, err
 	}
 
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
-			r.SetURL(url)
-			r.Out.Host = r.In.Host // if desired
-			re := regexp.MustCompile(`/(\w+)/_apis/artifactcache`)
+			re := regexp.MustCompile(`/(\w+)(/_apis/artifactcache/.+)`)
 			matches := re.FindStringSubmatch(r.In.URL.Path)
 			id := matches[1]
 			data, ok := h.runs.Load(id)
@@ -146,11 +144,15 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 				// ! it really shouldn't happen anyway so it's fine for now
 				return
 			}
+			uri := matches[2]
 
-			r.Out.Header.Add("Forgejo-Cache-Repo", runData.repositoryFullName)
-			r.Out.Header.Add("Forgejo-Cache-RunNumber", runData.runNumber)
-			r.Out.Header.Add("Forgejo-Cache-Timestamp", runData.timestamp)
-			r.Out.Header.Add("Forgejo-Cache-MAC", runData.repositoryMAC)
+			r.SetURL(targetURL)
+			r.Out.URL.Path = uri
+
+			r.Out.Header.Add("Forgejo-Cache-Repo", runData.RepositoryFullName)
+			r.Out.Header.Add("Forgejo-Cache-RunNumber", runData.RunNumber)
+			r.Out.Header.Add("Forgejo-Cache-Timestamp", runData.Timestamp)
+			r.Out.Header.Add("Forgejo-Cache-MAC", runData.RepositoryMAC)
 		},
 	}
 	return proxy, nil
