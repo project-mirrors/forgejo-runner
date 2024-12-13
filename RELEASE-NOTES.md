@@ -1,5 +1,9 @@
 # Release Notes
 
+## 5.0.4
+
+* Define FORGEJO_TOKEN as an alias to GITHUB_TOKEN
+
 ## 5.0.3
 
 * [Fixes a regression](https://code.forgejo.org/forgejo/runner/pulls/354) that was introduced in version 5.0.0 by which it was no longer possible to mount the docker socket in each container by specifying `[container].docker_host = ""`. This is now implemented when `[container].docker_host = "automount"` is specified.
