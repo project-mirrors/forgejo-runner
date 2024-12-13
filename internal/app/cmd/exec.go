@@ -418,7 +418,9 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 
 		config.Env["ACT_EXEC"] = "true"
 
-		if t := config.Secrets["GITEA_TOKEN"]; t != "" {
+		if t := config.Secrets["FORGEJO_TOKEN"]; t != "" {
+			config.Token = t
+		} else if t := config.Secrets["GITEA_TOKEN"]; t != "" {
 			config.Token = t
 		} else if t := config.Secrets["GITHUB_TOKEN"]; t != "" {
 			config.Token = t
