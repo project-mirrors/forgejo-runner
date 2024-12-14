@@ -168,7 +168,9 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		RepositoryOwner: taskContext["repository_owner"].GetStringValue(),
 		RetentionDays:   taskContext["retention_days"].GetStringValue(),
 	}
-	if t := task.Secrets["GITEA_TOKEN"]; t != "" {
+	if t := task.Secrets["FORGEJO_TOKEN"]; t != "" {
+		preset.Token = t
+	} else if t := task.Secrets["GITEA_TOKEN"]; t != "" {
 		preset.Token = t
 	} else if t := task.Secrets["GITHUB_TOKEN"]; t != "" {
 		preset.Token = t
