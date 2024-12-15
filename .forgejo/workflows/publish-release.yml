@@ -28,13 +28,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: copy & sign
-        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/publish@v5
+        uses: https://code.forgejo.org/forgejo/forgejo-build-publish/publish@v5.2.0
         with:
           from-forgejo: ${{ secrets.FORGEJO }}
           to-forgejo: ${{ secrets.FORGEJO }}
           from-owner: ${{ secrets.FROM_OWNER }}
           to-owner: ${{ secrets.TO_OWNER }}
           repo: "runner"
+          release-notes: "See https://code.forgejo.org/forgejo/runner/src/branch/main/RELEASE-NOTES.md#{ANCHOR}"
           ref-name: ${{ github.ref_name }}
           sha: ${{ github.sha }}
           container-suffixes: " "
