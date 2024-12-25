@@ -489,12 +489,14 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				UsernsMode:     rc.Config.UsernsMode,
 				Platform:       rc.Config.ContainerArchitecture,
 				AutoRemove:     rc.Config.AutoRemove,
-				Options:        rc.ExprEval.Interpolate(ctx, spec.Options),
 				NetworkMode:    networkName,
 				NetworkAliases: []string{serviceID},
 				ExposedPorts:   exposedPorts,
 				PortBindings:   portBindings,
 				ValidVolumes:   rc.Config.ValidVolumes,
+
+				JobOptions:    rc.ExprEval.Interpolate(ctx, spec.Options),
+				ConfigOptions: rc.Config.ContainerOptions,
 			})
 			rc.ServiceContainers = append(rc.ServiceContainers, c)
 		}
@@ -549,9 +551,11 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			Privileged:     rc.Config.Privileged,
 			UsernsMode:     rc.Config.UsernsMode,
 			Platform:       rc.Config.ContainerArchitecture,
-			Options:        rc.options(ctx),
 			AutoRemove:     rc.Config.AutoRemove,
 			ValidVolumes:   rc.Config.ValidVolumes,
+
+			JobOptions:    rc.options(ctx),
+			ConfigOptions: "",
 		})
 		if rc.JobContainer == nil {
 			return errors.New("Failed to create job container")
@@ -889,10 +893,10 @@ func (rc *RunContext) options(ctx context.Context) string {
 	job := rc.Run.Job()
 	c := job.Container()
 	if c != nil {
-		return rc.Config.ContainerOptions + " " + rc.ExprEval.Interpolate(ctx, c.Options)
+		return rc.ExprEval.Interpolate(ctx, c.Options)
 	}
 
-	return rc.Config.ContainerOptions
+	return ""
 }
 
 func (rc *RunContext) isEnabled(ctx context.Context) (bool, error) {

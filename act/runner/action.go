@@ -429,9 +429,10 @@ func newStepContainer(ctx context.Context, step step, image string, cmd []string
 		Privileged:   rc.Config.Privileged,
 		UsernsMode:   rc.Config.UsernsMode,
 		Platform:     rc.Config.ContainerArchitecture,
-		Options:      rc.Config.ContainerOptions,
 		AutoRemove:   rc.Config.AutoRemove,
 		ValidVolumes: rc.Config.ValidVolumes,
+
+		ConfigOptions: rc.Config.ContainerOptions,
 	})
 	return stepContainer
 }

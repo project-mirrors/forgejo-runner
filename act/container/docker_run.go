@@ -350,22 +350,24 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	logger := common.Logger(ctx)
 	input := cr.input
 
-	if input.Options == "" {
+	if input.ConfigOptions == "" && input.JobOptions == "" {
 		return config, hostConfig, nil
 	}
+
+	options := input.ConfigOptions + " " + input.JobOptions
 
 	// parse configuration from CLI container.options
 	flags := pflag.NewFlagSet("container_flags", pflag.ContinueOnError)
 	copts := addFlags(flags)
 
-	optionsArgs, err := shellquote.Split(input.Options)
+	optionsArgs, err := shellquote.Split(options)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot split container options: '%s': '%w'", input.Options, err)
+		return nil, nil, fmt.Errorf("Cannot split container options: '%s': '%w'", options, err)
 	}
 
 	err = flags.Parse(optionsArgs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot parse container options: '%s': '%w'", input.Options, err)
+		return nil, nil, fmt.Errorf("Cannot parse container options: '%s': '%w'", options, err)
 	}
 
 	// If a service container's network is set to `host`, the container will not be able to
@@ -386,14 +388,14 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 
 	containerConfig, err := parse(flags, copts, runtime.GOOS)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot process container options: '%s': '%w'", input.Options, err)
+		return nil, nil, fmt.Errorf("Cannot process container options: '%s': '%w'", options, err)
 	}
 
 	logger.Debugf("Custom container.Config from options ==> %+v", containerConfig.Config)
 
 	err = mergo.Merge(config, containerConfig.Config, mergo.WithOverride, mergo.WithAppendSlice)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot merge container.Config options: '%s': '%w'", input.Options, err)
+		return nil, nil, fmt.Errorf("Cannot merge container.Config options: '%s': '%w'", options, err)
 	}
 	logger.Debugf("Merged container.Config ==> %+v", config)
 
@@ -406,7 +408,7 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	networkMode := hostConfig.NetworkMode
 	err = mergo.Merge(hostConfig, containerConfig.HostConfig, mergo.WithOverride)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot merge container.HostConfig options: '%s': '%w'", input.Options, err)
+		return nil, nil, fmt.Errorf("Cannot merge container.HostConfig options: '%s': '%w'", options, err)
 	}
 	hostConfig.Binds = binds
 	hostConfig.Mounts = mounts

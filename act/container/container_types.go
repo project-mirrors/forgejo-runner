@@ -26,10 +26,12 @@ type NewContainerInput struct {
 	Privileged     bool
 	UsernsMode     string
 	Platform       string
-	Options        string
 	NetworkAliases []string
 	ExposedPorts   nat.PortSet
 	PortBindings   nat.PortMap
+
+	ConfigOptions string
+	JobOptions    string
 
 	// Gitea specific
 	AutoRemove bool
