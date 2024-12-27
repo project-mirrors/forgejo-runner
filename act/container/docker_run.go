@@ -355,40 +355,14 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	}
 
 	options := input.ConfigOptions + " " + input.JobOptions
+	containerConfig, err := parseOptions(ctx, options)
 
-	// parse configuration from CLI container.options
-	flags := pflag.NewFlagSet("container_flags", pflag.ContinueOnError)
-	copts := addFlags(flags)
-
-	optionsArgs, err := shellquote.Split(options)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot split container options: '%s': '%w'", options, err)
+		return nil, nil, err
 	}
 
-	err = flags.Parse(optionsArgs)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot parse container options: '%s': '%w'", options, err)
-	}
-
-	// If a service container's network is set to `host`, the container will not be able to
-	// connect to the specified network created for the job container and the service containers.
-	// So comment out the following code.
-
-	// if len(copts.netMode.Value()) == 0 {
-	// 	if err = copts.netMode.Set(cr.input.NetworkMode); err != nil {
-	// 		return nil, nil, fmt.Errorf("Cannot parse networkmode=%s. This is an internal error and should not happen: '%w'", cr.input.NetworkMode, err)
-	// 	}
-	// }
-
-	// If the `privileged` config has been disabled, `copts.privileged` need to be forced to false,
-	// even if the user specifies `--privileged` in the options string.
 	if !hostConfig.Privileged {
-		copts.privileged = false
-	}
-
-	containerConfig, err := parse(flags, copts, runtime.GOOS)
-	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot process container options: '%s': '%w'", options, err)
+		containerConfig.HostConfig.Privileged = false
 	}
 
 	logger.Debugf("Custom container.Config from options ==> %+v", containerConfig.Config)
@@ -412,13 +386,38 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	}
 	hostConfig.Binds = binds
 	hostConfig.Mounts = mounts
-	if len(copts.netMode.Value()) > 0 {
-		logger.Warn("--network and --net in the options will be ignored.")
-	}
 	hostConfig.NetworkMode = networkMode
 	logger.Debugf("Merged container.HostConfig ==> %+v", hostConfig)
 
 	return config, hostConfig, nil
+}
+
+func parseOptions(ctx context.Context, options string) (*containerConfig, error) {
+	logger := common.Logger(ctx)
+
+	flags := pflag.NewFlagSet("container_flags", pflag.ContinueOnError)
+	copts := addFlags(flags)
+
+	if len(copts.netMode.Value()) > 0 {
+		logger.Warn("--network and --net in the options will be ignored.")
+	}
+
+	optionsArgs, err := shellquote.Split(options)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot split container options: '%s': '%w'", options, err)
+	}
+
+	err = flags.Parse(optionsArgs)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot parse container options: '%s': '%w'", options, err)
+	}
+
+	containerConfig, err := parse(flags, copts, runtime.GOOS)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot process container options: '%s': '%w'", options, err)
+	}
+
+	return containerConfig, nil
 }
 
 func (cr *containerReference) create(capAdd []string, capDrop []string) common.Executor {
