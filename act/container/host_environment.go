@@ -62,7 +62,7 @@ func (e *HostEnvironment) Copy(destPath string, files ...*FileEntry) common.Exec
 			if err := os.MkdirAll(filepath.Dir(filepath.Join(destPath, f.Name)), 0o777); err != nil {
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(destPath, f.Name), []byte(f.Body), fs.FileMode(f.Mode)); err != nil {
+			if err := os.WriteFile(filepath.Join(destPath, f.Name), []byte(f.Body), fs.FileMode(f.Mode)); err != nil { //nolint:gosec
 				return err
 			}
 		}

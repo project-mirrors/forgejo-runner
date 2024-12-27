@@ -213,14 +213,14 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 				rc.execJobContainer(execArgs, *step.getEnv(), "", ""),
 			)(ctx)
 		default:
-			return fmt.Errorf(fmt.Sprintf("The runs.using key must be one of: %v, got %s", []string{
+			return fmt.Errorf("The runs.using key must be one of: %v, got %s", []string{
 				model.ActionRunsUsingDocker,
 				model.ActionRunsUsingNode12,
 				model.ActionRunsUsingNode16,
 				model.ActionRunsUsingNode20,
 				model.ActionRunsUsingComposite,
 				model.ActionRunsUsingGo,
-			}, action.Runs.Using))
+			}, action.Runs.Using)
 		}
 	}
 }
@@ -257,8 +257,6 @@ func removeGitIgnore(ctx context.Context, directory string) error {
 }
 
 // TODO: break out parts of function to reduce complexicity
-//
-//nolint:gocyclo
 func execAsDocker(ctx context.Context, step actionStep, actionName string, basedir string, localAction bool) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()

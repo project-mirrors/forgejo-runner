@@ -403,7 +403,6 @@ func escapeFormatString(in string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(in, "{", "{{"), "}", "}}")
 }
 
-//nolint:gocyclo
 func rewriteSubExpression(ctx context.Context, in string, forceFormat bool) (string, error) {
 	if !strings.Contains(in, "${{") || !strings.Contains(in, "}}") {
 		return in, nil
@@ -470,7 +469,6 @@ func rewriteSubExpression(ctx context.Context, in string, forceFormat bool) (str
 	return out, nil
 }
 
-//nolint:gocyclo
 func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *model.GithubContext) map[string]interface{} {
 	inputs := map[string]interface{}{}
 
