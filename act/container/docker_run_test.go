@@ -20,6 +20,9 @@ import (
 )
 
 func TestDocker(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
 	ctx := context.Background()
 	client, err := GetDockerClient(ctx)
 	assert.NoError(t, err)
