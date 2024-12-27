@@ -1,5 +1,9 @@
 # Release Notes
 
+## 6.0.0
+
+* Security: the container options a job is allowed to specify are limited to a [predefined allow list](https://forgejo.org/docs/next/user/actions/#jobsjob_idcontaineroptions).
+
 ## 5.0.4
 
 * Define FORGEJO_TOKEN as an alias to GITHUB_TOKEN
