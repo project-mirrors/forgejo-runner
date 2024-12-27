@@ -346,17 +346,29 @@ func (cr *containerReference) remove() common.Executor {
 	}
 }
 
-func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (*container.Config, *container.HostConfig, error) {
-	logger := common.Logger(ctx)
-	input := cr.input
-
-	if input.ConfigOptions == "" && input.JobOptions == "" {
+func (cr *containerReference) mergeOptions(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (*container.Config, *container.HostConfig, error) {
+	if cr.input.ConfigOptions == "" && cr.input.JobOptions == "" {
 		return config, hostConfig, nil
 	}
 
-	options := input.ConfigOptions + " " + input.JobOptions
-	containerConfig, err := parseOptions(ctx, options)
+	var err error
 
+	if config, hostConfig, err = cr.mergeConfigOptions(ctx, config, hostConfig); err != nil {
+		return nil, nil, err
+	}
+
+	if config, hostConfig, err = cr.mergeJobOptions(ctx, config, hostConfig); err != nil {
+		return nil, nil, err
+	}
+
+	return config, hostConfig, nil
+}
+
+func (cr *containerReference) mergeConfigOptions(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (*container.Config, *container.HostConfig, error) {
+	logger := common.Logger(ctx)
+	input := cr.input
+
+	containerConfig, err := parseOptions(ctx, input.ConfigOptions)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -369,7 +381,7 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 
 	err = mergo.Merge(config, containerConfig.Config, mergo.WithOverride, mergo.WithAppendSlice)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot merge container.Config options: '%s': '%w'", options, err)
+		return nil, nil, fmt.Errorf("Cannot merge container.Config options: '%s': '%w'", input.ConfigOptions, err)
 	}
 	logger.Debugf("Merged container.Config ==> %+v", config)
 
@@ -382,12 +394,46 @@ func (cr *containerReference) mergeContainerConfigs(ctx context.Context, config 
 	networkMode := hostConfig.NetworkMode
 	err = mergo.Merge(hostConfig, containerConfig.HostConfig, mergo.WithOverride)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot merge container.HostConfig options: '%s': '%w'", options, err)
+		return nil, nil, fmt.Errorf("Cannot merge container.HostConfig options: '%s': '%w'", input.ConfigOptions, err)
 	}
 	hostConfig.Binds = binds
 	hostConfig.Mounts = mounts
 	hostConfig.NetworkMode = networkMode
 	logger.Debugf("Merged container.HostConfig ==> %+v", hostConfig)
+	return config, hostConfig, nil
+}
+
+func (cr *containerReference) mergeJobOptions(ctx context.Context, config *container.Config, hostConfig *container.HostConfig) (*container.Config, *container.HostConfig, error) {
+	jobConfig, err := parseOptions(ctx, cr.input.JobOptions)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	logger := common.Logger(ctx)
+
+	if len(jobConfig.Config.Volumes) > 0 {
+		logger.Debugf("--volume options (except bind) %v", jobConfig.Config.Volumes)
+		err = mergo.Merge(&config.Volumes, jobConfig.Config.Volumes, mergo.WithOverride, mergo.WithAppendSlice)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Cannot merge container.Config.Volumes options: '%s': '%w'", cr.input.JobOptions, err)
+		}
+	}
+
+	if len(jobConfig.HostConfig.Binds) > 0 {
+		logger.Debugf("--volume options (only bind) %v", jobConfig.HostConfig.Binds)
+		err = mergo.Merge(&hostConfig.Binds, jobConfig.HostConfig.Binds, mergo.WithOverride, mergo.WithAppendSlice)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Cannot merge hostConfig.Bind options: '%s': '%w'", cr.input.JobOptions, err)
+		}
+	}
+
+	if len(jobConfig.HostConfig.Tmpfs) > 0 {
+		logger.Debugf("--tmpfs options %v", jobConfig.HostConfig.Tmpfs)
+		err = mergo.Merge(&hostConfig.Tmpfs, jobConfig.HostConfig.Tmpfs, mergo.WithOverride, mergo.WithAppendSlice)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Cannot merge Config.Tmpfs options: '%s': '%w'", cr.input.JobOptions, err)
+		}
+	}
 
 	return config, hostConfig, nil
 }
@@ -482,7 +528,7 @@ func (cr *containerReference) create(capAdd []string, capDrop []string) common.E
 		}
 		logger.Debugf("Common container.HostConfig ==> %+v", hostConfig)
 
-		config, hostConfig, err := cr.mergeContainerConfigs(ctx, config, hostConfig)
+		config, hostConfig, err := cr.mergeOptions(ctx, config, hostConfig)
 		if err != nil {
 			return err
 		}

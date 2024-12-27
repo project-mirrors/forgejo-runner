@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDocker(t *testing.T) {
@@ -244,6 +245,45 @@ func TestCheckVolumes(t *testing.T) {
 			}
 			_, hostConf := cr.sanitizeConfig(ctx, &container.Config{}, &container.HostConfig{Binds: tc.binds})
 			assert.Equal(t, tc.expectedBinds, hostConf.Binds)
+		})
+	}
+}
+
+func TestMergeJobOptions(t *testing.T) {
+	for _, testCase := range []struct {
+		name       string
+		options    string
+		config     *container.Config
+		hostConfig *container.HostConfig
+	}{
+		{
+			name:    "ok",
+			options: "--volume /foo:/bar --volume /frob:/nitz --volume somevolume --tmpfs /tmp:exec,noatime",
+			config: &container.Config{
+				Volumes: map[string]struct{}{"somevolume": {}},
+			},
+			hostConfig: &container.HostConfig{
+				Binds: []string{"/foo:/bar", "/frob:/nitz"},
+				Tmpfs: map[string]string{"/tmp": "exec,noatime"},
+			},
+		},
+		{
+			name:       "ignore",
+			options:    "--pid=host --device=/dev/sda",
+			config:     &container.Config{},
+			hostConfig: &container.HostConfig{},
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			cr := &containerReference{
+				input: &NewContainerInput{
+					JobOptions: testCase.options,
+				},
+			}
+			config, hostConfig, err := cr.mergeJobOptions(context.Background(), &container.Config{}, &container.HostConfig{})
+			require.NoError(t, err)
+			assert.EqualValues(t, testCase.config, config)
+			assert.EqualValues(t, testCase.hostConfig, hostConfig)
 		})
 	}
 }
