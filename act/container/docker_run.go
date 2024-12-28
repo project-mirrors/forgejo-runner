@@ -753,7 +753,7 @@ func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgno
 		defer func(tarFile *os.File) {
 			name := tarFile.Name()
 			err := tarFile.Close()
-			if !errors.Is(err, os.ErrClosed) {
+			if err != nil && !errors.Is(err, os.ErrClosed) {
 				logger.Error(err)
 			}
 			err = os.Remove(name)
