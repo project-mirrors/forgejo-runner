@@ -300,7 +300,7 @@ func Serve(ctx context.Context, artifactPath string, addr string, port string) c
 	go func() {
 		logger.Infof("Start server on http://%s:%s", addr, port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal(err)
+			logger.Fatalf("http listener: %v", err)
 		}
 	}()
 
