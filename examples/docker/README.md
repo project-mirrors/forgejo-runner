@@ -6,7 +6,7 @@ The following assumes:
 * a `runner-config.yml` file exists in /tmp/data
 
 ```sh
-docker run -v /var/run/docker.sock:/var/run/docker.sock  -v /tmp/data:/data --user 1000:133 --rm code.forgejo.org/forgejo/runner:3.0.0 forgejo-runner --config runner-config.yaml daemon
+docker run -v /var/run/docker.sock:/var/run/docker.sock  -v /tmp/data:/data --user 1000:133 --rm code.forgejo.org/forgejo/runner:5.0.4 forgejo-runner --config runner-config.yaml daemon
 ```
 
 The workflows will run using the host docker srever
