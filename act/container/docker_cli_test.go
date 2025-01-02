@@ -191,7 +191,6 @@ func TestParseRunWithInvalidArgs(t *testing.T) {
 	}
 }
 
-//nolint:gocyclo
 func TestParseWithVolumes(t *testing.T) {
 
 	// A single volume

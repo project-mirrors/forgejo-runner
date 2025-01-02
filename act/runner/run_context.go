@@ -391,7 +391,6 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 	}
 }
 
-//nolint:gocyclo
 func (rc *RunContext) startJobContainer() common.Executor {
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
@@ -591,7 +590,7 @@ func (rc *RunContext) execJobContainer(cmd []string, env map[string]string, user
 }
 
 func (rc *RunContext) ApplyExtraPath(ctx context.Context, env *map[string]string) {
-	if rc.ExtraPath != nil && len(rc.ExtraPath) > 0 {
+	if len(rc.ExtraPath) > 0 {
 		path := rc.JobContainer.GetPathVariableName()
 		if rc.JobContainer.IsEnvironmentCaseInsensitive() {
 			// On windows system Path and PATH could also be in the map
@@ -939,7 +938,7 @@ func mergeMaps(maps ...map[string]string) map[string]string {
 	return rtnMap
 }
 
-// deprecated: use createSimpleContainerName
+// Deprecated: use createSimpleContainerName
 func createContainerName(parts ...string) string {
 	name := strings.Join(parts, "-")
 	pattern := regexp.MustCompile("[^a-zA-Z0-9]")

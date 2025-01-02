@@ -20,7 +20,6 @@ type jobInfo interface {
 	result(result string)
 }
 
-//nolint:contextcheck,gocyclo
 func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executor {
 	steps := make([]common.Executor, 0)
 	preSteps := make([]common.Executor, 0)

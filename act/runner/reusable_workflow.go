@@ -225,21 +225,3 @@ func newRemoteReusableWorkflowWithPlat(url, uses string) *remoteReusableWorkflow
 		URL:         url,
 	}
 }
-
-// deprecated: use newRemoteReusableWorkflowWithPlat
-func newRemoteReusableWorkflow(uses string) *remoteReusableWorkflow {
-	// GitHub docs:
-	// https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_iduses
-	r := regexp.MustCompile(`^([^/]+)/([^/]+)/.github/workflows/([^@]+)@(.*)$`)
-	matches := r.FindStringSubmatch(uses)
-	if len(matches) != 5 {
-		return nil
-	}
-	return &remoteReusableWorkflow{
-		Org:      matches[1],
-		Repo:     matches[2],
-		Filename: matches[3],
-		Ref:      matches[4],
-		URL:      "https://github.com",
-	}
-}
