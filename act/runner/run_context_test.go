@@ -394,6 +394,7 @@ func TestGetGitHubContext(t *testing.T) {
 	assert.Equal(t, ghc.RepositoryOwner, owner)
 	assert.Equal(t, ghc.RunnerPerflog, "/dev/null")
 	assert.Equal(t, ghc.Token, rc.Config.Secrets["GITHUB_TOKEN"])
+	assert.Equal(t, ghc.Token, rc.Config.Secrets["FORGEJO_TOKEN"])
 	assert.Equal(t, ghc.Job, "job1")
 }
 

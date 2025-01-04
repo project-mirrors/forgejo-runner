@@ -1198,6 +1198,7 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 	env["GITHUB_REF_NAME"] = github.RefName
 	env["GITHUB_REF_TYPE"] = github.RefType
 	env["GITHUB_TOKEN"] = github.Token
+	env["FORGEJO_TOKEN"] = github.Token
 	env["GITHUB_JOB"] = github.Job
 	env["GITHUB_REPOSITORY_OWNER"] = github.RepositoryOwner
 	env["GITHUB_RETENTION_DAYS"] = github.RetentionDays
