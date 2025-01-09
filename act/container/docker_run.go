@@ -526,8 +526,9 @@ func (cr *containerReference) extractFromImageEnv(env *map[string]string) common
 
 		inspect, _, err := cr.cli.ImageInspectWithRaw(ctx, cr.input.Image)
 		if err != nil {
+			err = fmt.Errorf("inspect image: %w", err)
 			logger.Error(err)
-			return fmt.Errorf("inspect image: %w", err)
+			return err
 		}
 
 		if inspect.Config == nil {
@@ -536,8 +537,9 @@ func (cr *containerReference) extractFromImageEnv(env *map[string]string) common
 
 		imageEnv, err := godotenv.Unmarshal(strings.Join(inspect.Config.Env, "\n"))
 		if err != nil {
+			err = fmt.Errorf("unmarshal image env: %w", err)
 			logger.Error(err)
-			return fmt.Errorf("unmarshal image env: %w", err)
+			return err
 		}
 
 		for k, v := range imageEnv {
@@ -709,7 +711,7 @@ func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal boo
 		return ctx.Err()
 	case err := <-cmdResponse:
 		if err != nil {
-			logger.Error(err)
+			logger.Errorf("command response: %v", err)
 		}
 
 		return nil
@@ -754,11 +756,11 @@ func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgno
 			name := tarFile.Name()
 			err := tarFile.Close()
 			if err != nil && !errors.Is(err, os.ErrClosed) {
-				logger.Error(err)
+				logger.Errorf("close tar file: %s: %v", name, err)
 			}
 			err = os.Remove(name)
 			if err != nil {
-				logger.Error(err)
+				logger.Errorf("remove file: %s: %v", name, err)
 			}
 		}(tarFile)
 		tw := tar.NewWriter(tarFile)
@@ -797,6 +799,8 @@ func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgno
 			return err
 		}
 		if err := tw.Close(); err != nil {
+			err = fmt.Errorf("close tar writer: %w", err)
+			logger.Debug(err)
 			return err
 		}
 
@@ -875,7 +879,7 @@ func (cr *containerReference) attach() common.Executor {
 				_, err = io.Copy(outWriter, out.Reader)
 			}
 			if err != nil {
-				common.Logger(ctx).Error(err)
+				common.Logger(ctx).Errorf("redirect container output: %v", err)
 			}
 		}()
 		return nil
