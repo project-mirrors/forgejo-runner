@@ -7,7 +7,7 @@ toolchain go1.23.4
 require (
 	code.gitea.io/actions-proto-go v0.4.0
 	code.gitea.io/gitea-vet v0.2.3
-	connectrpc.com/connect v1.17.0
+	connectrpc.com/connect v1.18.1
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/docker/docker v25.0.7+incompatible
 	github.com/google/uuid v1.6.0
