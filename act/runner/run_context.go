@@ -555,7 +555,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			ValidVolumes:   rc.Config.ValidVolumes,
 
 			JobOptions:    rc.options(ctx),
-			ConfigOptions: "",
+			ConfigOptions: rc.Config.ContainerOptions,
 		})
 		if rc.JobContainer == nil {
 			return errors.New("Failed to create job container")
