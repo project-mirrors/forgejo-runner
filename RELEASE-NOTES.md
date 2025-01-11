@@ -1,5 +1,9 @@
 # Release Notes
 
+## 6.0.1
+
+* [Fixes a regression](https://code.forgejo.org/forgejo/runner/issues/425) that was introduced in version 6.0.0 by which the `[container].options` config file setting was ignored.
+
 ## 6.0.0
 
 * Security: the container options a job is allowed to specify are limited to a [predefined allow list](https://forgejo.org/docs/next/user/actions/#jobsjob_idcontaineroptions).
