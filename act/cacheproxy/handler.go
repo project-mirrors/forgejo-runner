@@ -151,8 +151,10 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 
 			r.Out.Header.Add("Forgejo-Cache-Repo", runData.RepositoryFullName)
 			r.Out.Header.Add("Forgejo-Cache-RunNumber", runData.RunNumber)
+			r.Out.Header.Add("Forgejo-Cache-RunId", id)
 			r.Out.Header.Add("Forgejo-Cache-Timestamp", runData.Timestamp)
 			r.Out.Header.Add("Forgejo-Cache-MAC", runData.RepositoryMAC)
+			r.Out.Header.Add("Forgejo-Cache-Host", h.ExternalURL())
 		},
 	}
 	return proxy, nil

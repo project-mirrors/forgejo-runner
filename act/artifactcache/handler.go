@@ -199,9 +199,10 @@ func (h *Handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 		h.responseJSON(w, r, 204)
 		return
 	}
+	archiveLocation := fmt.Sprintf("%s/%s%s/artifacts/%d", r.Header.Get("Forgejo-Cache-Host"), r.Header.Get("Forgejo-Cache-RunId"), urlBase, cache.ID)
 	h.responseJSON(w, r, 200, map[string]any{
 		"result":          "hit",
-		"archiveLocation": fmt.Sprintf("%s%s/artifacts/%d", h.ExternalURL(), urlBase, cache.ID),
+		"archiveLocation": archiveLocation,
 		"cacheKey":        cache.Key,
 	})
 }
