@@ -163,7 +163,7 @@ func (h *Handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 	rundata := runDataFromHeaders(r)
 	repo, err := h.validateMac(rundata)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 403, err)
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, params httprou
 	rundata := runDataFromHeaders(r)
 	repo, err := h.validateMac(rundata)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 403, err)
 		return
 	}
 
@@ -250,7 +250,7 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 	rundata := runDataFromHeaders(r)
 	repo, err := h.validateMac(rundata)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 403, err)
 		return
 	}
 
@@ -304,7 +304,7 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 	rundata := runDataFromHeaders(r)
 	repo, err := h.validateMac(rundata)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 403, err)
 		return
 	}
 
@@ -372,7 +372,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 	rundata := runDataFromHeaders(r)
 	repo, err := h.validateMac(rundata)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 403, err)
 		return
 	}
 
@@ -413,7 +413,7 @@ func (h *Handler) clean(w http.ResponseWriter, r *http.Request, params httproute
 	rundata := runDataFromHeaders(r)
 	_, err := h.validateMac(rundata)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 403, err)
 		return
 	}
 	// TODO: don't support force deleting cache entries
