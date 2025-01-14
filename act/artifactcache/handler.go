@@ -409,7 +409,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 }
 
 // POST /_apis/artifactcache/clean
-func (h *Handler) clean(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+func (h *Handler) clean(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	rundata := runDataFromHeaders(r)
 	_, err := h.validateMac(rundata)
 	if err != nil {
