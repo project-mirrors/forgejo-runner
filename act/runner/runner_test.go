@@ -20,7 +20,7 @@ import (
 )
 
 var (
-	baseImage = "node:16-buster-slim"
+	baseImage = "code.forgejo.org/oci/node:20-bookworm"
 	platforms map[string]string
 	logLevel  = log.DebugLevel
 	workdir   = "testdata"
@@ -540,7 +540,7 @@ func (f *maskJobLoggerFactory) WithJobLogger() *log.Logger {
 }
 
 func TestMaskValues(t *testing.T) {
-	assertNoSecret := func(text string, secret string) {
+	assertNoSecret := func(text, secret string) {
 		index := strings.Index(text, "composite secret")
 		if index > -1 {
 			fmt.Printf("\nFound Secret in the given text:\n%s\n", text)
