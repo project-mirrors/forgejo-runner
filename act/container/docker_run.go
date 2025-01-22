@@ -435,6 +435,11 @@ func (cr *containerReference) mergeJobOptions(ctx context.Context, config *conta
 		}
 	}
 
+	if len(jobConfig.Config.Hostname) > 0 {
+		logger.Debugf("--hostname %v", jobConfig.Config.Hostname)
+		config.Hostname = jobConfig.Config.Hostname
+	}
+
 	return config, hostConfig, nil
 }
 
