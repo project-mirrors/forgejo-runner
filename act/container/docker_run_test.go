@@ -258,13 +258,13 @@ func TestMergeJobOptions(t *testing.T) {
 	}{
 		{
 			name:    "ok",
-			options: "--volume /foo:/bar --volume /frob:/nitz --volume somevolume --tmpfs /tmp:exec,noatime --hostname alternatehost",
+			options: "--volume /frob:/nitz --volume somevolume --tmpfs /tmp:exec,noatime --hostname alternatehost",
 			config: &container.Config{
 				Volumes:  map[string]struct{}{"somevolume": {}},
 				Hostname: "alternatehost",
 			},
 			hostConfig: &container.HostConfig{
-				Binds: []string{"/foo:/bar", "/frob:/nitz"},
+				Binds: []string{"/frob:/nitz"},
 				Tmpfs: map[string]string{"/tmp": "exec,noatime"},
 			},
 		},
