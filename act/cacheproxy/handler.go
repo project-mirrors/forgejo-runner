@@ -173,19 +173,21 @@ func (h *Handler) ExternalURL() string {
 // The RunData contains the information about the repository.
 // The function returns the 32-bit random key which the run will use to identify itself.
 func (h *Handler) AddRun(data RunData) (string, error) {
-	keyBytes := make([]byte, 4)
-	_, err := rand.Read(keyBytes)
-	if err != nil {
-		return "", errors.New("Could not generate the run id")
-	}
-	key := hex.EncodeToString(keyBytes)
+	for retries := 0; retries < 3; retries++ {
+		keyBytes := make([]byte, 4)
+		_, err := rand.Read(keyBytes)
+		if err != nil {
+			return "", errors.New("Could not generate the run id")
+		}
+		key := hex.EncodeToString(keyBytes)
 
-	_, loaded := h.runs.LoadOrStore(key, data)
-	if loaded {
-		return "", errors.New("Run id already exists")
+		_, loaded := h.runs.LoadOrStore(key, data)
+		if !loaded {
+			// The key was unique and added successfully
+			return key, nil
+		}
 	}
-
-	return key, nil
+	return "", errors.New("Repeated collisions in generating run id")
 }
 
 func (h *Handler) RemoveRun(runID string) error {
