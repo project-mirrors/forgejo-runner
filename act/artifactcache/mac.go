@@ -25,7 +25,7 @@ func (h *Handler) validateMac(rundata cacheproxy.RunData) (string, error) {
 	}
 
 	expectedMAC := computeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp)
-	if expectedMAC == rundata.RepositoryMAC {
+	if hmac.Equal([]byte(expectedMAC), []byte(rundata.RepositoryMAC)) {
 		return rundata.RepositoryFullName, nil
 	}
 	return rundata.RepositoryFullName, ErrValidation

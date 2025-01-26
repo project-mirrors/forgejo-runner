@@ -16,6 +16,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"regexp"
+	"strconv"
 	"sync"
 	"time"
 
@@ -27,6 +28,10 @@ import (
 
 const (
 	urlBase = "/_apis/artifactcache"
+)
+
+var (
+	urlRegex = regexp.MustCompile(`/(\w+)(/_apis/artifactcache/.+)`)
 )
 
 type Handler struct {
@@ -133,8 +138,7 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(r *httputil.ProxyRequest) {
-			re := regexp.MustCompile(`/(\w+)(/_apis/artifactcache/.+)`)
-			matches := re.FindStringSubmatch(r.In.URL.Path)
+			matches := urlRegex.FindStringSubmatch(r.In.URL.Path)
 			id := matches[1]
 			data, ok := h.runs.Load(id)
 			var runData = data.(RunData)
@@ -149,12 +153,12 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 			r.SetURL(targetURL)
 			r.Out.URL.Path = uri
 
-			r.Out.Header.Add("Forgejo-Cache-Repo", runData.RepositoryFullName)
-			r.Out.Header.Add("Forgejo-Cache-RunNumber", runData.RunNumber)
-			r.Out.Header.Add("Forgejo-Cache-RunId", id)
-			r.Out.Header.Add("Forgejo-Cache-Timestamp", runData.Timestamp)
-			r.Out.Header.Add("Forgejo-Cache-MAC", runData.RepositoryMAC)
-			r.Out.Header.Add("Forgejo-Cache-Host", h.ExternalURL())
+			r.Out.Header.Set("Forgejo-Cache-Repo", runData.RepositoryFullName)
+			r.Out.Header.Set("Forgejo-Cache-RunNumber", runData.RunNumber)
+			r.Out.Header.Set("Forgejo-Cache-RunId", id)
+			r.Out.Header.Set("Forgejo-Cache-Timestamp", runData.Timestamp)
+			r.Out.Header.Set("Forgejo-Cache-MAC", runData.RepositoryMAC)
+			r.Out.Header.Set("Forgejo-Cache-Host", h.ExternalURL())
 		},
 	}
 	return proxy, nil
@@ -162,9 +166,7 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 
 func (h *Handler) ExternalURL() string {
 	// TODO: make the external url configurable if necessary
-	return fmt.Sprintf("http://%s:%d",
-		h.outboundIP,
-		h.listener.Addr().(*net.TCPAddr).Port)
+	return net.JoinHostPort(h.outboundIP, strconv.Itoa(h.listener.Addr().(*net.TCPAddr).Port))
 }
 
 // Informs the proxy of a workflow run that can make cache requests.
@@ -178,7 +180,10 @@ func (h *Handler) AddRun(data RunData) (string, error) {
 	}
 	key := hex.EncodeToString(keyBytes)
 
-	h.runs.Store(key, data)
+	_, loaded := h.runs.LoadOrStore(key, data)
+	if loaded {
+		return "", errors.New("Run id already exists")
+	}
 
 	return key, nil
 }
@@ -219,7 +224,9 @@ func (h *Handler) Close() error {
 func computeMac(secret, repo, run, ts string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(repo))
+	mac.Write([]byte(">"))
 	mac.Write([]byte(run))
+	mac.Write([]byte(">"))
 	mac.Write([]byte(ts))
 	return hex.EncodeToString(mac.Sum(nil))
 }
