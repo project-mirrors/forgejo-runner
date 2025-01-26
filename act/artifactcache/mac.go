@@ -45,7 +45,9 @@ func validateAge(ts string) bool {
 func computeMac(secret, repo, run, ts string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(repo))
+	mac.Write([]byte(">"))
 	mac.Write([]byte(run))
+	mac.Write([]byte(">"))
 	mac.Write([]byte(ts))
 	return hex.EncodeToString(mac.Sum(nil))
 }

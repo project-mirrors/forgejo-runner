@@ -166,7 +166,7 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 
 func (h *Handler) ExternalURL() string {
 	// TODO: make the external url configurable if necessary
-	return net.JoinHostPort(h.outboundIP, strconv.Itoa(h.listener.Addr().(*net.TCPAddr).Port))
+	return fmt.Sprintf("http://%s", net.JoinHostPort(h.outboundIP, strconv.Itoa(h.listener.Addr().(*net.TCPAddr).Port)))
 }
 
 // Informs the proxy of a workflow run that can make cache requests.
