@@ -207,6 +207,11 @@ function ensure_configuration_and_registration() {
 .runner.labels = ["docker:docker://data.forgejo.org/oci/node:${NODEJS_VERSION}-${DEBIAN_RELEASE}","lxc:lxc://debian:${DEBIAN_RELEASE}"]
 EOF
     yq --inplace --from-file $TMPDIR/edit-config $etc/config.yml
+    cat >$TMPDIR/edit-config <<EOF
+.cache.dir = "/var/lib/forgejo-runner/runner-${INPUTS_SERIAL}-lxc/.cache/actcache"
+EOF
+    yq --inplace --from-file $TMPDIR/edit-config $etc/config.yml
+
   fi
 
   if ! test -f $etc/env; then

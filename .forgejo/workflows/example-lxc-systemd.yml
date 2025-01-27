@@ -82,6 +82,10 @@ jobs:
            service=/etc/systemd/system/forgejo-runner@.service
            cat $service
 
+           cache=/var/lib/forgejo-runner/runner-$INPUTS_SERIAL-lxc/.cache/actcache
+           touch $cache/something
+           lxc-attach runner-$INPUTS_SERIAL-lxc -- test -f $cache/something
+
        - name: forgejo-runner-service.sh start / stop
          run: |
            set -x
