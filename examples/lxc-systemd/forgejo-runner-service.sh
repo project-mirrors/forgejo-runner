@@ -31,6 +31,7 @@ SELF_FILENAME=$(basename "$SELF")
 ETC=/etc/forgejo-runner
 LIB=/var/lib/forgejo-runner
 LOG=/var/log/forgejo-runner
+LOCK=/var/lock/forgejo-runner
 : ${HOST:=$(hostname)}
 
 LXC_IPV4_PREFIX="10.105.7"
@@ -253,10 +254,19 @@ function daemon() {
   set -e
 }
 
-function start() {
+function destroy_and_create() {
   stop
   lxc-helpers.sh lxc_container_destroy $(lxc_name)
   lxc_create
+}
+
+function start() {
+  # it should be more than
+  # (time it takes for one runner to be recreated) * (number of runners)
+  # because they will all start at the same time on boot
+  local timeout=3600
+
+  flock --timeout $timeout $LOCK $SELF destroy_and_create
 
   local log=$LOG/$INPUTS_SERIAL.log
   if test -f $log; then
