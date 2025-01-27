@@ -31,6 +31,7 @@ SELF_FILENAME=$(basename "$SELF")
 ETC=/etc/forgejo-runner
 LIB=/var/lib/forgejo-runner
 LOG=/var/log/forgejo-runner
+LOCK=/var/lock/forgejo-runner
 : ${HOST:=$(hostname)}
 
 LXC_IPV4_PREFIX="10.105.7"
@@ -159,13 +160,14 @@ function inside() {
   local name=$(lxc_name)
 
   lxc-helpers.sh lxc_container_run $name -- sudo --user $LXC_USER_NAME \
-    INPUTS_SERIAL=$INPUTS_SERIAL \
-    INPUTS_TOKEN=$INPUTS_TOKEN \
-    INPUTS_FORGEJO=$INPUTS_FORGEJO \
-    INPUTS_LIFETIME=$INPUTS_LIFETIME \
-    KILL_AFTER=$KILL_AFTER \
-    VERBOSE=$VERBOSE \
-    HOST=$HOST \
+    INPUTS_SERIAL="$INPUTS_SERIAL" \
+    INPUTS_LXC_CONFIG="$INPUTS_LXC_CONFIG" \
+    INPUTS_TOKEN="$INPUTS_TOKEN" \
+    INPUTS_FORGEJO="$INPUTS_FORGEJO" \
+    INPUTS_LIFETIME="$INPUTS_LIFETIME" \
+    KILL_AFTER="$KILL_AFTER" \
+    VERBOSE="$VERBOSE" \
+    HOST="$HOST" \
     $SELF_FILENAME "$@"
 }
 
@@ -206,6 +208,11 @@ function ensure_configuration_and_registration() {
 .runner.labels = ["docker:docker://data.forgejo.org/oci/node:${NODEJS_VERSION}-${DEBIAN_RELEASE}","lxc:lxc://debian:${DEBIAN_RELEASE}"]
 EOF
     yq --inplace --from-file $TMPDIR/edit-config $etc/config.yml
+    cat >$TMPDIR/edit-config <<EOF
+.cache.dir = "/var/lib/forgejo-runner/runner-${INPUTS_SERIAL}-lxc/.cache/actcache"
+EOF
+    yq --inplace --from-file $TMPDIR/edit-config $etc/config.yml
+
   fi
 
   if ! test -f $etc/env; then
@@ -247,10 +254,19 @@ function daemon() {
   set -e
 }
 
-function start() {
+function destroy_and_create() {
   stop
   lxc-helpers.sh lxc_container_destroy $(lxc_name)
   lxc_create
+}
+
+function start() {
+  # it should be more than
+  # (time it takes for one runner to be recreated) * (number of runners)
+  # because they will all start at the same time on boot
+  local timeout=3600
+
+  flock --timeout $timeout $LOCK $SELF destroy_and_create
 
   local log=$LOG/$INPUTS_SERIAL.log
   if test -f $log; then
