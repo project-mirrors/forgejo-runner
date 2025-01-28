@@ -265,7 +265,7 @@ function daemon() {
 }
 
 function destroy_and_create() {
-  stop
+  stop || true
   lxc-helpers.sh lxc_container_destroy $(lxc_name)
   lxc_create
 }
