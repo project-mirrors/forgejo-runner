@@ -101,7 +101,7 @@ ACTIONS IN THE CONTAINER
       Install LXC in the `name` container to allow the creation of
       named containers. `prefix` is a class C IP prefix from which
       containers will obtain their IP (for instance 10.40.50). `prefixv6`
-      is an optional IPv6 private address prefix that defaults to fc15.
+      is an optional IPv6 private address prefix that defaults to fd15.
 
    lxc_container_run `name` command [options...]
 
@@ -129,32 +129,32 @@ EOF
 function main() {
     local options=$(getopt -o hvoc --long help,verbose,os:,config: -- "$@")
     [ $? -eq 0 ] || {
-	echo "Incorrect options provided"
-	exit 1
+        echo "Incorrect options provided"
+        exit 1
     }
     eval set -- "$options"
     while true; do
-	case "$1" in
-	    -v | --verbose)
-		verbose
-		;;
-	    -h | --help)
-		help
-		;;
-	    -o | --os)
-		LXC_CONTAINER_RELEASE=$2
-		shift
-		;;
-	    -c | --config)
-		LXC_CONTAINER_CONFIG="$2"
-		shift
-		;;
-	    --)
-		shift
-		break
-		;;
-	esac
-	shift
+        case "$1" in
+        -v | --verbose)
+            verbose
+            ;;
+        -h | --help)
+            help
+            ;;
+        -o | --os)
+            LXC_CONTAINER_RELEASE=$2
+            shift
+            ;;
+        -c | --config)
+            LXC_CONTAINER_CONFIG="$2"
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        esac
+        shift
     done
 
     lxc_maybe_sudo

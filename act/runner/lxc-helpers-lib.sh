@@ -3,13 +3,14 @@
 
 export DEBIAN_FRONTEND=noninteractive
 
-LXC_SELF_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+LXC_SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LXC_BIN=/usr/local/bin
 LXC_CONTAINER_CONFIG_ALL="unprivileged lxc libvirt docker k8s"
 LXC_CONTAINER_CONFIG_DEFAULT="lxc libvirt docker"
-LXC_IPV6_PREFIX_DEFAULT="fc15"
+LXC_IPV6_PREFIX_DEFAULT="fd15"
 LXC_DOCKER_PREFIX_DEFAULT="172.17"
 LXC_IPV6_DOCKER_PREFIX_DEFAULT="fd00:d0ca"
+LXC_APT_TOO_OLD='1 week ago'
 
 : ${LXC_SUDO:=}
 : ${LXC_CONTAINER_RELEASE:=bookworm}
@@ -75,14 +76,14 @@ function lxc_container_user_install() {
     local user_id="$2"
     local user="$3"
 
-    if test "$user" = root ; then
-	return
+    if test "$user" = root; then
+        return
     fi
 
     local root=$(lxc_root $name)
 
-    if ! $LXC_SUDO grep --quiet "^$user " $root/etc/sudoers ; then
-	$LXC_SUDO tee $root/usr/local/bin/lxc-helpers-create-user.sh > /dev/null <<EOF
+    if ! $LXC_SUDO grep --quiet "^$user " $root/etc/sudoers; then
+        $LXC_SUDO tee $root/usr/local/bin/lxc-helpers-create-user.sh >/dev/null <<EOF
 #!/bin/bash
 set -ex
 
@@ -94,20 +95,20 @@ done
 echo "$user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 sudo --user $user ssh-keygen -b 2048 -N '' -f $LXC_HOME/$user/.ssh/id_rsa
 EOF
-	lxc_container_run_script $name /usr/local/bin/lxc-helpers-create-user.sh
+        lxc_container_run_script $name /usr/local/bin/lxc-helpers-create-user.sh
     fi
 }
 
 function lxc_maybe_sudo() {
-    if test $(id -u) != 0 ; then
-	LXC_SUDO=sudo
+    if test $(id -u) != 0; then
+        LXC_SUDO=sudo
     fi
 }
 
 function lxc_prepare_environment() {
     lxc_maybe_sudo
-    if ! $(which lxc-create > /dev/null) ; then
-	$LXC_SUDO apt-get install -y -qq make git libvirt0 libpam-cgfs bridge-utils uidmap dnsmasq-base dnsmasq dnsmasq-utils qemu-user-static
+    if ! $(which lxc-create >/dev/null); then
+        $LXC_SUDO apt-get install -y -qq make git libvirt0 libpam-cgfs bridge-utils uidmap dnsmasq-base dnsmasq dnsmasq-utils qemu-user-static
     fi
 }
 
@@ -194,42 +195,41 @@ EOF
 }
 
 function lxc_container_config() {
-    for config in "$@" ; do
-	case $config in
-	    unprivileged)
-		;;
-	    lxc)
-		echo nesting
-		echo cap
-		;;
-	    docker)
-		echo net
-		;;
-	    libvirt)
-		echo cap
-		echo kvm
-		echo loop
-		echo mapper
-		echo fuse
-		;;
-	    k8s)
-		echo cap
-		echo loop
-		echo mapper
-		echo fuse
-		echo kmsg
-		echo proc
-		;;
-	    *)
-		echo "$config unknown ($LXC_CONTAINER_CONFIG_ALL)"
-		return 1
-		;;
-	esac
-    done | sort -u | while read config ; do
-	echo "#"
-	echo "# include $config config snippet"
-	echo "#"
-	lxc_container_config_$config
+    for config in "$@"; do
+        case $config in
+        unprivileged) ;;
+        lxc)
+            echo nesting
+            echo cap
+            ;;
+        docker)
+            echo net
+            ;;
+        libvirt)
+            echo cap
+            echo kvm
+            echo loop
+            echo mapper
+            echo fuse
+            ;;
+        k8s)
+            echo cap
+            echo loop
+            echo mapper
+            echo fuse
+            echo kmsg
+            echo proc
+            ;;
+        *)
+            echo "$config unknown ($LXC_CONTAINER_CONFIG_ALL)"
+            return 1
+            ;;
+        esac
+    done | sort -u | while read config; do
+        echo "#"
+        echo "# include $config config snippet"
+        echo "#"
+        lxc_container_config_$config
     done
 }
 
@@ -247,7 +247,7 @@ function lxc_container_install_lxc_helpers() {
     # Wait for the network to come up
     #
     local wait_networking=$(lxc_root $name)/usr/local/bin/lxc-helpers-wait-networking.sh
-    $LXC_SUDO tee $wait_networking > /dev/null <<'EOF'
+    $LXC_SUDO tee $wait_networking >/dev/null <<'EOF'
 #!/bin/sh -e
 for d in $(seq 60); do
   getent hosts wikipedia.org > /dev/null && break
@@ -271,23 +271,22 @@ function lxc_container_mount() {
 
     local config=$(lxc_config $name)
 
-    if ! $LXC_SUDO grep --quiet "lxc.mount.entry = $dir" $config ; then
-	local relative_dir=${dir##/}
-	$LXC_SUDO tee -a $config > /dev/null <<< "lxc.mount.entry = $dir $relative_dir none bind,create=dir 0 0"
+    if ! $LXC_SUDO grep --quiet "lxc.mount.entry = $dir" $config; then
+        local relative_dir=${dir##/}
+        $LXC_SUDO tee -a $config >/dev/null <<<"lxc.mount.entry = $dir $relative_dir none bind,create=dir 0 0"
     fi
 }
-
 
 function lxc_container_start() {
     local name="$1"
 
-    if lxc_running $name ; then
-	return
+    if lxc_running $name; then
+        return
     fi
 
     local logs
     if $LXC_VERBOSE; then
-	logs="--logfile=/dev/tty"
+        logs="--logfile=/dev/tty"
     fi
 
     $LXC_SUDO lxc-start $logs $name
@@ -298,8 +297,8 @@ function lxc_container_start() {
 function lxc_container_stop() {
     local name="$1"
 
-    $LXC_SUDO lxc-ls -1 --running --filter="^$name" | while read container ; do
-	$LXC_SUDO lxc-stop --kill --name="$container"
+    $LXC_SUDO lxc-ls -1 --running --filter="^$name" | while read container; do
+        $LXC_SUDO lxc-stop --kill --name="$container"
     done
 }
 
@@ -307,9 +306,9 @@ function lxc_container_destroy() {
     local name="$1"
     local root="$2"
 
-    if lxc_exists "$name" ; then
-	lxc_container_stop $name $root
-	$LXC_SUDO lxc-destroy --force --name="$name"
+    if lxc_exists "$name"; then
+        lxc_container_stop $name $root
+        $LXC_SUDO lxc-destroy --force --name="$name"
     fi
 }
 
@@ -317,6 +316,21 @@ function lxc_exists() {
     local name="$1"
 
     test "$($LXC_SUDO lxc-ls --filter=^$name\$)"
+}
+
+function lxc_exists_and_apt_not_old() {
+    local name="$1"
+
+    if lxc_exists $name; then
+        if lxc_apt_is_old $name; then
+            $LXC_SUDO lxc-destroy --force --name="$name"
+            return 1
+        else
+            return 0
+        fi
+    else
+        return 1
+    fi
 }
 
 function lxc_running() {
@@ -328,8 +342,8 @@ function lxc_running() {
 function lxc_build_template_release() {
     local name="$(lxc_template_release)"
 
-    if lxc_exists $name ; then
-	return
+    if lxc_exists_and_apt_not_old $name; then
+        return
     fi
 
     local root=$(lxc_root $name)
@@ -346,19 +360,33 @@ function lxc_build_template() {
     local name="$1"
     local newname="$2"
 
-    if lxc_exists $newname ; then
-	return
+    if lxc_exists_and_apt_not_old $newname; then
+        return
     fi
 
-    if test "$name" = "$(lxc_template_release)" ; then
-	lxc_build_template_release
+    if test "$name" = "$(lxc_template_release)"; then
+        lxc_build_template_release
     fi
 
-    if ! $LXC_SUDO lxc-copy --name=$name --newname=$newname ; then
-	echo lxc-copy --name=$name --newname=$newname failed
-	return 1
+    if ! $LXC_SUDO lxc-copy --name=$name --newname=$newname; then
+        echo lxc-copy --name=$name --newname=$newname failed
+        return 1
     fi
     lxc_container_configure $newname
+}
+
+function lxc_apt_age() {
+    local name="$1"
+    $LXC_SUDO stat --format %Y $(lxc_root $name)/var/cache/apt/pkgcache.bin
+}
+
+function lxc_apt_is_old() {
+    local name="$1"
+
+    local age=$(lxc_apt_age $name)
+    local too_old=$(date --date "$LXC_APT_TOO_OLD" +%s)
+
+    test $age -lt $too_old
 }
 
 function lxc_apt_install() {
@@ -385,19 +413,19 @@ function lxc_install_lxc_inside() {
     local prefixv6="${2:-$LXC_IPV6_PREFIX_DEFAULT}"
 
     local packages="make git libvirt0 libpam-cgfs bridge-utils uidmap dnsmasq-base dnsmasq dnsmasq-utils qemu-user-static lxc-templates debootstrap"
-    if test "$(lxc_release)" = bookworm ; then
-	packages="$packages distro-info"
+    if test "$(lxc_release)" = bookworm; then
+        packages="$packages distro-info"
     fi
 
     lxc_apt_install_inside $packages
 
-    if ! grep --quiet LXC_ADDR=.$prefix.1. /etc/default/lxc-net ; then
-	systemctl disable --now dnsmasq
-	apt-get install -y -qq lxc
-	systemctl stop lxc-net
-	sed -i -e '/ConditionVirtualization/d' /usr/lib/systemd/system/lxc-net.service
-	systemctl daemon-reload
-	cat >> /etc/default/lxc-net <<EOF
+    if ! grep --quiet LXC_ADDR=.$prefix.1. /etc/default/lxc-net; then
+        systemctl disable --now dnsmasq
+        apt-get install -y -qq lxc
+        systemctl stop lxc-net
+        sed -i -e '/ConditionVirtualization/d' /usr/lib/systemd/system/lxc-net.service
+        systemctl daemon-reload
+        cat >>/etc/default/lxc-net <<EOF
 LXC_ADDR="$prefix.1"
 LXC_NETMASK="255.255.255.0"
 LXC_NETWORK="$prefix.0/24"
@@ -408,7 +436,7 @@ LXC_IPV6_MASK="64"
 LXC_IPV6_NETWORK="$prefixv6::/64"
 LXC_IPV6_NAT="true"
 EOF
-	systemctl start lxc-net
+        systemctl start lxc-net
     fi
 }
 
@@ -420,7 +448,7 @@ function lxc_install_docker() {
 
 function lxc_install_docker_inside() {
     mkdir /etc/docker
-    cat > /etc/docker/daemon.json <<EOF
+    cat >/etc/docker/daemon.json <<EOF
 {
   "ipv6": true,
   "fixed-cidr-v6": "$LXC_IPV6_DOCKER_PREFIX_DEFAULT:1::/64",
