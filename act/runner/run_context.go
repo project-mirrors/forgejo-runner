@@ -222,8 +222,8 @@ EOF
 function build_template_act() {
     local name="$(template_act)"
 
-    if lxc_exists $name ; then
-      return
+    if lxc_exists_and_apt_not_old $name ; then
+      return 0
     fi
 
     lxc_build_template $(lxc_template_release) $name
