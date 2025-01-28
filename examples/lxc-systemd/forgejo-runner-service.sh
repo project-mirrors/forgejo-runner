@@ -159,6 +159,7 @@ EOF
 function inside() {
   local name=$(lxc_name)
 
+  # all exported variables must be --unset before running the daemon
   lxc-helpers.sh lxc_container_run $name -- sudo --user $LXC_USER_NAME \
     INPUTS_SERIAL="$INPUTS_SERIAL" \
     INPUTS_LXC_CONFIG="$INPUTS_LXC_CONFIG" \
@@ -245,7 +246,16 @@ function daemon() {
   rm -f stopped-* killed-*
   touch started-running
   set +e
-  timeout --signal=SIGINT --kill-after=$KILL_AFTER $INPUTS_LIFETIME forgejo-runner --config config.yml daemon
+  timeout --signal=SIGINT --kill-after=$KILL_AFTER $INPUTS_LIFETIME env \
+    --unset INPUTS_SERIAL \
+    --unset INPUTS_LXC_CONFIG \
+    --unset INPUTS_TOKEN \
+    --unset INPUTS_FORGEJO \
+    --unset INPUTS_LIFETIME \
+    --unset KILL_AFTER \
+    --unset VERBOSE \
+    --unset HOST \
+    /usr/local/bin/forgejo-runner --config config.yml daemon
   case $? in
   0) touch stopped-gracefully ;;
   124) touch stopped-timeout ;;
