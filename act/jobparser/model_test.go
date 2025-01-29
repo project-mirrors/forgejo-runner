@@ -163,13 +163,16 @@ func TestParseRawOn(t *testing.T) {
 			},
 		},
 		{
-			input: "on: [pull_request, workflow_dispatch]",
+			input: "on: [pull_request, workflow_dispatch, workflow_call]",
 			result: []*Event{
 				{
 					Name: "pull_request",
 				},
 				{
 					Name: "workflow_dispatch",
+				},
+				{
+					Name: "workflow_call",
 				},
 			},
 		},
@@ -191,6 +194,14 @@ func TestParseRawOn(t *testing.T) {
 			result: []*Event{
 				{
 					Name: "workflow_dispatch",
+				},
+			},
+		},
+		{
+			input: "on:\n  workflow_call:\n    inputs:\n      test:\n        type: string\n    outputs:\n      output:\n        value: something",
+			result: []*Event{
+				{
+					Name: "workflow_call",
 				},
 			},
 		},

@@ -260,7 +260,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 							}
 						}
 					case map[string]interface{}:
-						if k != "workflow_dispatch" || act != "inputs" {
+						if isInvalidOnType(k, act) {
 							return nil, fmt.Errorf("unknown on type: %#v", v)
 						}
 						acts = nil
@@ -302,6 +302,16 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 	default:
 		return nil, fmt.Errorf("unknown on type: %v", rawOn.Kind)
 	}
+}
+
+func isInvalidOnType(onType, subKey string) bool {
+	if onType == "workflow_dispatch" && subKey == "inputs" {
+		return false
+	}
+	if onType == "workflow_call" && (subKey == "inputs" || subKey == "outputs") {
+		return false
+	}
+	return true
 }
 
 // parseMappingNode parse a mapping node and preserve order.
