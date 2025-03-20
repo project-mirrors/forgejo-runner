@@ -391,7 +391,7 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 	defer db.Close()
 	if err := db.Get(id, cache); err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
-			h.responseJSON(w, r, 400, fmt.Errorf("cache %d: not reserved", id))
+			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
 		h.responseJSON(w, r, 500, err)
