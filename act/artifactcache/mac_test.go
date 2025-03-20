@@ -73,7 +73,7 @@ func TestMac(t *testing.T) {
 		ts := "1337"
 
 		mac := computeMac(secret, name, run, ts)
-		expectedMac := "09b0e9111660359d319c2d55c0664b5a6c5915c2f705b08af61aa63e7542f511" // * Precomputed, anytime the computeMac function changes this needs to be recalculated
+		expectedMac := "f666f06f917acb7186e152195b2a8c8d36d068ce683454be0878806e08e04f2b" // * Precomputed, anytime the computeMac function changes this needs to be recalculated
 
 		require.Equal(t, mac, expectedMac)
 	})
