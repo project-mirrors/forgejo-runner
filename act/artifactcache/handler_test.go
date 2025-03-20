@@ -23,6 +23,8 @@ const cache_runnum = "1"
 const cache_timestamp = "0"
 const cache_mac = "c13854dd1ac599d1d61680cd93c26b77ba0ee10f374a3408bcaea82f38ca1865"
 
+var handlerExternalUrl string
+
 type AuthHeaderTransport struct {
 	T http.RoundTripper
 }
@@ -32,6 +34,7 @@ func (t *AuthHeaderTransport) RoundTrip(req *http.Request) (*http.Response, erro
 	req.Header.Set("Forgejo-Cache-RunNumber", cache_runnum)
 	req.Header.Set("Forgejo-Cache-Timestamp", cache_timestamp)
 	req.Header.Set("Forgejo-Cache-MAC", cache_mac)
+	req.Header.Set("Forgejo-Cache-Host", handlerExternalUrl)
 	return t.T.RoundTrip(req)
 }
 
@@ -43,6 +46,7 @@ func TestHandler(t *testing.T) {
 	handler, err := StartHandler(dir, "", 0, "secret", nil)
 	require.NoError(t, err)
 
+	handlerExternalUrl = handler.ExternalURL()
 	base := fmt.Sprintf("%s%s", handler.ExternalURL(), urlBase)
 
 	defer func() {
