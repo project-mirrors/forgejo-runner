@@ -59,6 +59,7 @@ type Input struct {
 	logPrefixJobID                     bool
 	networkName                        string
 	useNewActionCache                  bool
+	secret                             string
 }
 
 func (i *Input) resolve(path string) string {

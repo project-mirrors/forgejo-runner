@@ -18,11 +18,35 @@ import (
 	"go.etcd.io/bbolt"
 )
 
+const cache_repo = "testuser/repo"
+const cache_runnum = "1"
+const cache_timestamp = "0"
+const cache_mac = "c13854dd1ac599d1d61680cd93c26b77ba0ee10f374a3408bcaea82f38ca1865"
+
+var handlerExternalUrl string
+
+type AuthHeaderTransport struct {
+	T http.RoundTripper
+}
+
+func (t *AuthHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	req.Header.Set("Forgejo-Cache-Repo", cache_repo)
+	req.Header.Set("Forgejo-Cache-RunNumber", cache_runnum)
+	req.Header.Set("Forgejo-Cache-Timestamp", cache_timestamp)
+	req.Header.Set("Forgejo-Cache-MAC", cache_mac)
+	req.Header.Set("Forgejo-Cache-Host", handlerExternalUrl)
+	return t.T.RoundTrip(req)
+}
+
+var httpClientTransport = AuthHeaderTransport{http.DefaultTransport}
+var httpClient = http.Client{Transport: &httpClientTransport}
+
 func TestHandler(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "artifactcache")
-	handler, err := StartHandler(dir, "", 0, nil)
+	handler, err := StartHandler(dir, "", 0, "secret", nil)
 	require.NoError(t, err)
 
+	handlerExternalUrl = handler.ExternalURL()
 	base := fmt.Sprintf("%s%s", handler.ExternalURL(), urlBase)
 
 	defer func() {
@@ -41,7 +65,7 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, handler.Close())
 			assert.Nil(t, handler.server)
 			assert.Nil(t, handler.listener)
-			_, err := http.Post(fmt.Sprintf("%s/caches/%d", base, 1), "", nil)
+			_, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, 1), "", nil)
 			assert.Error(t, err)
 		})
 	}()
@@ -49,7 +73,7 @@ func TestHandler(t *testing.T) {
 	t.Run("get not exist", func(t *testing.T) {
 		key := strings.ToLower(t.Name())
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d20"
-		resp, err := http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
 		require.NoError(t, err)
 		require.Equal(t, 204, resp.StatusCode)
 	})
@@ -64,7 +88,7 @@ func TestHandler(t *testing.T) {
 	})
 
 	t.Run("clean", func(t *testing.T) {
-		resp, err := http.Post(fmt.Sprintf("%s/clean", base), "", nil)
+		resp, err := httpClient.Post(fmt.Sprintf("%s/clean", base), "", nil)
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 	})
@@ -72,7 +96,7 @@ func TestHandler(t *testing.T) {
 	t.Run("reserve with bad request", func(t *testing.T) {
 		body := []byte(`invalid json`)
 		require.NoError(t, err)
-		resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+		resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -90,7 +114,7 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 
@@ -104,7 +128,7 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 
@@ -121,7 +145,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Content-Range", "bytes 0-99/*")
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -132,7 +156,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Content-Range", "bytes 0-99/*")
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, 400, resp.StatusCode)
 	})
@@ -151,7 +175,7 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 
@@ -167,12 +191,12 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-99/*")
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := http.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 		}
@@ -182,7 +206,7 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-99/*")
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
 		}
@@ -202,7 +226,7 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 
@@ -218,7 +242,7 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes xx-99/*")
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
 		}
@@ -226,7 +250,7 @@ func TestHandler(t *testing.T) {
 
 	t.Run("commit with bad id", func(t *testing.T) {
 		{
-			resp, err := http.Post(fmt.Sprintf("%s/caches/invalid_id", base), "", nil)
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/invalid_id", base), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
 		}
@@ -234,7 +258,7 @@ func TestHandler(t *testing.T) {
 
 	t.Run("commit with not exist id", func(t *testing.T) {
 		{
-			resp, err := http.Post(fmt.Sprintf("%s/caches/%d", base, 100), "", nil)
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, 100), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
 		}
@@ -254,7 +278,7 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 
@@ -270,17 +294,17 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-99/*")
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := http.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := http.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
 		}
@@ -300,7 +324,7 @@ func TestHandler(t *testing.T) {
 				Size:    100,
 			})
 			require.NoError(t, err)
-			resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 
@@ -316,33 +340,60 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/octet-stream")
 			req.Header.Set("Content-Range", "bytes 0-59/*")
-			resp, err := http.DefaultClient.Do(req)
+			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		{
-			resp, err := http.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
+			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 500, resp.StatusCode)
 		}
 	})
 
 	t.Run("get with bad id", func(t *testing.T) {
-		resp, err := http.Get(fmt.Sprintf("%s/artifacts/invalid_id", base))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/artifacts/invalid_id", base))
 		require.NoError(t, err)
 		require.Equal(t, 400, resp.StatusCode)
 	})
 
 	t.Run("get with not exist id", func(t *testing.T) {
-		resp, err := http.Get(fmt.Sprintf("%s/artifacts/%d", base, 100))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/artifacts/%d", base, 100))
 		require.NoError(t, err)
 		require.Equal(t, 404, resp.StatusCode)
 	})
 
 	t.Run("get with not exist id", func(t *testing.T) {
-		resp, err := http.Get(fmt.Sprintf("%s/artifacts/%d", base, 100))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/artifacts/%d", base, 100))
 		require.NoError(t, err)
 		require.Equal(t, 404, resp.StatusCode)
+	})
+
+	t.Run("get with bad MAC", func(t *testing.T) {
+		key := strings.ToLower(t.Name())
+		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46b4ee758284e26bb3045ad11d9d20"
+		content := make([]byte, 100)
+		_, err := rand.Read(content)
+		require.NoError(t, err)
+
+		uploadCacheNormally(t, base, key, version, content)
+
+		// Perform the request with the custom `httpClient` which will send correct MAC data
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+		require.NoError(t, err)
+		require.Equal(t, 200, resp.StatusCode)
+
+		// Perform the same request with incorrect MAC data
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version), nil)
+		require.NoError(t, err)
+		req.Header.Set("Forgejo-Cache-Repo", cache_repo)
+		req.Header.Set("Forgejo-Cache-RunNumber", cache_runnum)
+		req.Header.Set("Forgejo-Cache-Timestamp", cache_timestamp)
+		req.Header.Set("Forgejo-Cache-MAC", "33f0e850ba0bdfd2f3e66ff79c1f8004b8226114e3b2e65c229222bb59df0f9d") // ! This is not the correct MAC
+		req.Header.Set("Forgejo-Cache-Host", handlerExternalUrl)
+		resp, err = http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+		require.NoError(t, err)
+		require.Equal(t, 403, resp.StatusCode)
 	})
 
 	t.Run("get with multiple keys", func(t *testing.T) {
@@ -371,7 +422,7 @@ func TestHandler(t *testing.T) {
 			key + "_a",
 		}, ",")
 
-		resp, err := http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 
@@ -391,7 +442,7 @@ func TestHandler(t *testing.T) {
 		assert.Equal(t, "hit", got.Result)
 		assert.Equal(t, keys[except], got.CacheKey)
 
-		contentResp, err := http.Get(got.ArchiveLocation)
+		contentResp, err := httpClient.Get(got.ArchiveLocation)
 		require.NoError(t, err)
 		require.Equal(t, 200, contentResp.StatusCode)
 		content, err := io.ReadAll(contentResp.Body)
@@ -409,7 +460,7 @@ func TestHandler(t *testing.T) {
 
 		{
 			reqKey := key + "_aBc"
-			resp, err := http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKey, version))
+			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKey, version))
 			require.NoError(t, err)
 			require.Equal(t, 200, resp.StatusCode)
 			got := struct {
@@ -448,7 +499,7 @@ func TestHandler(t *testing.T) {
 			key + "_a_b",
 		}, ",")
 
-		resp, err := http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 
@@ -466,7 +517,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 		assert.Equal(t, keys[expect], got.CacheKey)
 
-		contentResp, err := http.Get(got.ArchiveLocation)
+		contentResp, err := httpClient.Get(got.ArchiveLocation)
 		require.NoError(t, err)
 		require.Equal(t, 200, contentResp.StatusCode)
 		content, err := io.ReadAll(contentResp.Body)
@@ -500,7 +551,7 @@ func TestHandler(t *testing.T) {
 			key + "_a_b",
 		}, ",")
 
-		resp, err := http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, reqKeys, version))
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 
@@ -519,7 +570,7 @@ func TestHandler(t *testing.T) {
 		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
 		assert.Equal(t, keys[expect], got.CacheKey)
 
-		contentResp, err := http.Get(got.ArchiveLocation)
+		contentResp, err := httpClient.Get(got.ArchiveLocation)
 		require.NoError(t, err)
 		require.Equal(t, 200, contentResp.StatusCode)
 		content, err := io.ReadAll(contentResp.Body)
@@ -537,7 +588,7 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 			Size:    int64(len(content)),
 		})
 		require.NoError(t, err)
-		resp, err := http.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
+		resp, err := httpClient.Post(fmt.Sprintf("%s/caches", base), "application/json", bytes.NewReader(body))
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 
@@ -553,18 +604,18 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 		require.NoError(t, err)
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.Header.Set("Content-Range", "bytes 0-99/*")
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpClient.Do(req)
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 	}
 	{
-		resp, err := http.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
+		resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 		require.NoError(t, err)
 		assert.Equal(t, 200, resp.StatusCode)
 	}
 	var archiveLocation string
 	{
-		resp, err := http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 		got := struct {
@@ -578,7 +629,7 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 		archiveLocation = got.ArchiveLocation
 	}
 	{
-		resp, err := http.Get(archiveLocation) //nolint:gosec
+		resp, err := httpClient.Get(archiveLocation)
 		require.NoError(t, err)
 		require.Equal(t, 200, resp.StatusCode)
 		got, err := io.ReadAll(resp.Body)
@@ -589,7 +640,7 @@ func uploadCacheNormally(t *testing.T, base, key, version string, content []byte
 
 func TestHandler_gcCache(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "artifactcache")
-	handler, err := StartHandler(dir, "", 0, nil)
+	handler, err := StartHandler(dir, "", 0, "", nil)
 	require.NoError(t, err)
 
 	defer func() {
