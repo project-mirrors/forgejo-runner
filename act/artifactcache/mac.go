@@ -28,7 +28,7 @@ func (h *Handler) validateMac(rundata cacheproxy.RunData) (string, error) {
 	if hmac.Equal([]byte(expectedMAC), []byte(rundata.RepositoryMAC)) {
 		return rundata.RepositoryFullName, nil
 	}
-	return rundata.RepositoryFullName, ErrValidation
+	return "", ErrValidation
 }
 
 func validateAge(ts string) bool {

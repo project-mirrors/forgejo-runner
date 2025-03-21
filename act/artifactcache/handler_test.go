@@ -369,6 +369,33 @@ func TestHandler(t *testing.T) {
 		require.Equal(t, 404, resp.StatusCode)
 	})
 
+	t.Run("get with bad MAC", func(t *testing.T) {
+		key := strings.ToLower(t.Name())
+		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46b4ee758284e26bb3045ad11d9d20"
+		content := make([]byte, 100)
+		_, err := rand.Read(content)
+		require.NoError(t, err)
+
+		uploadCacheNormally(t, base, key, version, content)
+
+		// Perform the request with the custom `httpClient` which will send correct MAC data
+		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+		require.NoError(t, err)
+		require.Equal(t, 200, resp.StatusCode)
+
+		// Perform the same request with incorrect MAC data
+		req, err := http.NewRequest("GET", fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version), nil)
+		require.NoError(t, err)
+		req.Header.Set("Forgejo-Cache-Repo", cache_repo)
+		req.Header.Set("Forgejo-Cache-RunNumber", cache_runnum)
+		req.Header.Set("Forgejo-Cache-Timestamp", cache_timestamp)
+		req.Header.Set("Forgejo-Cache-MAC", "33f0e850ba0bdfd2f3e66ff79c1f8004b8226114e3b2e65c229222bb59df0f9d") // ! This is not the correct MAC
+		req.Header.Set("Forgejo-Cache-Host", handlerExternalUrl)
+		resp, err = http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+		require.NoError(t, err)
+		require.Equal(t, 403, resp.StatusCode)
+	})
+
 	t.Run("get with multiple keys", func(t *testing.T) {
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d20"
 		key := strings.ToLower(t.Name())

@@ -63,7 +63,7 @@ func TestMac(t *testing.T) {
 
 		repoName, err := handler.validateMac(rundata)
 		require.Error(t, err)
-		require.Equal(t, name, repoName)
+		require.Equal(t, "", repoName)
 	})
 
 	t.Run("compute correct mac", func(t *testing.T) {

@@ -78,7 +78,6 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 	h.logger = logger
 
 	h.cacheSecret = cacheSecret
-	// h.runs = make(map[string]RunData)
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -125,9 +124,7 @@ func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret
 }
 
 func proxyRequestHandler(proxy *httputil.ReverseProxy) func(http.ResponseWriter, *http.Request) {
-	return func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
-	}
+	return proxy.ServeHTTP
 }
 
 func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, error) {
@@ -141,13 +138,12 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 			matches := urlRegex.FindStringSubmatch(r.In.URL.Path)
 			id := matches[1]
 			data, ok := h.runs.Load(id)
-			var runData = data.(RunData)
 			if !ok {
 				// The ID doesn't exist.
-				// ! this should probably be handled more gracefully but i can't figure out how
-				// ! it really shouldn't happen anyway so it's fine for now
+				h.logger.Warn(fmt.Sprintf("Tried starting a cache proxy with id %s, which does not exist.", id))
 				return
 			}
+			var runData = data.(RunData)
 			uri := matches[2]
 
 			r.SetURL(targetURL)
@@ -212,10 +208,7 @@ func (h *Handler) Close() error {
 	}
 	if h.listener != nil {
 		err := h.listener.Close()
-		if errors.Is(err, net.ErrClosed) {
-			err = nil
-		}
-		if err != nil {
+		if !errors.Is(err, net.ErrClosed) {
 			retErr = err
 		}
 		h.listener = nil
