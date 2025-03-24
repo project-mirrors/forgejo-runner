@@ -260,16 +260,10 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache := &Cache{}
-	db, err := h.openDB()
+	cache, err := h.readCache(id)
 	if err != nil {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache openDB: %w", err))
-		return
-	}
-	defer db.Close()
-	if err := db.Get(id, cache); err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
-			h.responseJSON(w, r, 400, fmt.Errorf("cache %d: not reserved", id))
+			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
 		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
@@ -286,7 +280,6 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		h.responseJSON(w, r, 400, fmt.Errorf("cache %v %q: already complete", cache.ID, cache.Key))
 		return
 	}
-	db.Close()
 	start, _, err := parseContentRange(r.Header.Get("Content-Range"))
 	if err != nil {
 		h.responseJSON(w, r, 400, fmt.Errorf("cache parseContentRange(%s): %w", r.Header.Get("Content-Range"), err))
@@ -318,19 +311,13 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache := &Cache{}
-	db, err := h.openDB()
+	cache, err := h.readCache(id)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
-		return
-	}
-	defer db.Close()
-	if err := db.Get(id, cache); err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
-			h.responseJSON(w, r, 400, fmt.Errorf("cache %d: not reserved", id))
+			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
@@ -345,8 +332,6 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	db.Close()
-
 	size, err := h.storage.Commit(cache.ID, cache.Size)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
@@ -355,7 +340,7 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 	// write real size back to cache, it may be different from the current value when the request doesn't specify it.
 	cache.Size = size
 
-	db, err = h.openDB()
+	db, err := h.openDB()
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -386,22 +371,14 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 		return
 	}
 
-	cache := &Cache{}
-	{
-		db, err := h.openDB()
-		if err != nil {
-			h.responseJSON(w, r, 500, fmt.Errorf("cache openDB: %w", err))
+	cache, err := h.readCache(id)
+	if err != nil {
+		if errors.Is(err, bolthold.ErrNotFound) {
+			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		defer db.Close()
-		if err := db.Get(id, cache); err != nil {
-			if errors.Is(err, bolthold.ErrNotFound) {
-				h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
-				return
-			}
-			h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
-			return
-		}
+		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		return
 	}
 
 	// Should not happen
@@ -485,6 +462,19 @@ func insertCache(db *bolthold.Store, cache *Cache) error {
 		return fmt.Errorf("write back id to db: %w", err)
 	}
 	return nil
+}
+
+func (h *Handler) readCache(id uint64) (*Cache, error) {
+	db, err := h.openDB()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	cache := &Cache{}
+	if err := db.Get(id, cache); err != nil {
+		return nil, err
+	}
+	return cache, nil
 }
 
 func (h *Handler) useCache(id uint64) error {
