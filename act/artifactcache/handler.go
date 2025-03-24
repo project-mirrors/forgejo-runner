@@ -387,19 +387,21 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 	}
 
 	cache := &Cache{}
-	db, err := h.openDB()
-	if err != nil {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache openDB: %w", err))
-		return
-	}
-	db.Close()
-	if err := db.Get(id, cache); err != nil {
-		if errors.Is(err, bolthold.ErrNotFound) {
-			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
+	{
+		db, err := h.openDB()
+		if err != nil {
+			h.responseJSON(w, r, 500, fmt.Errorf("cache openDB: %w", err))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
-		return
+		defer db.Close()
+		if err := db.Get(id, cache); err != nil {
+			if errors.Is(err, bolthold.ErrNotFound) {
+				h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
+				return
+			}
+			h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+			return
+		}
 	}
 
 	// Should not happen
