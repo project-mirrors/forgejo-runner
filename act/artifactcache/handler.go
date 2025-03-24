@@ -260,25 +260,19 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache := &Cache{}
-	db, err := h.openDB()
+	cache, err := h.readCache(id)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
-		return
-	}
-	defer db.Close()
-	if err := db.Get(id, cache); err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
-			h.responseJSON(w, r, 400, fmt.Errorf("cache %d: not reserved", id))
+			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
 	// Should not happen
 	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, ErrValidation)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
 		return
 	}
 
@@ -286,16 +280,19 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		h.responseJSON(w, r, 400, fmt.Errorf("cache %v %q: already complete", cache.ID, cache.Key))
 		return
 	}
-	defer db.Close()
 	start, _, err := parseContentRange(r.Header.Get("Content-Range"))
 	if err != nil {
-		h.responseJSON(w, r, 400, err)
+		h.responseJSON(w, r, 400, fmt.Errorf("cache parseContentRange(%s): %w", r.Header.Get("Content-Range"), err))
 		return
 	}
 	if err := h.storage.Write(cache.ID, start, r.Body); err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache storage.Write: %w", err))
+		return
 	}
-	h.useCache(db, cache)
+	if err := h.useCache(id); err != nil {
+		h.responseJSON(w, r, 500, fmt.Errorf("cache useCache: %w", err))
+		return
+	}
 	h.responseJSON(w, r, 200)
 }
 
@@ -314,25 +311,19 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache := &Cache{}
-	db, err := h.openDB()
+	cache, err := h.readCache(id)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
-		return
-	}
-	defer db.Close()
-	if err := db.Get(id, cache); err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
-			h.responseJSON(w, r, 400, fmt.Errorf("cache %d: not reserved", id))
+			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
 	// Should not happen
 	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, ErrValidation)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
 		return
 	}
 
@@ -340,8 +331,6 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		h.responseJSON(w, r, 400, fmt.Errorf("cache %v %q: already complete", cache.ID, cache.Key))
 		return
 	}
-
-	db.Close()
 
 	size, err := h.storage.Commit(cache.ID, cache.Size)
 	if err != nil {
@@ -351,7 +340,7 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 	// write real size back to cache, it may be different from the current value when the request doesn't specify it.
 	cache.Size = size
 
-	db, err = h.openDB()
+	db, err := h.openDB()
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -382,29 +371,26 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 		return
 	}
 
-	cache := &Cache{}
-	db, err := h.openDB()
+	cache, err := h.readCache(id)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
-		return
-	}
-	defer db.Close()
-	if err := db.Get(id, cache); err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
 	// Should not happen
 	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, ErrValidation)
+		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
 		return
 	}
 
-	h.useCache(db, cache)
+	if err := h.useCache(id); err != nil {
+		h.responseJSON(w, r, 500, fmt.Errorf("cache useCache: %w", err))
+		return
+	}
 	h.storage.Serve(w, r, id)
 }
 
@@ -478,9 +464,31 @@ func insertCache(db *bolthold.Store, cache *Cache) error {
 	return nil
 }
 
-func (h *Handler) useCache(db *bolthold.Store, cache *Cache) {
+func (h *Handler) readCache(id uint64) (*Cache, error) {
+	db, err := h.openDB()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	cache := &Cache{}
+	if err := db.Get(id, cache); err != nil {
+		return nil, err
+	}
+	return cache, nil
+}
+
+func (h *Handler) useCache(id uint64) error {
+	db, err := h.openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	cache := &Cache{}
+	if err := db.Get(id, cache); err != nil {
+		return err
+	}
 	cache.UsedAt = time.Now().Unix()
-	_ = db.Update(cache.ID, cache)
+	return db.Update(cache.ID, cache)
 }
 
 const (
