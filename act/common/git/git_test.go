@@ -32,10 +32,19 @@ func TestFindGitSlug(t *testing.T) {
 		{"http://github.com/nektos/act", "GitHub", "nektos/act"},
 		{"git+ssh://git@github.com/owner/repo.git", "GitHub", "owner/repo"},
 		{"http://myotherrepo.com/act.git", "", "http://myotherrepo.com/act.git"},
+		{"ssh://git@example.com/forgejo/act.git", "GitHubEnterprise", "forgejo/act"},
+		{"ssh://git@example.com:2222/forgejo/act.git", "GitHubEnterprise", "forgejo/act"},
+		{"ssh://git@example.com:forgejo/act.git", "GitHubEnterprise", "forgejo/act"},
+		{"ssh://git@example.com:/forgejo/act.git", "GitHubEnterprise", "forgejo/act"},
 	}
 
 	for _, tt := range slugTests {
-		provider, slug, err := findGitSlug(tt.url, "github.com")
+		instance := "example.com"
+		if tt.provider == "GitHub" {
+			instance = "github.com"
+		}
+
+		provider, slug, err := findGitSlug(tt.url, instance)
 
 		assert.NoError(err)
 		assert.Equal(tt.provider, provider)
