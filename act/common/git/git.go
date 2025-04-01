@@ -209,7 +209,12 @@ func findGitSlug(url string, githubInstance string) (string, string, error) {
 		return "GitHub", fmt.Sprintf("%s/%s", matches[1], matches[2]), nil
 	} else if githubInstance != "github.com" {
 		gheHTTPRegex := regexp.MustCompile(fmt.Sprintf(`^https?://%s/(.+)/(.+?)(?:.git)?$`, githubInstance))
-		gheSSHRegex := regexp.MustCompile(fmt.Sprintf(`%s[:/](.+)/(.+?)(?:.git)?$`, githubInstance))
+		// Examples:
+		// - `code.forgejo.org/forgejo/act`
+		// - `code.forgejo.org:22/forgejo/act`
+		// - `code.forgejo.org:forgejo/act`
+		// - `code.forgejo.org:/forgejo/act`
+		gheSSHRegex := regexp.MustCompile(fmt.Sprintf(`%s(?::\d+/|:|/|:/)([^/].+)/(.+?)(?:.git)?$`, githubInstance))
 		if matches := gheHTTPRegex.FindStringSubmatch(url); matches != nil {
 			return "GitHubEnterprise", fmt.Sprintf("%s/%s", matches[1], matches[2]), nil
 		} else if matches := gheSSHRegex.FindStringSubmatch(url); matches != nil {
