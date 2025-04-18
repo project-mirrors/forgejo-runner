@@ -639,6 +639,8 @@ func (s *Step) ShellCommand() string {
 		shellCommand = "cmd /D /E:ON /V:OFF /S /C \"CALL \"{0}\"\""
 	case "powershell":
 		shellCommand = "powershell -command . '{0}'"
+	case "node":
+		shellCommand = "node {0}"
 	default:
 		shellCommand = s.Shell
 	}
