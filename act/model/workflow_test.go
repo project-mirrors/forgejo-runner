@@ -510,6 +510,8 @@ func TestStep_ShellCommand(t *testing.T) {
 		{"pwsh -v '. {0}'", "pwsh -v '. {0}'"},
 		{"pwsh", "pwsh -command . '{0}'"},
 		{"powershell", "powershell -command . '{0}'"},
+		{"node", "node {0}"},
+		{"python", "python {0}"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.shell, func(t *testing.T) {
