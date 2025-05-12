@@ -7,13 +7,6 @@
       "description": "Disable nektos/act, it's replaced",
       "matchDepNames": ["github.com/nektos/act"],
       "enabled": false
-    },
-    {
-      "description": "Enable indirect gomod updates but require approval",
-      "matchManagers": ["gomod"],
-      "matchDepTypes": ["indirect"],
-      "enabled": true,
-      "dependencyDashboardApproval": true
     }
   ]
 }
