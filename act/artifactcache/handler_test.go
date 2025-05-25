@@ -746,3 +746,38 @@ func TestHandler_gcCache(t *testing.T) {
 	}
 	require.NoError(t, db.Close())
 }
+
+func TestHandler_ExternalURL(t *testing.T) {
+	t.Run("reports correct URL on IPv4", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "artifactcache")
+		handler, err := StartHandler(dir, "127.0.0.1", 34567, "secret", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, handler.ExternalURL(), "http://127.0.0.1:34567")
+		require.NoError(t, handler.Close())
+		assert.Nil(t, handler.server)
+		assert.Nil(t, handler.listener)
+	})
+
+	t.Run("reports correct URL on IPv6 zero host", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "artifactcache")
+		handler, err := StartHandler(dir, "2001:db8::", 34567, "secret", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, handler.ExternalURL(), "http://[2001:db8::]:34567")
+		require.NoError(t, handler.Close())
+		assert.Nil(t, handler.server)
+		assert.Nil(t, handler.listener)
+	})
+
+	t.Run("reports correct URL on IPv6", func(t *testing.T) {
+		dir := filepath.Join(t.TempDir(), "artifactcache")
+		handler, err := StartHandler(dir, "2001:db8::1:2:3:4", 34567, "secret", nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, handler.ExternalURL(), "http://[2001:db8::1:2:3:4]:34567")
+		require.NoError(t, handler.Close())
+		assert.Nil(t, handler.server)
+		assert.Nil(t, handler.listener)
+	})
+}

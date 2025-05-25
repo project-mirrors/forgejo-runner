@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -291,14 +292,14 @@ func Serve(ctx context.Context, artifactPath string, addr string, port string) c
 	downloads(router, artifactPath, fsys)
 
 	server := &http.Server{
-		Addr:              fmt.Sprintf("%s:%s", addr, port),
+		Addr:              net.JoinHostPort(addr, port),
 		ReadHeaderTimeout: 2 * time.Second,
 		Handler:           router,
 	}
 
 	// run server
 	go func() {
-		logger.Infof("Start server on http://%s:%s", addr, port)
+		logger.Infof("Start server on http://%s", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Fatalf("http listener: %v", err)
 		}

@@ -115,10 +115,10 @@ func StartHandler(dir, outboundIP string, port uint16, secret string, logger log
 }
 
 func (h *Handler) ExternalURL() string {
+	port := strconv.Itoa(h.listener.Addr().(*net.TCPAddr).Port)
+
 	// TODO: make the external url configurable if necessary
-	return fmt.Sprintf("http://%s:%d",
-		h.outboundIP,
-		h.listener.Addr().(*net.TCPAddr).Port)
+	return fmt.Sprintf("http://%s", net.JoinHostPort(h.outboundIP, port))
 }
 
 func (h *Handler) Close() error {
