@@ -127,6 +127,8 @@ func (sr *stepRun) setupShellCommand(ctx context.Context) (name, script string, 
 		runPrepend = "@echo off"
 	case "python":
 		name += ".py"
+	case "node":
+		name += ".js"
 	}
 
 	script = fmt.Sprintf("%s\n%s\n%s", runPrepend, script, runAppend)
