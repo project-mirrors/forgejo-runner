@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
@@ -42,14 +42,14 @@ func RemoveImage(ctx context.Context, imageName string, force bool, pruneChildre
 	}
 	defer cli.Close()
 
-	inspectImage, _, err := cli.ImageInspectWithRaw(ctx, imageName)
+	inspectImage, err := cli.ImageInspect(ctx, imageName)
 	if client.IsErrNotFound(err) {
 		return false, nil
 	} else if err != nil {
 		return false, err
 	}
 
-	if _, err = cli.ImageRemove(ctx, inspectImage.ID, types.ImageRemoveOptions{
+	if _, err = cli.ImageRemove(ctx, inspectImage.ID, image.RemoveOptions{
 		Force:         force,
 		PruneChildren: pruneChildren,
 	}); err != nil {

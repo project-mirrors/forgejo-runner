@@ -24,6 +24,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	networktypes "github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/go-git/go-billy/v5/helper/polyfill"
@@ -234,7 +235,7 @@ func GetDockerClient(ctx context.Context) (cli client.APIClient, err error) {
 	return cli, nil
 }
 
-func GetHostInfo(ctx context.Context) (info types.Info, err error) {
+func GetHostInfo(ctx context.Context) (info system.Info, err error) {
 	var cli client.APIClient
 	cli, err = GetDockerClient(ctx)
 	if err != nil {
@@ -304,7 +305,7 @@ func (cr *containerReference) find() common.Executor {
 		if cr.id != "" {
 			return nil
 		}
-		containers, err := cr.cli.ContainerList(ctx, types.ContainerListOptions{
+		containers, err := cr.cli.ContainerList(ctx, container.ListOptions{
 			All: true,
 		})
 		if err != nil {
@@ -332,7 +333,7 @@ func (cr *containerReference) remove() common.Executor {
 		}
 
 		logger := common.Logger(ctx)
-		err := cr.cli.ContainerRemove(ctx, cr.id, types.ContainerRemoveOptions{
+		err := cr.cli.ContainerRemove(ctx, cr.id, container.RemoveOptions{
 			RemoveVolumes: true,
 			Force:         true,
 		})
@@ -642,7 +643,7 @@ func (cr *containerReference) exec(cmd []string, env map[string]string, user, wo
 		}
 		logger.Debugf("Working directory '%s'", wd)
 
-		idResp, err := cr.cli.ContainerExecCreate(ctx, cr.id, types.ExecConfig{
+		idResp, err := cr.cli.ContainerExecCreate(ctx, cr.id, container.ExecOptions{
 			User:         user,
 			Cmd:          cmd,
 			WorkingDir:   wd,
@@ -655,7 +656,7 @@ func (cr *containerReference) exec(cmd []string, env map[string]string, user, wo
 			return fmt.Errorf("failed to create exec: %w", err)
 		}
 
-		resp, err := cr.cli.ContainerExecAttach(ctx, idResp.ID, types.ExecStartCheck{
+		resp, err := cr.cli.ContainerExecAttach(ctx, idResp.ID, container.ExecAttachOptions{
 			Tty: isTerminal,
 		})
 		if err != nil {
@@ -686,7 +687,7 @@ func (cr *containerReference) exec(cmd []string, env map[string]string, user, wo
 
 func (cr *containerReference) tryReadID(opt string, cbk func(id int)) common.Executor {
 	return func(ctx context.Context) error {
-		idResp, err := cr.cli.ContainerExecCreate(ctx, cr.id, types.ExecConfig{
+		idResp, err := cr.cli.ContainerExecCreate(ctx, cr.id, container.ExecOptions{
 			Cmd:          []string{"id", opt},
 			AttachStdout: true,
 			AttachStderr: true,
@@ -695,7 +696,7 @@ func (cr *containerReference) tryReadID(opt string, cbk func(id int)) common.Exe
 			return nil
 		}
 
-		resp, err := cr.cli.ContainerExecAttach(ctx, idResp.ID, types.ExecStartCheck{})
+		resp, err := cr.cli.ContainerExecAttach(ctx, idResp.ID, container.ExecAttachOptions{})
 		if err != nil {
 			return nil
 		}
@@ -780,12 +781,12 @@ func (cr *containerReference) CopyTarStream(ctx context.Context, destPath string
 		Typeflag: tar.TypeDir,
 	})
 	tw.Close()
-	err := cr.cli.CopyToContainer(ctx, cr.id, "/", buf, types.CopyToContainerOptions{})
+	err := cr.cli.CopyToContainer(ctx, cr.id, "/", buf, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to mkdir to copy content to container: %w", err)
 	}
 	// Copy Content
-	err = cr.cli.CopyToContainer(ctx, cr.id, destPath, tarStream, types.CopyToContainerOptions{})
+	err = cr.cli.CopyToContainer(ctx, cr.id, destPath, tarStream, container.CopyToContainerOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to copy content to container: %w", err)
 	}
@@ -861,7 +862,7 @@ func (cr *containerReference) copyDir(dstPath string, srcPath string, useGitIgno
 		if err != nil {
 			return fmt.Errorf("failed to seek tar archive: %w", err)
 		}
-		err = cr.cli.CopyToContainer(ctx, cr.id, "/", tarFile, types.CopyToContainerOptions{})
+		err = cr.cli.CopyToContainer(ctx, cr.id, "/", tarFile, container.CopyToContainerOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to copy content to container: %w", err)
 		}
@@ -895,7 +896,7 @@ func (cr *containerReference) copyContent(dstPath string, files ...*FileEntry) c
 		}
 
 		logger.Debugf("Extracting content to '%s'", dstPath)
-		err := cr.cli.CopyToContainer(ctx, cr.id, dstPath, &buf, types.CopyToContainerOptions{})
+		err := cr.cli.CopyToContainer(ctx, cr.id, dstPath, &buf, container.CopyToContainerOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to copy content to container: %w", err)
 		}
@@ -905,7 +906,7 @@ func (cr *containerReference) copyContent(dstPath string, files ...*FileEntry) c
 
 func (cr *containerReference) attach() common.Executor {
 	return func(ctx context.Context) error {
-		out, err := cr.cli.ContainerAttach(ctx, cr.id, types.ContainerAttachOptions{
+		out, err := cr.cli.ContainerAttach(ctx, cr.id, container.AttachOptions{
 			Stream: true,
 			Stdout: true,
 			Stderr: true,
@@ -943,7 +944,7 @@ func (cr *containerReference) start() common.Executor {
 		logger := common.Logger(ctx)
 		logger.Debugf("Starting container: %v", cr.id)
 
-		if err := cr.cli.ContainerStart(ctx, cr.id, types.ContainerStartOptions{}); err != nil {
+		if err := cr.cli.ContainerStart(ctx, cr.id, container.StartOptions{}); err != nil {
 			return fmt.Errorf("failed to start container: %w", err)
 		}
 

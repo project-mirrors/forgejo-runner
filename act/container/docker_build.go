@@ -73,7 +73,7 @@ func createBuildContext(ctx context.Context, contextDir string, relDockerfile st
 	common.Logger(ctx).Debugf("Creating archive for build context dir '%s' with relative dockerfile '%s'", contextDir, relDockerfile)
 
 	// And canonicalize dockerfile name to a platform-independent one
-	relDockerfile = archive.CanonicalTarNameForPath(relDockerfile)
+	relDockerfile = filepath.ToSlash(relDockerfile)
 
 	f, err := os.Open(filepath.Join(contextDir, ".dockerignore"))
 	if err != nil && !os.IsNotExist(err) {

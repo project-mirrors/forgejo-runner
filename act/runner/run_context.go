@@ -20,7 +20,7 @@ import (
 	"strings"
 	"text/template"
 
-	docker "github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
@@ -561,10 +561,10 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			return errors.New("Failed to create job container")
 		}
 
-		networkConfig := docker.NetworkCreate{
+		networkConfig := network.CreateOptions{
 			Driver:     "bridge",
 			Scope:      "local",
-			EnableIPv6: rc.Config.ContainerNetworkEnableIPv6,
+			EnableIPv6: &rc.Config.ContainerNetworkEnableIPv6,
 		}
 		return common.NewPipelineExecutor(
 			rc.pullServicesImages(rc.Config.ForcePull),
