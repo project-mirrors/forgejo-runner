@@ -21,6 +21,8 @@ type Workflow struct {
 	Env      map[string]string `yaml:"env"`
 	Jobs     map[string]*Job   `yaml:"jobs"`
 	Defaults Defaults          `yaml:"defaults"`
+
+	RawNotifications yaml.Node `yaml:"notifications"`
 }
 
 // On events for the workflow
@@ -760,4 +762,20 @@ func decodeNode(node yaml.Node, out interface{}) bool {
 		return false
 	}
 	return true
+}
+
+func (w *Workflow) Notifications() (bool, error) {
+	switch w.RawNotifications.Kind {
+	case 0:
+		return false, nil
+	case yaml.ScalarNode:
+		var val bool
+		err := w.RawNotifications.Decode(&val)
+		if err != nil {
+			return false, fmt.Errorf("notifications: failed to decode: %v", w.RawNotifications.Kind)
+		}
+		return val, nil
+	default:
+		return false, fmt.Errorf("notifications: unknown type: %v", w.RawNotifications.Kind)
+	}
 }

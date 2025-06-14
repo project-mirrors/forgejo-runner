@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -106,6 +107,64 @@ jobs:
 
 	assert.Len(t, workflow.On(), 1)
 	assert.Contains(t, workflow.On(), "push")
+}
+
+func TestReadWorkflow_Notifications(t *testing.T) {
+	for _, testCase := range []struct {
+		expected bool
+		hasErr   bool
+		snippet  string
+	}{
+		{
+			expected: false,
+			hasErr:   false,
+			snippet:  "# nothing",
+		},
+		{
+			expected: true,
+			hasErr:   false,
+			snippet:  "notifications: true",
+		},
+		{
+			expected: false,
+			hasErr:   false,
+			snippet:  "notifications: false",
+		},
+		{
+			hasErr:  true,
+			snippet: "notifications: invalid",
+		},
+		{
+			hasErr:  true,
+			snippet: "notifications: [1,2]",
+		},
+	} {
+		t.Run(testCase.snippet, func(t *testing.T) {
+			yaml := fmt.Sprintf(`
+name: name-455
+on: push
+
+%s
+
+jobs:
+  valid-JOB-Name-455:
+    runs-on: docker
+    steps:
+      - run: echo hi
+`, testCase.snippet)
+
+			workflow, err := ReadWorkflow(strings.NewReader(yaml))
+			assert.NoError(t, err, "read workflow should succeed")
+
+			notification, err := workflow.Notifications()
+			if testCase.hasErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, testCase.expected, notification)
+			}
+		})
+	}
 }
 
 func TestReadWorkflow_ListEvent(t *testing.T) {
