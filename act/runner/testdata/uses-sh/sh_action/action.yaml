@@ -1,0 +1,8 @@
+---
+name: Basic test using the sh type
+
+runs:
+  using: sh
+  pre:  'echo "testing pre"'
+  main: 'echo "testing main"'
+  post: 'echo "testing post"'

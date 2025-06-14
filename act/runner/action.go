@@ -164,13 +164,17 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 		action := step.getActionModel()
 		logger.Debugf("About to run action %v", action)
 
+		actionLocation := path.Join(actionDir, actionPath)
+		actionName, containerActionDir := getContainerActionPaths(stepModel, actionLocation, rc)
+
+		if action.Runs.Using == model.ActionRunsUsingSh {
+			rc.ActionPath = containerActionDir
+		}
+
 		err := setupActionEnv(ctx, step, remoteAction)
 		if err != nil {
 			return err
 		}
-
-		actionLocation := path.Join(actionDir, actionPath)
-		actionName, containerActionDir := getContainerActionPaths(stepModel, actionLocation, rc)
 
 		logger.Debugf("type=%v actionDir=%s actionPath=%s workdir=%s actionCacheDir=%s actionName=%s containerActionDir=%s", stepModel.Type(), actionDir, actionPath, rc.Config.Workdir, rc.ActionCacheDir(), actionName, containerActionDir)
 
@@ -179,7 +183,19 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 			if err := maybeCopyToActionDir(ctx, step, actionDir, actionPath, containerActionDir); err != nil {
 				return err
 			}
+
 			containerArgs := []string{"node", path.Join(containerActionDir, action.Runs.Main)}
+			logger.Debugf("executing remote job container: %s", containerArgs)
+
+			rc.ApplyExtraPath(ctx, step.getEnv())
+
+			return rc.execJobContainer(containerArgs, *step.getEnv(), "", "")(ctx)
+		case model.ActionRunsUsingSh:
+			if err := maybeCopyToActionDir(ctx, step, actionDir, actionPath, containerActionDir); err != nil {
+				return err
+			}
+
+			containerArgs := []string{"sh", "-c", action.Runs.Main}
 			logger.Debugf("executing remote job container: %s", containerArgs)
 
 			rc.ApplyExtraPath(ctx, step.getEnv())
@@ -220,6 +236,7 @@ func runActionImpl(step actionStep, actionDir string, remoteAction *remoteAction
 				model.ActionRunsUsingNode20,
 				model.ActionRunsUsingComposite,
 				model.ActionRunsUsingGo,
+				model.ActionRunsUsingSh,
 			}, action.Runs.Using)
 		}
 	}
@@ -509,7 +526,8 @@ func hasPreStep(step actionStep) common.Conditional {
 			((action.Runs.Using == model.ActionRunsUsingNode12 ||
 				action.Runs.Using == model.ActionRunsUsingNode16 ||
 				action.Runs.Using == model.ActionRunsUsingNode20 ||
-				action.Runs.Using == model.ActionRunsUsingGo) &&
+				action.Runs.Using == model.ActionRunsUsingGo ||
+				action.Runs.Using == model.ActionRunsUsingSh) &&
 				action.Runs.Pre != "")
 	}
 }
@@ -524,7 +542,7 @@ func runPreStep(step actionStep) common.Executor {
 		action := step.getActionModel()
 
 		switch action.Runs.Using {
-		case model.ActionRunsUsingNode12, model.ActionRunsUsingNode16, model.ActionRunsUsingNode20:
+		case model.ActionRunsUsingNode12, model.ActionRunsUsingNode16, model.ActionRunsUsingNode20, model.ActionRunsUsingSh:
 			// defaults in pre steps were missing, however provided inputs are available
 			populateEnvsFromInput(ctx, step.getEnv(), action, rc)
 			// todo: refactor into step
@@ -551,7 +569,14 @@ func runPreStep(step actionStep) common.Executor {
 				return err
 			}
 
-			containerArgs := []string{"node", path.Join(containerActionDir, action.Runs.Pre)}
+			var containerArgs []string
+
+			if action.Runs.Using == model.ActionRunsUsingSh {
+				rc.ActionPath = containerActionDir
+				containerArgs = []string{"sh", "-c", action.Runs.Pre}
+			} else {
+				containerArgs = []string{"node", path.Join(containerActionDir, action.Runs.Pre)}
+			}
 			logger.Debugf("executing remote job container: %s", containerArgs)
 
 			rc.ApplyExtraPath(ctx, step.getEnv())
@@ -643,7 +668,8 @@ func hasPostStep(step actionStep) common.Conditional {
 			((action.Runs.Using == model.ActionRunsUsingNode12 ||
 				action.Runs.Using == model.ActionRunsUsingNode16 ||
 				action.Runs.Using == model.ActionRunsUsingNode20 ||
-				action.Runs.Using == model.ActionRunsUsingGo) &&
+				action.Runs.Using == model.ActionRunsUsingGo ||
+				action.Runs.Using == model.ActionRunsUsingSh) &&
 				action.Runs.Post != "")
 	}
 }
@@ -683,6 +709,18 @@ func runPostStep(step actionStep) common.Executor {
 			populateEnvsFromSavedState(step.getEnv(), step, rc)
 
 			containerArgs := []string{"node", path.Join(containerActionDir, action.Runs.Post)}
+			logger.Debugf("executing remote job container: %s", containerArgs)
+
+			rc.ApplyExtraPath(ctx, step.getEnv())
+
+			return rc.execJobContainer(containerArgs, *step.getEnv(), "", "")(ctx)
+
+		case model.ActionRunsUsingSh:
+
+			populateEnvsFromSavedState(step.getEnv(), step, rc)
+
+			rc.ActionPath = containerActionDir
+			containerArgs := []string{"sh", "-c", action.Runs.Post}
 			logger.Debugf("executing remote job container: %s", containerArgs)
 
 			rc.ApplyExtraPath(ctx, step.getEnv())

@@ -382,6 +382,8 @@ func TestRunEventHostEnvironment(t *testing.T) {
 			{workdir, "uses-composite-with-error", "push", "Job 'failing-composite-action' failed", platforms, secrets},
 			{workdir, "uses-nested-composite", "push", "", platforms, secrets},
 			{workdir, "act-composite-env-test", "push", "", platforms, secrets},
+			{workdir, "uses-sh", "push", "", platforms, secrets},
+			{workdir, "uses-sh-test-action-path", "push", "", platforms, secrets},
 
 			// Eval
 			{workdir, "evalmatrix", "push", "", platforms, secrets},

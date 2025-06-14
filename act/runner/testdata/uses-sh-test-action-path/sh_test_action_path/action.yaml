@@ -1,0 +1,8 @@
+---
+name: Test for the action path being a valid directory using the sh action type
+
+runs:
+  using: sh
+  pre:  'echo "testing pre";  if [ -d "$GITHUB_ACTION_PATH" ] ; then echo "Everything okay" ; ls "$GITHUB_ACTION_PATH" ; else echo "No directory at action path: $GITHUB_ACTION_PATH" ; exit 1; fi'
+  main: 'echo "testing main"; if [ -d "$GITHUB_ACTION_PATH" ] ; then echo "Everything okay" ; ls "$GITHUB_ACTION_PATH" ; else echo "No directory at action path: $GITHUB_ACTION_PATH" ; exit 1; fi'
+  post: 'echo "testing post"; if [ -d "$GITHUB_ACTION_PATH" ] ; then echo "Everything okay" ; ls "$GITHUB_ACTION_PATH" ; else echo "No directory at action path: $GITHUB_ACTION_PATH" ; exit 1; fi'
