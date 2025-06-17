@@ -123,20 +123,20 @@ func TestReadWorkflow_Notifications(t *testing.T) {
 		{
 			expected: true,
 			hasErr:   false,
-			snippet:  "notifications: true",
+			snippet:  "enable-email-notifications: true",
 		},
 		{
 			expected: false,
 			hasErr:   false,
-			snippet:  "notifications: false",
+			snippet:  "enable-email-notifications: false",
 		},
 		{
 			hasErr:  true,
-			snippet: "notifications: invalid",
+			snippet: "enable-email-notifications: invalid",
 		},
 		{
 			hasErr:  true,
-			snippet: "notifications: [1,2]",
+			snippet: "enable-email-notifications: [1,2]",
 		},
 	} {
 		t.Run(testCase.snippet, func(t *testing.T) {

@@ -22,7 +22,7 @@ type Workflow struct {
 	Jobs     map[string]*Job   `yaml:"jobs"`
 	Defaults Defaults          `yaml:"defaults"`
 
-	RawNotifications yaml.Node `yaml:"notifications"`
+	RawNotifications yaml.Node `yaml:"enable-email-notifications"`
 }
 
 // On events for the workflow
@@ -772,10 +772,10 @@ func (w *Workflow) Notifications() (bool, error) {
 		var val bool
 		err := w.RawNotifications.Decode(&val)
 		if err != nil {
-			return false, fmt.Errorf("notifications: failed to decode: %v", w.RawNotifications.Kind)
+			return false, fmt.Errorf("enable-email-notifications: failed to decode: %v", w.RawNotifications.Kind)
 		}
 		return val, nil
 	default:
-		return false, fmt.Errorf("notifications: unknown type: %v", w.RawNotifications.Kind)
+		return false, fmt.Errorf("enable-email-notifications: unknown type: %v", w.RawNotifications.Kind)
 	}
 }
