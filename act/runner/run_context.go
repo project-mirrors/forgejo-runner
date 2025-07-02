@@ -475,7 +475,6 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			serviceContainerName := createContainerName(rc.jobContainerName(), serviceID)
 			c := container.NewContainer(&container.NewContainerInput{
 				Name:           serviceContainerName,
-				WorkingDir:     ext.ToContainerPath(rc.Config.Workdir),
 				Image:          rc.ExprEval.Interpolate(ctx, spec.Image),
 				Username:       username,
 				Password:       password,
