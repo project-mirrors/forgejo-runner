@@ -84,6 +84,9 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 	envs["GITEA_ACTIONS"] = "true"
 	envs["GITEA_ACTIONS_RUNNER_VERSION"] = ver.Version()
 
+	envs["FORGEJO_ACTIONS"] = "true"
+	envs["FORGEJO_ACTIONS_RUNNER_VERSION"] = ver.Version()
+
 	return &Runner{
 		name:       reg.Name,
 		cfg:        cfg,
