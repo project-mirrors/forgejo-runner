@@ -15,9 +15,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"gitea.com/gitea/act_runner/internal/app/run"
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
+	"runner.forgejo.org/internal/app/run"
+	"runner.forgejo.org/internal/pkg/client"
+	"runner.forgejo.org/internal/pkg/config"
 )
 
 const PollerID = "PollerID"

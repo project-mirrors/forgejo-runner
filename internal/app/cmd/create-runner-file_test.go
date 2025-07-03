@@ -10,9 +10,9 @@ import (
 
 	runnerv1 "code.forgejo.org/forgejo/actions-proto/runner/v1"
 	"connectrpc.com/connect"
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"runner.forgejo.org/internal/pkg/client"
+	"runner.forgejo.org/internal/pkg/config"
+	"runner.forgejo.org/internal/pkg/ver"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"

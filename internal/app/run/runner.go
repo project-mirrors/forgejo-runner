@@ -25,11 +25,11 @@ import (
 	"github.com/nektos/act/pkg/runner"
 	log "github.com/sirupsen/logrus"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/report"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"runner.forgejo.org/internal/pkg/client"
+	"runner.forgejo.org/internal/pkg/config"
+	"runner.forgejo.org/internal/pkg/labels"
+	"runner.forgejo.org/internal/pkg/report"
+	"runner.forgejo.org/internal/pkg/ver"
 )
 
 // Runner runs the pipeline.

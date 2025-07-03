@@ -18,13 +18,13 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"gitea.com/gitea/act_runner/internal/app/poll"
-	"gitea.com/gitea/act_runner/internal/app/run"
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/envcheck"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"runner.forgejo.org/internal/app/poll"
+	"runner.forgejo.org/internal/app/run"
+	"runner.forgejo.org/internal/pkg/client"
+	"runner.forgejo.org/internal/pkg/config"
+	"runner.forgejo.org/internal/pkg/envcheck"
+	"runner.forgejo.org/internal/pkg/labels"
+	"runner.forgejo.org/internal/pkg/ver"
 )
 
 func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command, args []string) error {

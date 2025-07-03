@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client/mocks"
+	"runner.forgejo.org/internal/pkg/client/mocks"
 )
 
 func TestReporter_parseLogRow(t *testing.T) {
