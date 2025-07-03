@@ -382,7 +382,7 @@ func runExec(ctx context.Context, execArgs *executeArgs) func(cmd *cobra.Command
 		}
 
 		if len(execArgs.artifactServerPath) == 0 {
-			tempDir, err := os.MkdirTemp("", "gitea-act-")
+			tempDir, err := os.MkdirTemp("", "forgejo-runner-")
 			if err != nil {
 				fmt.Println(err)
 			}

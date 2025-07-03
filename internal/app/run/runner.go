@@ -77,8 +77,8 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 		cacheProxy = nil
 	}
 
-	artifactGiteaAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
-	envs["ACTIONS_RUNTIME_URL"] = artifactGiteaAPI
+	artifactAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
+	envs["ACTIONS_RUNTIME_URL"] = artifactAPI
 	envs["ACTIONS_RESULTS_URL"] = strings.TrimSuffix(cli.Address(), "/")
 
 	envs["GITEA_ACTIONS"] = "true"
