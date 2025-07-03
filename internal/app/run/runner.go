@@ -206,8 +206,12 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 
 	taskContext := task.Context.Fields
 
+	defaultActionURL := client.BackwardCompatibleContext(task, "default_actions_url")
+	if defaultActionURL == "" {
+		return fmt.Errorf("task %v context does not contain a {forgejo,gitea}_default_actions_url key", task.Id)
+	}
 	log.Infof("task %v repo is %v %v %v", task.Id, taskContext["repository"].GetStringValue(),
-		taskContext["gitea_default_actions_url"].GetStringValue(),
+		defaultActionURL,
 		r.client.Address())
 
 	preset := &model.GithubContext{
@@ -241,12 +245,12 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		runEnvs[id] = v
 	}
 
-	giteaRuntimeToken := taskContext["gitea_runtime_token"].GetStringValue()
-	if giteaRuntimeToken == "" {
+	runtimeToken := client.BackwardCompatibleContext(task, "runtime_token")
+	if runtimeToken == "" {
 		// use task token to action api token for previous Gitea Server Versions
-		giteaRuntimeToken = preset.Token
+		runtimeToken = preset.Token
 	}
-	runEnvs["ACTIONS_RUNTIME_TOKEN"] = giteaRuntimeToken
+	runEnvs["ACTIONS_RUNTIME_TOKEN"] = runtimeToken
 
 	// Register the run with the cacheproxy and modify the CACHE_URL
 	if r.cacheProxy != nil {
@@ -303,7 +307,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		ContainerOptions:           r.cfg.Container.Options,
 		ContainerDaemonSocket:      r.cfg.Container.DockerHost,
 		Privileged:                 r.cfg.Container.Privileged,
-		DefaultActionInstance:      taskContext["gitea_default_actions_url"].GetStringValue(),
+		DefaultActionInstance:      defaultActionURL,
 		PlatformPicker:             r.labels.PickPlatform,
 		Vars:                       task.Vars,
 		ValidVolumes:               r.cfg.Container.ValidVolumes,
