@@ -6,15 +6,14 @@ DIST_DIRS := $(DIST)/binaries $(DIST)/release
 GO ?= $(shell go env GOROOT)/bin/go
 SHASUM ?= shasum -a 256
 HAS_GO = $(shell hash $(GO) > /dev/null 2>&1 && echo "GO" || echo "NOGO" )
-XGO_PACKAGE ?= src.techknowlogick.com/xgo@latest
-XGO_VERSION := go-1.21.x
-GXZ_PAGAGE ?= github.com/ulikunitz/xz/cmd/gxz@v0.5.10
 
 LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
 WINDOWS_ARCHS ?= windows/amd64
 GO_FMT_FILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
 GOFILES := $(shell find . -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
+
+MOCKERY_PACKAGE ?= github.com/vektra/mockery/v2@v2.26.1 # renovate: datasource=go
 
 DOCKER_IMAGE ?= gitea/act_runner
 DOCKER_TAG ?= nightly
@@ -106,6 +105,10 @@ vet:
 	@echo "Running go vet..."
 	@$(GO) vet $(GO_PACKAGES_TO_VET)
 
+.PHONY: generate
+generate:
+	$(GO) generate ./...
+
 install: $(GOFILES)
 	$(GO) install -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)'
 
@@ -114,50 +117,12 @@ build: go-check $(EXECUTABLE)
 $(EXECUTABLE): $(GOFILES)
 	$(GO) build -v -tags 'netgo osusergo $(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)' -o $@
 
-.PHONY: deps-backend
-deps-backend:
-	$(GO) mod download
-	$(GO) install $(GXZ_PAGAGE)
-	$(GO) install $(XGO_PACKAGE)
-
-.PHONY: release
-release: release-windows release-linux release-darwin release-copy release-compress release-check
+.PHONY: deps-tools
+deps-tools:
+	$(GO) install $(MOCKERY_PACKAGE)
 
 $(DIST_DIRS):
 	mkdir -p $(DIST_DIRS)
-
-.PHONY: release-windows
-release-windows: | $(DIST_DIRS)
-	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -buildmode exe -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets '$(WINDOWS_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
-ifeq ($(CI),true)
-	cp -r /build/* $(DIST)/binaries/
-endif
-
-.PHONY: release-linux
-release-linux: | $(DIST_DIRS)
-	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '-linkmode external -extldflags "-static" $(LDFLAGS)' -targets '$(LINUX_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
-ifeq ($(CI),true)
-	cp -r /build/* $(DIST)/binaries/
-endif
-
-.PHONY: release-darwin
-release-darwin: | $(DIST_DIRS)
-	CGO_CFLAGS="$(CGO_CFLAGS)" $(GO) run $(XGO_PACKAGE) -go $(XGO_VERSION) -dest $(DIST)/binaries -tags 'netgo osusergo $(TAGS)' -ldflags '$(LDFLAGS)' -targets '$(DARWIN_ARCHS)' -out $(EXECUTABLE)-$(VERSION) .
-ifeq ($(CI),true)
-	cp -r /build/* $(DIST)/binaries/
-endif
-
-.PHONY: release-copy
-release-copy: | $(DIST_DIRS)
-	cd $(DIST); for file in `find . -type f -name "*"`; do cp $${file} ./release/; done;
-
-.PHONY: release-check
-release-check: | $(DIST_DIRS)
-	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "checksumming $${file}" && $(SHASUM) `echo $${file} | sed 's/^..//'` > $${file}.sha256; done;
-
-.PHONY: release-compress
-release-compress: | $(DIST_DIRS)
-	cd $(DIST)/release/; for file in `find . -type f -name "*"`; do echo "compressing $${file}" && $(GO) run $(GXZ_PAGAGE) -k -9 $${file}; done;
 
 .PHONY: docker
 docker:
