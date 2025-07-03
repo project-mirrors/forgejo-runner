@@ -509,7 +509,7 @@ func loadExecCmd(ctx context.Context) *cobra.Command {
 	execCmd.PersistentFlags().StringVarP(&execArg.image, "image", "i", "node:20-bullseye", "Docker image to use. Use \"-self-hosted\" to run directly on the host.")
 	execCmd.PersistentFlags().StringVarP(&execArg.network, "network", "", "", "Specify the network to which the container will connect")
 	execCmd.PersistentFlags().BoolVarP(&execArg.enableIPv6, "enable-ipv6", "6", false, "Create network with IPv6 enabled.")
-	execCmd.PersistentFlags().StringVarP(&execArg.githubInstance, "gitea-instance", "", "", "Gitea instance to use.")
+	execCmd.PersistentFlags().StringVarP(&execArg.githubInstance, "forgejo-instance", "", "", "Forgejo instance to use.")
 
 	return execCmd
 }
