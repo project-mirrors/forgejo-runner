@@ -95,7 +95,6 @@ func runJob(ctx context.Context, configFile *string) func(cmd *cobra.Command, ar
 		// declare the labels of the runner before fetching tasks
 		resp, err := runner.Declare(ctx, ls.Names())
 		if err != nil && connect.CodeOf(err) == connect.CodeUnimplemented {
-			// Gitea instance is older version. skip declare step.
 			log.Warn("Because the Forgejo instance is an old version, skipping declaring the labels and version.")
 		} else if err != nil {
 			log.WithError(err).Error("fail to invoke Declare")
