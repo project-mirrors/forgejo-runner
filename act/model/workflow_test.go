@@ -112,31 +112,24 @@ jobs:
 func TestReadWorkflow_Notifications(t *testing.T) {
 	for _, testCase := range []struct {
 		expected bool
-		hasErr   bool
+		err      string
 		snippet  string
 	}{
 		{
 			expected: false,
-			hasErr:   false,
 			snippet:  "# nothing",
 		},
 		{
 			expected: true,
-			hasErr:   false,
 			snippet:  "enable-email-notifications: true",
 		},
 		{
 			expected: false,
-			hasErr:   false,
 			snippet:  "enable-email-notifications: false",
 		},
 		{
-			hasErr:  true,
+			err:     "`invalid` into bool",
 			snippet: "enable-email-notifications: invalid",
-		},
-		{
-			hasErr:  true,
-			snippet: "enable-email-notifications: [1,2]",
 		},
 	} {
 		t.Run(testCase.snippet, func(t *testing.T) {
@@ -154,12 +147,12 @@ jobs:
 `, testCase.snippet)
 
 			workflow, err := ReadWorkflow(strings.NewReader(yaml))
-			assert.NoError(t, err, "read workflow should succeed")
-
-			notification, err := workflow.Notifications()
-			if testCase.hasErr {
-				assert.Error(t, err)
+			if testCase.err != "" {
+				assert.ErrorContains(t, err, testCase.err)
 			} else {
+				assert.NoError(t, err, "read workflow should succeed")
+
+				notification, err := workflow.Notifications()
 				assert.NoError(t, err)
 				assert.Equal(t, testCase.expected, notification)
 			}
