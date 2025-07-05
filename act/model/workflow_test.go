@@ -226,9 +226,8 @@ jobs:
           foo: {{ a }}
 `
 
-	workflow, err := ReadWorkflow(strings.NewReader(yaml))
-	assert.NoError(t, err, "read workflow should succeed")
-	assert.Nil(t, workflow.GetJob("test").Steps[0].GetEnv())
+	_, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.ErrorContains(t, err, "Line: 11 Column 16: Expected a scalar got mapping")
 }
 
 func TestReadWorkflow_RunsOnLabels(t *testing.T) {
