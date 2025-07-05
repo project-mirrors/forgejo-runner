@@ -256,6 +256,28 @@ func (r *Reporter) Close(lastWords string) error {
 	}, retry.Context(r.ctx))
 }
 
+type ErrRetry struct {
+	message string
+}
+
+func (err ErrRetry) Error() string {
+	return err.message
+}
+
+func (err ErrRetry) Is(target error) bool {
+	_, ok := target.(*ErrRetry)
+	return ok
+}
+
+var (
+	errRetryNeedMoreRows = "need more rows to figure out if multiline secrets must be masked"
+	errRetrySendAll      = "not all logs are submitted %d remain"
+)
+
+func NewErrRetry(message string, args ...any) error {
+	return &ErrRetry{message: fmt.Sprintf(message, args...)}
+}
+
 func (r *Reporter) ReportLog(noMore bool) error {
 	r.clientM.Lock()
 	defer r.clientM.Unlock()
@@ -280,7 +302,7 @@ func (r *Reporter) ReportLog(noMore bool) error {
 
 	ack := int(resp.Msg.AckIndex)
 	if ack < r.logOffset {
-		return fmt.Errorf("submitted logs are lost")
+		return fmt.Errorf("submitted logs are lost %d < %d", ack, r.logOffset)
 	}
 
 	r.stateMu.Lock()
@@ -289,7 +311,7 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	r.stateMu.Unlock()
 
 	if noMore && ack < r.logOffset+len(rows) {
-		return fmt.Errorf("not all logs are submitted")
+		return NewErrRetry(errRetrySendAll, len(r.logRows))
 	}
 
 	return nil
@@ -335,7 +357,7 @@ func (r *Reporter) ReportState() error {
 		return true
 	})
 	if len(noSent) > 0 {
-		return fmt.Errorf("there are still outputs that have not been sent: %v", noSent)
+		return NewErrRetry(errRetrySendAll, len(noSent))
 	}
 
 	return nil
