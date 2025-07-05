@@ -264,6 +264,10 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	rows := r.logRows
 	r.stateMu.RUnlock()
 
+	if len(rows) == 0 {
+		return nil
+	}
+
 	resp, err := r.client.UpdateLog(r.ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 		TaskId: r.state.Id,
 		Index:  int64(r.logOffset),
