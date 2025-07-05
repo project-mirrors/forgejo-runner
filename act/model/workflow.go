@@ -100,7 +100,7 @@ func (w *Workflow) UnmarshalYAML(node *yaml.Node) error {
 		Definition: "workflow-root",
 		Schema:     schema.GetWorkflowSchema(),
 	}).UnmarshalYAML(node); err != nil {
-		return errors.Join(err, fmt.Errorf("Actions YAML Schema Validation Error detected:\nFor more information, see: https://nektosact.com/usage/schema.html"))
+		return errors.Join(err, fmt.Errorf("Forgejo Actions YAML Schema validation error"))
 	}
 	type WorkflowDefault Workflow
 	return node.Decode((*WorkflowDefault)(w))
