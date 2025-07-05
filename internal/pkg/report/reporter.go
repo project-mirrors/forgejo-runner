@@ -31,8 +31,7 @@ type Reporter struct {
 
 	logOffset      int
 	logRows        []*runnerv1.LogRow
-	logReplacer    *strings.Replacer
-	oldnew         []string
+	masker         *masker
 	reportInterval time.Duration
 
 	state   *runnerv1.TaskState
@@ -44,24 +43,23 @@ type Reporter struct {
 }
 
 func NewReporter(ctx context.Context, cancel context.CancelFunc, c client.Client, task *runnerv1.Task, reportInterval time.Duration) *Reporter {
-	var oldnew []string
+	masker := newMasker()
 	if v := task.Context.Fields["token"].GetStringValue(); v != "" {
-		oldnew = append(oldnew, v, "***")
+		masker.add(v)
 	}
 	if v := client.BackwardCompatibleContext(task, "runtime_token"); v != "" {
-		oldnew = append(oldnew, v, "***")
+		masker.add(v)
 	}
 	for _, v := range task.Secrets {
-		oldnew = append(oldnew, v, "***")
+		masker.add(v)
 	}
 
 	rv := &Reporter{
 		ctx:            ctx,
 		cancel:         cancel,
 		client:         c,
-		oldnew:         oldnew,
+		masker:         masker,
 		reportInterval: reportInterval,
-		logReplacer:    strings.NewReplacer(oldnew...),
 		state: &runnerv1.TaskState{
 			Id: task.Id,
 		},
@@ -290,6 +288,10 @@ func (r *Reporter) ReportLog(noMore bool) error {
 		return nil
 	}
 
+	if needMore := r.masker.replace(rows, noMore); needMore {
+		return NewErrRetry(errRetryNeedMoreRows)
+	}
+
 	resp, err := r.client.UpdateLog(r.ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 		TaskId: r.state.Id,
 		Index:  int64(r.logOffset),
@@ -402,7 +404,7 @@ func (r *Reporter) handleCommand(originalContent, command, parameters, value str
 
 	switch command {
 	case "add-mask":
-		r.addMask(value)
+		r.masker.add(value)
 		return nil
 	case "debug":
 		if r.debugOutputEnabled {
@@ -449,15 +451,8 @@ func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
 		}
 	}
 
-	content = r.logReplacer.Replace(content)
-
 	return &runnerv1.LogRow{
 		Time:    timestamppb.New(entry.Time),
 		Content: strings.ToValidUTF8(content, "?"),
 	}
-}
-
-func (r *Reporter) addMask(msg string) {
-	r.oldnew = append(r.oldnew, msg, "***")
-	r.logReplacer = strings.NewReplacer(r.oldnew...)
 }
