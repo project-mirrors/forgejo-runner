@@ -310,7 +310,7 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	r.logOffset = ack
 	r.stateMu.Unlock()
 
-	if noMore && ack < r.logOffset+len(rows) {
+	if noMore && len(r.logRows) > 0 {
 		return NewErrRetry(errRetrySendAll, len(r.logRows))
 	}
 
