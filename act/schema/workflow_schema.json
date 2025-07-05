@@ -1913,6 +1913,10 @@
             "type": "non-empty-string",
             "description": "Use `jobs.<job_id>.container.options` to configure additional Docker container resource options."
           },
+          "cmd": {
+            "type": "sequence-of-non-empty-string",
+            "description": "Use `jobs.<job_id>.container.cmd` to specify the command to run instead of the default."
+          },
           "env": "container-env",
           "ports": {
             "type": "sequence-of-non-empty-string",
