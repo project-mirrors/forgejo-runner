@@ -150,6 +150,7 @@
     },
     "output-value": {
       "context": [
+        "forge",
         "github",
         "strategy",
         "matrix",
@@ -163,6 +164,7 @@
     },
     "input-default-context": {
       "context": [
+        "forge",
         "github",
         "strategy",
         "matrix",
@@ -179,6 +181,7 @@
     },
     "string-steps-context": {
       "context": [
+        "forge",
         "github",
         "inputs",
         "strategy",
@@ -193,6 +196,7 @@
     },
     "boolean-steps-context": {
       "context": [
+        "forge",
         "github",
         "inputs",
         "strategy",
@@ -207,6 +211,7 @@
     },
     "step-env": {
       "context": [
+        "forge",
         "github",
         "inputs",
         "strategy",
@@ -224,6 +229,7 @@
     },
     "step-if": {
       "context": [
+        "forge",
         "github",
         "inputs",
         "strategy",
@@ -242,6 +248,7 @@
     },
     "step-with": {
       "context": [
+        "forge",
         "github",
         "inputs",
         "strategy",
