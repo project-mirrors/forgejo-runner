@@ -164,7 +164,6 @@ func TestActionRunner(t *testing.T) {
 							},
 						},
 					},
-					nodeToolFullPath: "node",
 				},
 				action: &model.Action{
 					Inputs: map[string]model.Input{
@@ -209,7 +208,6 @@ func TestActionRunner(t *testing.T) {
 							"name": "state value",
 						},
 					},
-					nodeToolFullPath: "node",
 				},
 				action: &model.Action{
 					Runs: model.ActionRuns{
