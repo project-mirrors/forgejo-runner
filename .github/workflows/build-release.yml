@@ -25,7 +25,7 @@ jobs:
         run: |
           env GOOS=windows GOARCH=${{matrix.architecture}} \
           go build \
-            -ldflags "-s -w -X gitea.com/gitea/act_runner/internal/pkg/ver.version=${{ github.ref_name }}" \
+            -ldflags "-s -w -X runner.forgejo.org/internal/pkg/ver.version=${{ github.ref_name }}" \
             -o forgejo-runner-windows-${{matrix.architecture}}.exe
 
       - uses: actions/upload-artifact@v4
@@ -149,4 +149,3 @@ jobs:
           token: ${{ secrets.RELEASE_TOKEN }}
           fail_on_unmatched_files: true
           body: See [original release notes](https://code.forgejo.org/forgejo/runner/releases/tag/${{ github.ref_name }}).
-

@@ -10,8 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"runner.forgejo.org/internal/pkg/config"
+	"runner.forgejo.org/internal/pkg/ver"
 )
 
 func Execute(ctx context.Context) {

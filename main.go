@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"gitea.com/gitea/act_runner/internal/app/cmd"
+	"runner.forgejo.org/internal/app/cmd"
 )
 
 func main() {

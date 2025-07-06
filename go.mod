@@ -1,4 +1,4 @@
-module gitea.com/gitea/act_runner
+module runner.forgejo.org
 
 go 1.23.0
 
@@ -6,7 +6,6 @@ toolchain go1.23.10
 
 require (
 	code.forgejo.org/forgejo/actions-proto v0.5.1
-	code.gitea.io/gitea-vet v0.2.3
 	connectrpc.com/connect v1.18.1
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/docker/docker v28.3.0+incompatible
@@ -100,7 +99,6 @@ require (
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 )
 

@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client"
+	"runner.forgejo.org/internal/pkg/client"
 )
 
 type Reporter struct {
@@ -43,12 +43,12 @@ type Reporter struct {
 	stopCommandEndToken string
 }
 
-func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.Client, task *runnerv1.Task, reportInterval time.Duration) *Reporter {
+func NewReporter(ctx context.Context, cancel context.CancelFunc, c client.Client, task *runnerv1.Task, reportInterval time.Duration) *Reporter {
 	var oldnew []string
 	if v := task.Context.Fields["token"].GetStringValue(); v != "" {
 		oldnew = append(oldnew, v, "***")
 	}
-	if v := task.Context.Fields["gitea_runtime_token"].GetStringValue(); v != "" {
+	if v := client.BackwardCompatibleContext(task, "runtime_token"); v != "" {
 		oldnew = append(oldnew, v, "***")
 	}
 	for _, v := range task.Secrets {
@@ -58,7 +58,7 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, client client.C
 	rv := &Reporter{
 		ctx:            ctx,
 		cancel:         cancel,
-		client:         client,
+		client:         c,
 		oldnew:         oldnew,
 		reportInterval: reportInterval,
 		logReplacer:    strings.NewReplacer(oldnew...),

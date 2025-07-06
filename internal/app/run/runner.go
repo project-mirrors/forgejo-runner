@@ -25,11 +25,11 @@ import (
 	"github.com/nektos/act/pkg/runner"
 	log "github.com/sirupsen/logrus"
 
-	"gitea.com/gitea/act_runner/internal/pkg/client"
-	"gitea.com/gitea/act_runner/internal/pkg/config"
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
-	"gitea.com/gitea/act_runner/internal/pkg/report"
-	"gitea.com/gitea/act_runner/internal/pkg/ver"
+	"runner.forgejo.org/internal/pkg/client"
+	"runner.forgejo.org/internal/pkg/config"
+	"runner.forgejo.org/internal/pkg/labels"
+	"runner.forgejo.org/internal/pkg/report"
+	"runner.forgejo.org/internal/pkg/ver"
 )
 
 // Runner runs the pipeline.
@@ -77,14 +77,15 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 		cacheProxy = nil
 	}
 
-	// set artifact gitea api
-	artifactGiteaAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
-	envs["ACTIONS_RUNTIME_URL"] = artifactGiteaAPI
+	artifactAPI := strings.TrimSuffix(cli.Address(), "/") + "/api/actions_pipeline/"
+	envs["ACTIONS_RUNTIME_URL"] = artifactAPI
 	envs["ACTIONS_RESULTS_URL"] = strings.TrimSuffix(cli.Address(), "/")
 
-	// Set specific environments to distinguish between Gitea and GitHub
 	envs["GITEA_ACTIONS"] = "true"
 	envs["GITEA_ACTIONS_RUNNER_VERSION"] = ver.Version()
+
+	envs["FORGEJO_ACTIONS"] = "true"
+	envs["FORGEJO_ACTIONS_RUNNER_VERSION"] = ver.Version()
 
 	return &Runner{
 		name:       reg.Name,
@@ -205,8 +206,12 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 
 	taskContext := task.Context.Fields
 
+	defaultActionURL := client.BackwardCompatibleContext(task, "default_actions_url")
+	if defaultActionURL == "" {
+		return fmt.Errorf("task %v context does not contain a {forgejo,gitea}_default_actions_url key", task.Id)
+	}
 	log.Infof("task %v repo is %v %v %v", task.Id, taskContext["repository"].GetStringValue(),
-		taskContext["gitea_default_actions_url"].GetStringValue(),
+		defaultActionURL,
 		r.client.Address())
 
 	preset := &model.GithubContext{
@@ -240,12 +245,12 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		runEnvs[id] = v
 	}
 
-	giteaRuntimeToken := taskContext["gitea_runtime_token"].GetStringValue()
-	if giteaRuntimeToken == "" {
+	runtimeToken := client.BackwardCompatibleContext(task, "runtime_token")
+	if runtimeToken == "" {
 		// use task token to action api token for previous Gitea Server Versions
-		giteaRuntimeToken = preset.Token
+		runtimeToken = preset.Token
 	}
-	runEnvs["ACTIONS_RUNTIME_TOKEN"] = giteaRuntimeToken
+	runEnvs["ACTIONS_RUNTIME_TOKEN"] = runtimeToken
 
 	// Register the run with the cacheproxy and modify the CACHE_URL
 	if r.cacheProxy != nil {
@@ -302,7 +307,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 		ContainerOptions:           r.cfg.Container.Options,
 		ContainerDaemonSocket:      r.cfg.Container.DockerHost,
 		Privileged:                 r.cfg.Container.Privileged,
-		DefaultActionInstance:      taskContext["gitea_default_actions_url"].GetStringValue(),
+		DefaultActionInstance:      defaultActionURL,
 		PlatformPicker:             r.labels.PickPlatform,
 		Vars:                       task.Vars,
 		ValidVolumes:               r.cfg.Container.ValidVolumes,

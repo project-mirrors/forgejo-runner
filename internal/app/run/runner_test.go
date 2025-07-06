@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"gitea.com/gitea/act_runner/internal/pkg/labels"
+	"runner.forgejo.org/internal/pkg/labels"
+
 	"github.com/stretchr/testify/assert"
 )
 
