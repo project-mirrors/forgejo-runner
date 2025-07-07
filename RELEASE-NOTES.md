@@ -11,7 +11,6 @@
 * [fix a v6.4.0 regression that fail a job when if: false](https://code.forgejo.org/forgejo/runner/issues/660).
 * [support for forgejo-runner exec --var](https://code.forgejo.org/forgejo/runner/pulls/645).
 * [do not force WORKING_DIR in service containers](https://code.forgejo.org/forgejo/runner/issues/304).
-* [allow downgrading node via setup-node without breaking later actions](https://code.forgejo.org/forgejo/act/pulls/168).
 * [remove the local action cache if the remote has changed](https://code.forgejo.org/forgejo/act/pulls/142), e.g. when [DEFAULT_ACTIONS_URL](https://forgejo.org/docs/next/admin/config-cheat-sheet/#actions-actions) is modified in the forgejo configuration.
 
 ## 6.4.0
