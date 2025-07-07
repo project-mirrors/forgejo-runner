@@ -5,6 +5,8 @@ package report
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +21,42 @@ import (
 
 	"runner.forgejo.org/internal/pkg/client/mocks"
 )
+
+func rowsToString(rows []*runnerv1.LogRow) string {
+	s := ""
+	for _, row := range rows {
+		s += row.Content + "\n"
+	}
+	return s
+}
+
+func stringToRows(s string) []*runnerv1.LogRow {
+	if s == "" {
+		return nil
+	}
+	lines := strings.Split(s, "\n")
+	rows := make([]*runnerv1.LogRow, 0, len(lines))
+	for _, line := range lines {
+		rows = append(rows, &runnerv1.LogRow{Content: line})
+	}
+	return rows
+}
+
+func mockReporter(t *testing.T) (*Reporter, *mocks.Client, func()) {
+	t.Helper()
+
+	client := mocks.NewClient(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	taskCtx, err := structpb.NewStruct(map[string]interface{}{})
+	require.NoError(t, err)
+	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
+		Context: taskCtx,
+	}, time.Second)
+	close := func() {
+		assert.NoError(t, reporter.Close(""))
+	}
+	return reporter, client, close
+}
 
 func TestReporter_parseLogRow(t *testing.T) {
 	tests := []struct {
@@ -139,7 +177,7 @@ func TestReporter_parseLogRow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := &Reporter{
-				logReplacer:        strings.NewReplacer(),
+				masker:             newMasker(),
 				debugOutputEnabled: tt.debugOutputEnabled,
 			}
 			for idx, arg := range tt.args {
@@ -147,6 +185,7 @@ func TestReporter_parseLogRow(t *testing.T) {
 				got := "<nil>"
 
 				if rv != nil {
+					r.masker.replace([]*runnerv1.LogRow{rv}, true)
 					got = rv.Content
 				}
 
@@ -158,7 +197,10 @@ func TestReporter_parseLogRow(t *testing.T) {
 
 func TestReporter_Fire(t *testing.T) {
 	t.Run("ignore command lines", func(t *testing.T) {
-		client := mocks.NewClient(t)
+		reporter, client, close := mockReporter(t)
+		defer close()
+		reporter.ResetSteps(5)
+
 		client.On("UpdateLog", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
 			t.Logf("Received UpdateLog: %s", req.Msg.String())
 			return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
@@ -169,16 +211,6 @@ func TestReporter_Fire(t *testing.T) {
 			t.Logf("Received UpdateTask: %s", req.Msg.String())
 			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
 		})
-		ctx, cancel := context.WithCancel(context.Background())
-		taskCtx, err := structpb.NewStruct(map[string]interface{}{})
-		require.NoError(t, err)
-		reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
-			Context: taskCtx,
-		}, time.Second)
-		defer func() {
-			assert.NoError(t, reporter.Close(""))
-		}()
-		reporter.ResetSteps(5)
 
 		dataStep0 := map[string]interface{}{
 			"stage":      "Main",
@@ -195,4 +227,129 @@ func TestReporter_Fire(t *testing.T) {
 
 		assert.Equal(t, int64(3), reporter.state.Steps[0].LogLength)
 	})
+}
+
+func TestReporterReportLogLost(t *testing.T) {
+	reporter, client, _ := mockReporter(t)
+	reporter.logRows = stringToRows("A")
+	reporter.logOffset = 100
+
+	client.On("UpdateLog", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+		t.Logf("Received UpdateLog: %s", req.Msg.String())
+		return connect_go.NewResponse(&runnerv1.UpdateLogResponse{
+			AckIndex: 50,
+		}), nil
+	})
+
+	err := reporter.ReportLog(false)
+	require.Error(t, err)
+	assert.Equal(t, "submitted logs are lost 50 < 100", err.Error())
+}
+
+func TestReporterReportLogError(t *testing.T) {
+	reporter, client, _ := mockReporter(t)
+	reporter.logRows = stringToRows("A")
+	someError := "ERROR MESSAGE"
+
+	client.On("UpdateLog", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+		t.Logf("Received UpdateLog: %s", req.Msg.String())
+		return connect_go.NewResponse(&runnerv1.UpdateLogResponse{}), errors.New(someError)
+	})
+
+	err := reporter.ReportLog(false)
+	require.Error(t, err)
+	assert.Equal(t, someError, err.Error())
+}
+
+func TestReporterReportLog(t *testing.T) {
+	secret := "secretOne"
+	firstLine := "ONE"
+	multiLineSecret := firstLine + "\nTWO\nTHREE\n"
+
+	for _, testCase := range []struct {
+		name     string
+		outgoing string
+		received int
+		sent     string
+		noMore   bool
+		err      error
+	}{
+		{
+			name:     "SecretsAreMasked",
+			outgoing: fmt.Sprintf(">>>%s<<< (((%s)))", secret, multiLineSecret),
+			sent:     ">>>***<<< (((***\n***\n***\n***)))\n",
+			err:      nil,
+		},
+		{
+			name: "NoRowsToSend",
+			err:  nil,
+		},
+		{
+			name:     "RetryToMaskSecrets",
+			outgoing: firstLine,
+			err:      NewErrRetry(errRetryNeedMoreRows),
+		},
+		{
+			name:     "OnlyTheFirstLineIsReceived",
+			outgoing: "A\nB\nC",
+			received: 1,
+			sent:     "A\n",
+		},
+		{
+			name:     "RetrySendAll",
+			outgoing: "A\nB\nC",
+			received: 1,
+			sent:     "A\n",
+			noMore:   true,
+			err:      NewErrRetry(errRetrySendAll, 2),
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			reporter, client, _ := mockReporter(t)
+			reporter.masker.add(secret)
+			reporter.masker.add(multiLineSecret)
+			rows := stringToRows(testCase.outgoing)
+			reporter.logRows = rows
+
+			sent := ""
+			if testCase.sent != "" {
+				client.On("UpdateLog", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+					t.Logf("UpdateLogRequest: %s", req.Msg.String())
+					rows := req.Msg.Rows
+					if testCase.received > 0 {
+						rows = rows[:testCase.received]
+					}
+					sent += rowsToString(rows)
+					resp := &runnerv1.UpdateLogResponse{
+						AckIndex: req.Msg.Index + int64(len(rows)),
+					}
+					t.Logf("UpdateLogResponse: %s", resp.String())
+					return connect_go.NewResponse(resp), nil
+				})
+			}
+
+			err := reporter.ReportLog(testCase.noMore)
+			if testCase.err == nil {
+				assert.NoError(t, err)
+			} else {
+				if assert.ErrorIs(t, err, testCase.err) {
+					assert.Equal(t, err.Error(), testCase.err.Error())
+				}
+			}
+			if testCase.sent != "" {
+				assert.Equal(t, testCase.sent, sent)
+				if testCase.received > 0 {
+					remain := len(rows) - testCase.received
+					assert.Equal(t, remain, len(reporter.logRows))
+					assert.Equal(t, testCase.received, reporter.logOffset)
+				} else {
+					assert.Empty(t, reporter.logRows)
+					assert.Equal(t, len(rows), reporter.logOffset)
+				}
+			} else {
+				assert.Equal(t, len(rows), len(reporter.logRows))
+				assert.Equal(t, 0, reporter.logOffset)
+			}
+		})
+	}
 }

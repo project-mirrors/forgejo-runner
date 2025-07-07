@@ -31,8 +31,7 @@ type Reporter struct {
 
 	logOffset      int
 	logRows        []*runnerv1.LogRow
-	logReplacer    *strings.Replacer
-	oldnew         []string
+	masker         *masker
 	reportInterval time.Duration
 
 	state   *runnerv1.TaskState
@@ -44,24 +43,23 @@ type Reporter struct {
 }
 
 func NewReporter(ctx context.Context, cancel context.CancelFunc, c client.Client, task *runnerv1.Task, reportInterval time.Duration) *Reporter {
-	var oldnew []string
+	masker := newMasker()
 	if v := task.Context.Fields["token"].GetStringValue(); v != "" {
-		oldnew = append(oldnew, v, "***")
+		masker.add(v)
 	}
 	if v := client.BackwardCompatibleContext(task, "runtime_token"); v != "" {
-		oldnew = append(oldnew, v, "***")
+		masker.add(v)
 	}
 	for _, v := range task.Secrets {
-		oldnew = append(oldnew, v, "***")
+		masker.add(v)
 	}
 
 	rv := &Reporter{
 		ctx:            ctx,
 		cancel:         cancel,
 		client:         c,
-		oldnew:         oldnew,
+		masker:         masker,
 		reportInterval: reportInterval,
-		logReplacer:    strings.NewReplacer(oldnew...),
 		state: &runnerv1.TaskState{
 			Id: task.Id,
 		},
@@ -256,6 +254,28 @@ func (r *Reporter) Close(lastWords string) error {
 	}, retry.Context(r.ctx))
 }
 
+type ErrRetry struct {
+	message string
+}
+
+func (err ErrRetry) Error() string {
+	return err.message
+}
+
+func (err ErrRetry) Is(target error) bool {
+	_, ok := target.(*ErrRetry)
+	return ok
+}
+
+var (
+	errRetryNeedMoreRows = "need more rows to figure out if multiline secrets must be masked"
+	errRetrySendAll      = "not all logs are submitted %d remain"
+)
+
+func NewErrRetry(message string, args ...any) error {
+	return &ErrRetry{message: fmt.Sprintf(message, args...)}
+}
+
 func (r *Reporter) ReportLog(noMore bool) error {
 	r.clientM.Lock()
 	defer r.clientM.Unlock()
@@ -263,6 +283,14 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	r.stateMu.RLock()
 	rows := r.logRows
 	r.stateMu.RUnlock()
+
+	if len(rows) == 0 {
+		return nil
+	}
+
+	if needMore := r.masker.replace(rows, noMore); needMore {
+		return NewErrRetry(errRetryNeedMoreRows)
+	}
 
 	resp, err := r.client.UpdateLog(r.ctx, connect.NewRequest(&runnerv1.UpdateLogRequest{
 		TaskId: r.state.Id,
@@ -276,7 +304,7 @@ func (r *Reporter) ReportLog(noMore bool) error {
 
 	ack := int(resp.Msg.AckIndex)
 	if ack < r.logOffset {
-		return fmt.Errorf("submitted logs are lost")
+		return fmt.Errorf("submitted logs are lost %d < %d", ack, r.logOffset)
 	}
 
 	r.stateMu.Lock()
@@ -284,8 +312,8 @@ func (r *Reporter) ReportLog(noMore bool) error {
 	r.logOffset = ack
 	r.stateMu.Unlock()
 
-	if noMore && ack < r.logOffset+len(rows) {
-		return fmt.Errorf("not all logs are submitted")
+	if noMore && len(r.logRows) > 0 {
+		return NewErrRetry(errRetrySendAll, len(r.logRows))
 	}
 
 	return nil
@@ -331,7 +359,7 @@ func (r *Reporter) ReportState() error {
 		return true
 	})
 	if len(noSent) > 0 {
-		return fmt.Errorf("there are still outputs that have not been sent: %v", noSent)
+		return NewErrRetry(errRetrySendAll, len(noSent))
 	}
 
 	return nil
@@ -376,7 +404,7 @@ func (r *Reporter) handleCommand(originalContent, command, parameters, value str
 
 	switch command {
 	case "add-mask":
-		r.addMask(value)
+		r.masker.add(value)
 		return nil
 	case "debug":
 		if r.debugOutputEnabled {
@@ -423,15 +451,8 @@ func (r *Reporter) parseLogRow(entry *log.Entry) *runnerv1.LogRow {
 		}
 	}
 
-	content = r.logReplacer.Replace(content)
-
 	return &runnerv1.LogRow{
 		Time:    timestamppb.New(entry.Time),
 		Content: strings.ToValidUTF8(content, "?"),
 	}
-}
-
-func (r *Reporter) addMask(msg string) {
-	r.oldnew = append(r.oldnew, msg, "***")
-	r.logReplacer = strings.NewReplacer(r.oldnew...)
 }
