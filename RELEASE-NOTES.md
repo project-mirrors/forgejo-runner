@@ -2,13 +2,14 @@
 
 ## 8.0.0 (not published yet)
 
-* Breaking change: workflows files go through a [schema validation](https://code.forgejo.org/forgejo/act/pulls/170) and will not run if they do not pass. Some existing workflows may have syntax errors that did not prevent them from running with versions 6.4.0 and below but they will no longer work with versions 7.0.0 and above. If the error is not immediately obvious, please file an issue with a copy of the failed workflow and revert to using version 6.4.0 until it is resolved.
+* Breaking change: workflows files go through a [schema validation](https://code.forgejo.org/forgejo/act/pulls/170) and will not run if they do not pass. Some existing workflows may have syntax errors that did not prevent them from running with versions 7.0.0 and below but they will no longer work with versions 8.0.0 and above. If the error is not immediately obvious, please file an issue with a copy of the failed workflow and revert to using version 7.0.0 until it is resolved.
 * [secrets that contain multiple lines are masked from the output](https://code.forgejo.org/forgejo/runner/pulls/661).
 
 ## 7.0.0
 
 * Breaking change: [forgejo-runner exec --forgejo-instance replaces --gitea-instance](https://code.forgejo.org/forgejo/runner/pulls/652).
 * [fix a v6.4.0 regression that fail a job when if: false](https://code.forgejo.org/forgejo/runner/issues/660).
+* [forge.FORGEJO_* can be used instead of to github.GITHUB_*](https://code.forgejo.org/forgejo/act/pulls/171), e.g. `forge.FORGEJO_REPOSITORY` is the same as `github.GITHUB_REPOSITORY`. The `GITHUB_*` environment variables are preserved indefinitely for backward compatibiliy with existing workflows and actions.
 * [support for forgejo-runner exec --var](https://code.forgejo.org/forgejo/runner/pulls/645).
 * [do not force WORKING_DIR in service containers](https://code.forgejo.org/forgejo/runner/issues/304).
 * [remove the local action cache if the remote has changed](https://code.forgejo.org/forgejo/act/pulls/142), e.g. when [DEFAULT_ACTIONS_URL](https://forgejo.org/docs/next/admin/config-cheat-sheet/#actions-actions) is modified in the forgejo configuration.
