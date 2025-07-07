@@ -1,8 +1,8 @@
-name: skip
+name: skipstep
 on: push
 
 jobs:
-  check:
+  checkstep:
     runs-on: ubuntu-latest
     steps:
       - if: false
