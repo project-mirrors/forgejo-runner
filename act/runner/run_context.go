@@ -1183,46 +1183,48 @@ func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) 
 }
 
 func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubContext, env map[string]string) map[string]string {
+	set := func(k, v string) {
+		for _, prefix := range []string{"FORGEJO", "GITHUB"} {
+			env[prefix+"_"+k] = v
+		}
+	}
 	env["CI"] = "true"
-	env["GITHUB_WORKFLOW"] = github.Workflow
-	env["GITHUB_RUN_ID"] = github.RunID
-	env["GITHUB_RUN_NUMBER"] = github.RunNumber
-	env["GITHUB_ACTION"] = github.Action
-	env["GITHUB_ACTION_PATH"] = github.ActionPath
-	env["GITHUB_ACTION_REPOSITORY"] = github.ActionRepository
-	env["GITHUB_ACTION_REF"] = github.ActionRef
-	env["GITHUB_ACTIONS"] = "true"
-	env["GITHUB_ACTOR"] = github.Actor
-	env["GITHUB_REPOSITORY"] = github.Repository
-	env["GITHUB_EVENT_NAME"] = github.EventName
-	env["GITHUB_EVENT_PATH"] = github.EventPath
-	env["GITHUB_WORKSPACE"] = github.Workspace
-	env["GITHUB_SHA"] = github.Sha
-	env["GITHUB_REF"] = github.Ref
-	env["GITHUB_REF_NAME"] = github.RefName
-	env["GITHUB_REF_TYPE"] = github.RefType
-	env["GITHUB_TOKEN"] = github.Token
-	env["FORGEJO_TOKEN"] = github.Token
-	env["GITHUB_JOB"] = github.Job
-	env["GITHUB_REPOSITORY_OWNER"] = github.RepositoryOwner
-	env["GITHUB_RETENTION_DAYS"] = github.RetentionDays
+	set("WORKFLOW", github.Workflow)
+	set("RUN_ID", github.RunID)
+	set("RUN_NUMBER", github.RunNumber)
+	set("ACTION", github.Action)
+	set("ACTION_PATH", github.ActionPath)
+	set("ACTION_REPOSITORY", github.ActionRepository)
+	set("ACTION_REF", github.ActionRef)
+	set("ACTIONS", "true")
+	set("ACTOR", github.Actor)
+	set("REPOSITORY", github.Repository)
+	set("EVENT_NAME", github.EventName)
+	set("EVENT_PATH", github.EventPath)
+	set("WORKSPACE", github.Workspace)
+	set("SHA", github.Sha)
+	set("REF", github.Ref)
+	set("REF_NAME", github.RefName)
+	set("REF_TYPE", github.RefType)
+	set("TOKEN", github.Token)
+	set("JOB", github.Job)
+	set("REPOSITORY_OWNER", github.RepositoryOwner)
+	set("RETENTION_DAYS", github.RetentionDays)
 	env["RUNNER_PERFLOG"] = github.RunnerPerflog
 	env["RUNNER_TRACKING_ID"] = github.RunnerTrackingID
-	env["GITHUB_BASE_REF"] = github.BaseRef
-	env["GITHUB_HEAD_REF"] = github.HeadRef
-	env["GITHUB_SERVER_URL"] = github.ServerURL
-	env["GITHUB_API_URL"] = github.APIURL
-	env["GITHUB_GRAPHQL_URL"] = github.GraphQLURL
+	set("BASE_REF", github.BaseRef)
+	set("HEAD_REF", github.HeadRef)
+	set("SERVER_URL", github.ServerURL)
+	set("API_URL", github.APIURL)
 
-	{ // Adapt to Gitea
+	{ // Adapt to Forgejo
 		instance := rc.Config.GitHubInstance
 		if !strings.HasPrefix(instance, "http://") &&
 			!strings.HasPrefix(instance, "https://") {
 			instance = "https://" + instance
 		}
-		env["GITHUB_SERVER_URL"] = instance
-		env["GITHUB_API_URL"] = instance + "/api/v1" // the version of Gitea is v1
-		env["GITHUB_GRAPHQL_URL"] = ""               // Gitea doesn't support graphql
+		set("SERVER_URL", instance)
+		set("API_URL", instance+"/api/v1")
 	}
 
 	if rc.Config.ArtifactServerPath != "" {
