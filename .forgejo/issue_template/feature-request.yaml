@@ -14,7 +14,7 @@ body:
   id: url
   attributes:
     label:  Feature request URL
-    description: The URL to the [feature request description](https://code.forgejo.org/forgejo/forgejo-actions-feature-requests/issues?labels=990)
+    description: The URL to the [feature request](https://code.forgejo.org/forgejo/forgejo-actions-feature-requests/issues?labels=990) in the `ready` stage
     placeholder: |
       https://code.forgejo.org/forgejo/forgejo-actions-feature-requests/issues/???
   validations:
@@ -22,6 +22,6 @@ body:
 - type: textarea
   id: Description
   attributes:
-    label: Copy/paste of the description
+    label: Copy/paste of the description of the feature request
   validations:
     required: true
