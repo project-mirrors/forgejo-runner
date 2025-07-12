@@ -14,7 +14,8 @@ jobs:
           fi
   check-container:
     runs-on: ubuntu-latest
-    container: node:16-buster-slim
+    container:
+      image: code.forgejo.org/oci/node:22-bookworm
     steps:
       - shell: ${{ env.MY_SHELL }}
         run: |
