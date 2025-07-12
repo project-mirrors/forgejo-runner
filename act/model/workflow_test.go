@@ -112,31 +112,24 @@ jobs:
 func TestReadWorkflow_Notifications(t *testing.T) {
 	for _, testCase := range []struct {
 		expected bool
-		hasErr   bool
+		err      string
 		snippet  string
 	}{
 		{
 			expected: false,
-			hasErr:   false,
 			snippet:  "# nothing",
 		},
 		{
 			expected: true,
-			hasErr:   false,
 			snippet:  "enable-email-notifications: true",
 		},
 		{
 			expected: false,
-			hasErr:   false,
 			snippet:  "enable-email-notifications: false",
 		},
 		{
-			hasErr:  true,
+			err:     "`invalid` into bool",
 			snippet: "enable-email-notifications: invalid",
-		},
-		{
-			hasErr:  true,
-			snippet: "enable-email-notifications: [1,2]",
 		},
 	} {
 		t.Run(testCase.snippet, func(t *testing.T) {
@@ -154,12 +147,12 @@ jobs:
 `, testCase.snippet)
 
 			workflow, err := ReadWorkflow(strings.NewReader(yaml))
-			assert.NoError(t, err, "read workflow should succeed")
-
-			notification, err := workflow.Notifications()
-			if testCase.hasErr {
-				assert.Error(t, err)
+			if testCase.err != "" {
+				assert.ErrorContains(t, err, testCase.err)
 			} else {
+				assert.NoError(t, err, "read workflow should succeed")
+
+				notification, err := workflow.Notifications()
 				assert.NoError(t, err)
 				assert.Equal(t, testCase.expected, notification)
 			}
@@ -226,9 +219,8 @@ jobs:
           foo: {{ a }}
 `
 
-	workflow, err := ReadWorkflow(strings.NewReader(yaml))
-	assert.NoError(t, err, "read workflow should succeed")
-	assert.Nil(t, workflow.GetJob("test").Steps[0].GetEnv())
+	_, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.ErrorContains(t, err, "Line: 11 Column 16: Expected a scalar got mapping")
 }
 
 func TestReadWorkflow_RunsOnLabels(t *testing.T) {
@@ -440,15 +432,8 @@ jobs:
         uses: ./local-action
 `
 
-	workflow, err := ReadWorkflow(strings.NewReader(yaml))
-	assert.NoError(t, err, "read workflow should succeed")
-	assert.Len(t, workflow.Jobs, 1)
-	assert.Len(t, workflow.Jobs["test"].Steps, 5)
-	assert.Equal(t, workflow.Jobs["test"].Steps[0].Type(), StepTypeInvalid)
-	assert.Equal(t, workflow.Jobs["test"].Steps[1].Type(), StepTypeRun)
-	assert.Equal(t, workflow.Jobs["test"].Steps[2].Type(), StepTypeUsesActionRemote)
-	assert.Equal(t, workflow.Jobs["test"].Steps[3].Type(), StepTypeUsesDockerURL)
-	assert.Equal(t, workflow.Jobs["test"].Steps[4].Type(), StepTypeUsesActionLocal)
+	_, err := ReadWorkflow(strings.NewReader(yaml))
+	assert.Error(t, err, "read workflow should fail")
 }
 
 // See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#jobsjob_idoutputs

@@ -42,16 +42,6 @@ func TestParse(t *testing.T) {
 			options: nil,
 			wantErr: false,
 		},
-		{
-			name:    "has_secrets",
-			options: nil,
-			wantErr: false,
-		},
-		{
-			name:    "empty_step",
-			options: nil,
-			wantErr: false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

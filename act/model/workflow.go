@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nektos/act/pkg/common"
+	"github.com/nektos/act/pkg/schema"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
@@ -90,6 +92,18 @@ func (w *Workflow) OnSchedule() []string {
 	}
 
 	return []string{}
+}
+
+func (w *Workflow) UnmarshalYAML(node *yaml.Node) error {
+	// Validate the schema before deserializing it into our model
+	if err := (&schema.Node{
+		Definition: "workflow-root",
+		Schema:     schema.GetWorkflowSchema(),
+	}).UnmarshalYAML(node); err != nil {
+		return errors.Join(err, fmt.Errorf("Forgejo Actions YAML Schema validation error"))
+	}
+	type WorkflowDefault Workflow
+	return node.Decode((*WorkflowDefault)(w))
 }
 
 type WorkflowDispatchInput struct {
@@ -488,7 +502,7 @@ func (j *Job) GetMatrixes() ([]map[string]interface{}, error) {
 	return matrixes, nil
 }
 
-func commonKeysMatch(a map[string]interface{}, b map[string]interface{}) bool {
+func commonKeysMatch(a, b map[string]interface{}) bool {
 	for aKey, aVal := range a {
 		if bVal, ok := b[aKey]; ok && !reflect.DeepEqual(aVal, bVal) {
 			return false
@@ -497,7 +511,7 @@ func commonKeysMatch(a map[string]interface{}, b map[string]interface{}) bool {
 	return true
 }
 
-func commonKeysMatch2(a map[string]interface{}, b map[string]interface{}, m map[string][]interface{}) bool {
+func commonKeysMatch2(a, b map[string]interface{}, m map[string][]interface{}) bool {
 	for aKey, aVal := range a {
 		_, useKey := m[aKey]
 		if bVal, ok := b[aKey]; useKey && ok && !reflect.DeepEqual(aVal, bVal) {
