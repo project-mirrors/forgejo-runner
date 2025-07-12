@@ -1402,7 +1402,7 @@
     },
     "workflow-env": {
       "description": "A map of environment variables that are available to the steps of all jobs in the workflow. You can also set environment variables that are only available to the steps of a single job or to a single step.\n\n[Documentation](https://docs.github.com/actions/using-workflows/workflow-syntax-for-github-actions#env)",
-      "context": ["forge", "github", "inputs", "vars", "secrets"],
+      "context": ["forge", "github", "inputs", "vars", "secrets", "env"],
       "mapping": {
         "loose-key-type": "non-empty-string",
         "loose-value-type": "string"
