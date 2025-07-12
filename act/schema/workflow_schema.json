@@ -1519,7 +1519,8 @@
         "always(0,0)",
         "failure(0,MAX)",
         "cancelled(0,0)",
-        "success(0,MAX)"
+        "success(0,MAX)",
+        "secrets"
       ],
       "string": {
         "is-expression": true
@@ -1535,7 +1536,8 @@
         "always(0,0)",
         "failure(0,MAX)",
         "cancelled(0,0)",
-        "success(0,MAX)"
+        "success(0,MAX)",
+        "secrets"
       ],
       "one-of": ["null", "boolean", "number", "string", "sequence", "mapping"]
     },
@@ -1801,7 +1803,8 @@
         "failure(0,0)",
         "cancelled(0,0)",
         "success(0,0)",
-        "hashFiles(1,255)"
+        "hashFiles(1,255)",
+        "secrets"
       ],
       "description": "Use the `if` conditional to prevent a step from running unless a condition is met. Any supported context and expression can be used to create a conditional. Expressions in an `if` conditional do not require the bracketed expression syntax. When you use expressions in an `if` conditional, you may omit the expression syntax because GitHub automatically evaluates the `if` conditional as an expression.",
       "string": {
@@ -1824,7 +1827,8 @@
         "failure(0,0)",
         "cancelled(0,0)",
         "success(0,0)",
-        "hashFiles(1,255)"
+        "hashFiles(1,255)",
+        "secrets"
       ],
       "one-of": ["null", "boolean", "number", "string", "sequence", "mapping"]
     },
