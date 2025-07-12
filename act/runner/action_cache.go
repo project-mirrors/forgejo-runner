@@ -3,8 +3,6 @@ package runner
 import (
 	"archive/tar"
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +17,8 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+
+	"github.com/nektos/act/pkg/common"
 )
 
 type ActionCache interface {
@@ -39,11 +39,10 @@ func (c GoGitActionCache) Fetch(ctx context.Context, cacheDir, url, ref, token s
 	if err != nil {
 		return "", err
 	}
-	tmpBranch := make([]byte, 12)
-	if _, err := rand.Read(tmpBranch); err != nil {
+	branchName, err := common.RandName(12)
+	if err != nil {
 		return "", err
 	}
-	branchName := hex.EncodeToString(tmpBranch)
 
 	var auth transport.AuthMethod
 	if token != "" {

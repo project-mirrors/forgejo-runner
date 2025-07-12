@@ -5,10 +5,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -283,9 +281,10 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 			return true
 		})
 		cacheDir := rc.ActionCacheDir()
-		randBytes := make([]byte, 8)
-		_, _ = rand.Read(randBytes)
-		randName := hex.EncodeToString(randBytes)
+		randName, err := common.RandName(8)
+		if err != nil {
+			return err
+		}
 		miscpath := filepath.Join(cacheDir, randName)
 		actPath := filepath.Join(miscpath, "act")
 		if err := os.MkdirAll(actPath, 0o777); err != nil {
