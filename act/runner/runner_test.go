@@ -218,7 +218,8 @@ func (j *TestJobFileInfo) runTest(ctx context.Context, t *testing.T, cfg *Config
 }
 
 type TestConfig struct {
-	LocalRepositories map[string]string `yaml:"local-repositories"`
+	LocalRepositories map[string]string `yaml:"local-repositories,omitempty"`
+	Env               map[string]string `yaml:"env,omitempty"`
 }
 
 func TestRunEvent(t *testing.T) {
@@ -314,6 +315,7 @@ func TestRunEvent(t *testing.T) {
 		{workdir, "set-env-step-env-override", "push", "", platforms, secrets},
 		{workdir, "set-env-new-env-file-per-step", "push", "", platforms, secrets},
 		{workdir, "no-panic-on-invalid-composite-action", "push", "jobs failed due to invalid action", platforms, secrets},
+		{workdir, "tool-cache", "push", "", platforms, secrets},
 
 		// services
 		{workdir, "services", "push", "", platforms, secrets},
@@ -349,6 +351,7 @@ func TestRunEvent(t *testing.T) {
 						}
 					}
 				}
+				config.Env = testConfig.Env
 			}
 
 			table.runTest(ctx, t, config)

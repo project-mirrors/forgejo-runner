@@ -107,7 +107,7 @@ func (sd *stepDocker) newStepContainer(ctx context.Context, image string, cmd []
 		envList = append(envList, fmt.Sprintf("%s=%s", k, v))
 	}
 
-	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TOOL_CACHE", "/opt/hostedtoolcache"))
+	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TOOL_CACHE", rc.getToolCache(ctx)))
 	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_OS", "Linux"))
 	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_ARCH", container.RunnerArch(ctx)))
 	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TEMP", "/tmp"))
@@ -122,6 +122,7 @@ func (sd *stepDocker) newStepContainer(ctx context.Context, image string, cmd []
 		Password:     rc.Config.Secrets["DOCKER_PASSWORD"],
 		Name:         createSimpleContainerName(rc.jobContainerName(), "STEP-"+step.ID),
 		Env:          envList,
+		ToolCache:    rc.getToolCache(ctx),
 		Mounts:       mounts,
 		NetworkMode:  fmt.Sprintf("container:%s", rc.jobContainerName()),
 		Binds:        binds,

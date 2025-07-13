@@ -300,13 +300,12 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 		if err := os.MkdirAll(runnerTmp, 0o777); err != nil {
 			return err
 		}
-		toolCache := filepath.Join(cacheDir, "tool_cache")
 		rc.JobContainer = &container.HostEnvironment{
 			Name:      randName,
 			Root:      miscpath,
 			Path:      path,
 			TmpDir:    runnerTmp,
-			ToolCache: toolCache,
+			ToolCache: rc.getToolCache(ctx),
 			Workdir:   rc.Config.Workdir,
 			ActPath:   actPath,
 			CleanUp: func() {
@@ -419,7 +418,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 
 		envList := make([]string, 0)
 
-		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TOOL_CACHE", "/opt/hostedtoolcache"))
+		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TOOL_CACHE", rc.getToolCache(ctx)))
 		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_OS", "Linux"))
 		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_ARCH", container.RunnerArch(ctx)))
 		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TEMP", "/tmp"))
@@ -481,6 +480,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 				Password:       password,
 				Cmd:            interpolatedCmd,
 				Env:            envs,
+				ToolCache:      rc.getToolCache(ctx),
 				Mounts:         serviceMounts,
 				Binds:          serviceBinds,
 				Stdout:         logWriter,
@@ -542,6 +542,7 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			Password:       password,
 			Name:           name,
 			Env:            envList,
+			ToolCache:      rc.getToolCache(ctx),
 			Mounts:         mounts,
 			NetworkMode:    networkName,
 			NetworkAliases: []string{rc.Name},
@@ -759,6 +760,16 @@ func (rc *RunContext) interpolateOutputs() common.Executor {
 		}
 		return nil
 	}
+}
+
+func (rc *RunContext) getToolCache(ctx context.Context) string {
+	if value, ok := rc.Config.Env["RUNNER_TOOL_CACHE"]; ok {
+		return value
+	}
+	if rc.IsHostEnv(ctx) {
+		return filepath.Join(rc.ActionCacheDir(), "tool_cache")
+	}
+	return "/opt/hostedtoolcache"
 }
 
 func (rc *RunContext) startContainer() common.Executor {

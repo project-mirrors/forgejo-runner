@@ -17,6 +17,7 @@ type NewContainerInput struct {
 	Cmd            []string
 	WorkingDir     string
 	Env            []string
+	ToolCache      string
 	Binds          []string
 	Mounts         map[string]string
 	Name           string

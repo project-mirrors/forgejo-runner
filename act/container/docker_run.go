@@ -46,6 +46,7 @@ import (
 func NewContainer(input *NewContainerInput) ExecutionsEnvironment {
 	cr := new(containerReference)
 	cr.input = input
+	cr.toolCache = input.ToolCache
 	return cr
 }
 
