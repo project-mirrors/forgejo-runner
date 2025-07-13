@@ -4,14 +4,8 @@ env:
 jobs:
   check:
     runs-on: ubuntu-latest
-    steps:
-      - shell: ${{ env.MY_SHELL }}
-        run: |
-          import platform
-          print(platform.python_version())
-  check-container:
-    runs-on: ubuntu-latest
-    container: node:16-buster
+    container:
+      image: code.forgejo.org/oci/python:slim
     steps:
       - shell: ${{ env.MY_SHELL }}
         run: |
@@ -19,6 +13,8 @@ jobs:
           print(platform.python_version())
   check-job-default:
     runs-on: ubuntu-latest
+    container:
+      image: code.forgejo.org/oci/python:slim
     defaults:
       run:
         shell: ${{ env.MY_SHELL }}

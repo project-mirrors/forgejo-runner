@@ -1,6 +1,6 @@
 on: push
 jobs:
-  check: # GHA uses `bash` as default for runners
+  check: # use `bash` as default for runners
     runs-on: ubuntu-latest
     steps:
       - run: |
@@ -9,12 +9,13 @@ jobs:
           else
             exit 1
           fi
-  check-container: # GHA uses `sh` as default for containers
+  fallback: # uses `sh` as fallback default if `bash` is not available
     runs-on: ubuntu-latest
-    container: alpine:latest
+    container:
+      image: code.forgejo.org/oci/alpine:latest
     steps:
       - run: |
-          if [ -z ${BASH+x} ]; then
+          if [ -z "${BASH}" ]; then
             echo "I'm sh!"
           else
             exit 1

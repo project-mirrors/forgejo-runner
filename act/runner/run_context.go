@@ -5,20 +5,20 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
@@ -283,9 +283,10 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 			return true
 		})
 		cacheDir := rc.ActionCacheDir()
-		randBytes := make([]byte, 8)
-		_, _ = rand.Read(randBytes)
-		randName := hex.EncodeToString(randBytes)
+		randName, err := common.RandName(8)
+		if err != nil {
+			return err
+		}
 		miscpath := filepath.Join(cacheDir, randName)
 		actPath := filepath.Join(miscpath, "act")
 		if err := os.MkdirAll(actPath, 0o777); err != nil {
@@ -584,6 +585,42 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			}),
 		)(ctx)
 	}
+}
+
+func (rc *RunContext) sh(ctx context.Context, script string) (stdout, stderr string, err error) {
+	timeed, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+	hout := &bytes.Buffer{}
+	herr := &bytes.Buffer{}
+
+	env := map[string]string{}
+	for k, v := range rc.Env {
+		env[k] = v
+	}
+
+	base, err := common.RandName(8)
+	if err != nil {
+		return "", "", err
+	}
+	name := base + ".sh"
+	oldStdout, oldStderr := rc.JobContainer.ReplaceLogWriter(hout, herr)
+	err = rc.JobContainer.Copy(rc.JobContainer.GetActPath(), &container.FileEntry{
+		Name: name,
+		Mode: 0o644,
+		Body: script,
+	}).
+		Then(rc.execJobContainer([]string{"sh", path.Join(rc.JobContainer.GetActPath(), name)},
+			env, "", "")).
+		Finally(func(context.Context) error {
+			rc.JobContainer.ReplaceLogWriter(oldStdout, oldStderr)
+			return nil
+		})(timeed)
+	if err != nil {
+		return "", "", err
+	}
+	stdout = hout.String()
+	stderr = herr.String()
+	return stdout, stderr, nil
 }
 
 func (rc *RunContext) execJobContainer(cmd []string, env map[string]string, user, workdir string) common.Executor {

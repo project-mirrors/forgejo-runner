@@ -194,9 +194,20 @@ func (sr *stepRun) setupShell(ctx context.Context) {
 			if err != nil {
 				step.Shell = shellWithFallback[1]
 			}
-		} else if containerImage := rc.containerImage(ctx); containerImage != "" {
-			// Currently only linux containers are supported, use sh by default like actions/runner
-			step.Shell = "sh"
+		} else {
+			shell_fallback := `
+if command -v bash >/dev/null; then
+	echo -n bash
+else
+	echo -n sh
+fi
+`
+			stdout, _, err := rc.sh(ctx, shell_fallback)
+			if err != nil {
+				common.Logger(ctx).Error("fail to run %q: %v", shell_fallback, err)
+				return
+			}
+			step.Shell = stdout
 		}
 	}
 }
