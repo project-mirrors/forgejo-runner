@@ -43,7 +43,7 @@ import (
 )
 
 // NewContainer creates a reference to a container
-func NewContainer(input *NewContainerInput) ExecutionsEnvironment {
+var NewContainer = func(input *NewContainerInput) ExecutionsEnvironment {
 	cr := new(containerReference)
 	cr.input = input
 	cr.toolCache = input.ToolCache

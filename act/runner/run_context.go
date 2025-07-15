@@ -391,177 +391,188 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 	}
 }
 
-func (rc *RunContext) startJobContainer() common.Executor {
-	return func(ctx context.Context) error {
-		logger := common.Logger(ctx)
-		image := rc.platformImage(ctx)
-		rawLogger := logger.WithField("raw_output", true)
-		logWriter := common.NewLineWriter(rc.commandHandler(ctx), func(s string) bool {
-			if rc.Config.LogOutput {
-				rawLogger.Infof("%s", s)
-			} else {
-				rawLogger.Debugf("%s", s)
-			}
-			return true
-		})
+func (rc *RunContext) getNetworkName(_ context.Context) (networkName string, createAndDeleteNetwork bool) {
+	// specify the network to which the container will connect when `docker create` stage. (like execute command line: docker create --network <networkName> <image>)
+	networkName = string(rc.Config.ContainerNetworkMode)
+	if networkName == "" {
+		// if networkName is empty string, will create a new network for the containers.
+		// and it will be removed after at last.
+		networkName, createAndDeleteNetwork = rc.networkName()
+	}
+	return networkName, createAndDeleteNetwork
+}
 
-		username, password, err := rc.handleCredentials(ctx)
+func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
+	logger := common.Logger(ctx)
+	image := rc.platformImage(ctx)
+	rawLogger := logger.WithField("raw_output", true)
+	logWriter := common.NewLineWriter(rc.commandHandler(ctx), func(s string) bool {
+		if rc.Config.LogOutput {
+			rawLogger.Infof("%s", s)
+		} else {
+			rawLogger.Debugf("%s", s)
+		}
+		return true
+	})
+
+	username, password, err := rc.handleCredentials(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to handle credentials: %s", err)
+	}
+
+	logger.Infof("\U0001f680  Start image=%s", image)
+	name := rc.jobContainerName()
+	// For gitea, to support --volumes-from <container_name_or_id> in options.
+	// We need to set the container name to the environment variable.
+	rc.Env["JOB_CONTAINER_NAME"] = name
+
+	envList := make([]string, 0)
+
+	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TOOL_CACHE", rc.getToolCache(ctx)))
+	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_OS", "Linux"))
+	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_ARCH", container.RunnerArch(ctx)))
+	envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TEMP", "/tmp"))
+	envList = append(envList, fmt.Sprintf("%s=%s", "LANG", "C.UTF-8")) // Use same locale as GitHub Actions
+
+	ext := container.LinuxContainerEnvironmentExtensions{}
+	binds, mounts := rc.GetBindsAndMounts()
+
+	networkName, createAndDeleteNetwork := rc.getNetworkName(ctx)
+	// add service containers
+	for serviceID, spec := range rc.Run.Job().Services {
+		// interpolate env
+		interpolatedEnvs := make(map[string]string, len(spec.Env))
+		for k, v := range spec.Env {
+			interpolatedEnvs[k] = rc.ExprEval.Interpolate(ctx, v)
+		}
+		envs := make([]string, 0, len(interpolatedEnvs))
+		for k, v := range interpolatedEnvs {
+			envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+		}
+		interpolatedCmd := make([]string, 0, len(spec.Cmd))
+		for _, v := range spec.Cmd {
+			interpolatedCmd = append(interpolatedCmd, rc.ExprEval.Interpolate(ctx, v))
+		}
+
+		username, password, err := rc.handleServiceCredentials(ctx, spec.Credentials)
 		if err != nil {
-			return fmt.Errorf("failed to handle credentials: %s", err)
+			return fmt.Errorf("failed to handle service %s credentials: %w", serviceID, err)
 		}
 
-		logger.Infof("\U0001f680  Start image=%s", image)
-		name := rc.jobContainerName()
-		// For gitea, to support --volumes-from <container_name_or_id> in options.
-		// We need to set the container name to the environment variable.
-		rc.Env["JOB_CONTAINER_NAME"] = name
+		interpolatedVolumes := make([]string, 0, len(spec.Volumes))
+		for _, volume := range spec.Volumes {
+			interpolatedVolumes = append(interpolatedVolumes, rc.ExprEval.Interpolate(ctx, volume))
+		}
+		serviceBinds, serviceMounts := rc.GetServiceBindsAndMounts(interpolatedVolumes)
 
-		envList := make([]string, 0)
-
-		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TOOL_CACHE", rc.getToolCache(ctx)))
-		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_OS", "Linux"))
-		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_ARCH", container.RunnerArch(ctx)))
-		envList = append(envList, fmt.Sprintf("%s=%s", "RUNNER_TEMP", "/tmp"))
-		envList = append(envList, fmt.Sprintf("%s=%s", "LANG", "C.UTF-8")) // Use same locale as GitHub Actions
-
-		ext := container.LinuxContainerEnvironmentExtensions{}
-		binds, mounts := rc.GetBindsAndMounts()
-
-		// specify the network to which the container will connect when `docker create` stage. (like execute command line: docker create --network <networkName> <image>)
-		networkName := string(rc.Config.ContainerNetworkMode)
-		var createAndDeleteNetwork bool
-		if networkName == "" {
-			// if networkName is empty string, will create a new network for the containers.
-			// and it will be removed after at last.
-			networkName, createAndDeleteNetwork = rc.networkName()
+		interpolatedPorts := make([]string, 0, len(spec.Ports))
+		for _, port := range spec.Ports {
+			interpolatedPorts = append(interpolatedPorts, rc.ExprEval.Interpolate(ctx, port))
+		}
+		exposedPorts, portBindings, err := nat.ParsePortSpecs(interpolatedPorts)
+		if err != nil {
+			return fmt.Errorf("failed to parse service %s ports: %w", serviceID, err)
 		}
 
-		// add service containers
-		for serviceID, spec := range rc.Run.Job().Services {
-			// interpolate env
-			interpolatedEnvs := make(map[string]string, len(spec.Env))
-			for k, v := range spec.Env {
-				interpolatedEnvs[k] = rc.ExprEval.Interpolate(ctx, v)
-			}
-			envs := make([]string, 0, len(interpolatedEnvs))
-			for k, v := range interpolatedEnvs {
-				envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-			}
-			interpolatedCmd := make([]string, 0, len(spec.Cmd))
-			for _, v := range spec.Cmd {
-				interpolatedCmd = append(interpolatedCmd, rc.ExprEval.Interpolate(ctx, v))
-			}
-
-			username, password, err = rc.handleServiceCredentials(ctx, spec.Credentials)
-			if err != nil {
-				return fmt.Errorf("failed to handle service %s credentials: %w", serviceID, err)
-			}
-
-			interpolatedVolumes := make([]string, 0, len(spec.Volumes))
-			for _, volume := range spec.Volumes {
-				interpolatedVolumes = append(interpolatedVolumes, rc.ExprEval.Interpolate(ctx, volume))
-			}
-			serviceBinds, serviceMounts := rc.GetServiceBindsAndMounts(interpolatedVolumes)
-
-			interpolatedPorts := make([]string, 0, len(spec.Ports))
-			for _, port := range spec.Ports {
-				interpolatedPorts = append(interpolatedPorts, rc.ExprEval.Interpolate(ctx, port))
-			}
-			exposedPorts, portBindings, err := nat.ParsePortSpecs(interpolatedPorts)
-			if err != nil {
-				return fmt.Errorf("failed to parse service %s ports: %w", serviceID, err)
-			}
-
-			serviceContainerName := createContainerName(rc.jobContainerName(), serviceID)
-			c := container.NewContainer(&container.NewContainerInput{
-				Name:           serviceContainerName,
-				Image:          rc.ExprEval.Interpolate(ctx, spec.Image),
-				Username:       username,
-				Password:       password,
-				Cmd:            interpolatedCmd,
-				Env:            envs,
-				ToolCache:      rc.getToolCache(ctx),
-				Mounts:         serviceMounts,
-				Binds:          serviceBinds,
-				Stdout:         logWriter,
-				Stderr:         logWriter,
-				Privileged:     rc.Config.Privileged,
-				UsernsMode:     rc.Config.UsernsMode,
-				Platform:       rc.Config.ContainerArchitecture,
-				AutoRemove:     rc.Config.AutoRemove,
-				NetworkMode:    networkName,
-				NetworkAliases: []string{serviceID},
-				ExposedPorts:   exposedPorts,
-				PortBindings:   portBindings,
-				ValidVolumes:   rc.Config.ValidVolumes,
-
-				JobOptions:    rc.ExprEval.Interpolate(ctx, spec.Options),
-				ConfigOptions: rc.Config.ContainerOptions,
-			})
-			rc.ServiceContainers = append(rc.ServiceContainers, c)
-		}
-
-		rc.cleanUpJobContainer = func(ctx context.Context) error {
-			reuseJobContainer := func(ctx context.Context) bool {
-				return rc.Config.ReuseContainers
-			}
-
-			if rc.JobContainer != nil {
-				return rc.JobContainer.Remove().IfNot(reuseJobContainer).
-					Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName(), false)).IfNot(reuseJobContainer).
-					Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName()+"-env", false)).IfNot(reuseJobContainer).
-					Then(func(ctx context.Context) error {
-						if len(rc.ServiceContainers) > 0 {
-							logger.Infof("Cleaning up services for job %s", rc.JobName)
-							if err := rc.stopServiceContainers()(ctx); err != nil {
-								logger.Errorf("Error while cleaning services: %v", err)
-							}
-							if createAndDeleteNetwork {
-								// clean network if it has been created by act
-								// if using service containers
-								// it means that the network to which containers are connecting is created by `act_runner`,
-								// so, we should remove the network at last.
-								logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
-								if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
-									logger.Errorf("Error while cleaning network: %v", err)
-								}
-							}
-						}
-						return nil
-					})(ctx)
-			}
-			return nil
-		}
-
-		rc.JobContainer = container.NewContainer(&container.NewContainerInput{
-			Cmd:            nil,
-			Entrypoint:     []string{"tail", "-f", "/dev/null"},
-			WorkingDir:     ext.ToContainerPath(rc.Config.Workdir),
-			Image:          image,
+		serviceContainerName := createContainerName(rc.jobContainerName(), serviceID)
+		c := container.NewContainer(&container.NewContainerInput{
+			Name:           serviceContainerName,
+			Image:          rc.ExprEval.Interpolate(ctx, spec.Image),
 			Username:       username,
 			Password:       password,
-			Name:           name,
-			Env:            envList,
+			Cmd:            interpolatedCmd,
+			Env:            envs,
 			ToolCache:      rc.getToolCache(ctx),
-			Mounts:         mounts,
-			NetworkMode:    networkName,
-			NetworkAliases: []string{rc.Name},
-			Binds:          binds,
+			Mounts:         serviceMounts,
+			Binds:          serviceBinds,
 			Stdout:         logWriter,
 			Stderr:         logWriter,
 			Privileged:     rc.Config.Privileged,
 			UsernsMode:     rc.Config.UsernsMode,
 			Platform:       rc.Config.ContainerArchitecture,
 			AutoRemove:     rc.Config.AutoRemove,
+			NetworkMode:    networkName,
+			NetworkAliases: []string{serviceID},
+			ExposedPorts:   exposedPorts,
+			PortBindings:   portBindings,
 			ValidVolumes:   rc.Config.ValidVolumes,
 
-			JobOptions:    rc.options(ctx),
+			JobOptions:    rc.ExprEval.Interpolate(ctx, spec.Options),
 			ConfigOptions: rc.Config.ContainerOptions,
 		})
-		if rc.JobContainer == nil {
-			return errors.New("Failed to create job container")
+		rc.ServiceContainers = append(rc.ServiceContainers, c)
+	}
+
+	rc.cleanUpJobContainer = func(ctx context.Context) error {
+		reuseJobContainer := func(ctx context.Context) bool {
+			return rc.Config.ReuseContainers
 		}
 
+		if rc.JobContainer != nil {
+			return rc.JobContainer.Remove().IfNot(reuseJobContainer).
+				Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName(), false)).IfNot(reuseJobContainer).
+				Then(container.NewDockerVolumeRemoveExecutor(rc.jobContainerName()+"-env", false)).IfNot(reuseJobContainer).
+				Then(func(ctx context.Context) error {
+					if len(rc.ServiceContainers) > 0 {
+						logger.Infof("Cleaning up services for job %s", rc.JobName)
+						if err := rc.stopServiceContainers()(ctx); err != nil {
+							logger.Errorf("Error while cleaning services: %v", err)
+						}
+						if createAndDeleteNetwork {
+							// clean network if it has been created by act
+							// if using service containers
+							// it means that the network to which containers are connecting is created by `act_runner`,
+							// so, we should remove the network at last.
+							logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
+							if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
+								logger.Errorf("Error while cleaning network: %v", err)
+							}
+						}
+					}
+					return nil
+				})(ctx)
+		}
+		return nil
+	}
+
+	rc.JobContainer = container.NewContainer(&container.NewContainerInput{
+		Cmd:            nil,
+		Entrypoint:     []string{"tail", "-f", "/dev/null"},
+		WorkingDir:     ext.ToContainerPath(rc.Config.Workdir),
+		Image:          image,
+		Username:       username,
+		Password:       password,
+		Name:           name,
+		Env:            envList,
+		ToolCache:      rc.getToolCache(ctx),
+		Mounts:         mounts,
+		NetworkMode:    networkName,
+		NetworkAliases: []string{rc.Name},
+		Binds:          binds,
+		Stdout:         logWriter,
+		Stderr:         logWriter,
+		Privileged:     rc.Config.Privileged,
+		UsernsMode:     rc.Config.UsernsMode,
+		Platform:       rc.Config.ContainerArchitecture,
+		AutoRemove:     rc.Config.AutoRemove,
+		ValidVolumes:   rc.Config.ValidVolumes,
+
+		JobOptions:    rc.options(ctx),
+		ConfigOptions: rc.Config.ContainerOptions,
+	})
+	if rc.JobContainer == nil {
+		return errors.New("Failed to create job container")
+	}
+
+	return nil
+}
+
+func (rc *RunContext) startJobContainer() common.Executor {
+	return func(ctx context.Context) error {
+		if err := rc.prepareJobContainer(ctx); err != nil {
+			return err
+		}
+		networkName, _ := rc.getNetworkName(ctx)
 		networkConfig := network.CreateOptions{
 			Driver:     "bridge",
 			Scope:      "local",

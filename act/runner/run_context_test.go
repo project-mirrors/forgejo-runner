@@ -1,20 +1,26 @@
 package runner
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
+	"github.com/nektos/act/pkg/testutils"
 
+	"github.com/docker/go-connections/nat"
 	log "github.com/sirupsen/logrus"
-	assert "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	yaml "gopkg.in/yaml.v3"
 )
 
@@ -701,6 +707,174 @@ func Test_createSimpleContainerName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.parts, " "), func(t *testing.T) {
 			assert.Equalf(t, tt.want, createSimpleContainerName(tt.parts...), "createSimpleContainerName(%v)", tt.parts)
+		})
+	}
+}
+
+func TestPrepareJobContainer(t *testing.T) {
+	yaml := `
+on:
+  push:
+
+jobs:
+  job:
+    runs-on: docker
+    container:
+      image: some:image
+      credentials:
+        username: containerusername
+        password: containerpassword
+    services:
+      service1:
+        image: service1:image
+        credentials:
+          username: service1username
+          password: service1password
+      service2:
+        image: service2:image
+        credentials:
+          username: service2username
+          password: service2password
+    steps:
+      - run: echo ok
+`
+	workflow, err := model.ReadWorkflow(strings.NewReader(yaml))
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name   string
+		step   actionStep
+		inputs []container.NewContainerInput
+	}{
+		{
+			name: "Overlapping",
+			step: &stepActionRemote{
+				Step: &model.Step{
+					Uses: "org/repo/path@ref",
+				},
+				RunContext: &RunContext{
+					Config: &Config{
+						Workdir: "/my/workdir",
+					},
+					Run: &model.Run{
+						JobID:    "job",
+						Workflow: workflow,
+					},
+				},
+				env: map[string]string{},
+			},
+			inputs: []container.NewContainerInput{
+				{
+					Name:           "WORKFLOW-JOB-service1-24d1b6963554cd6e1a2f9bfcd21b822bf5b42547db24667196ac45f89072fdd9",
+					Image:          "service1:image",
+					Username:       "service1username",
+					Password:       "service1password",
+					Entrypoint:     nil,
+					Cmd:            []string{},
+					WorkingDir:     "",
+					Env:            []string{},
+					ToolCache:      "/opt/hostedtoolcache",
+					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
+					Mounts:         map[string]string{},
+					NetworkMode:    "WORKFLOW_JOB-job-network",
+					Privileged:     false,
+					UsernsMode:     "",
+					Platform:       "",
+					NetworkAliases: []string{"service1"},
+					ExposedPorts:   nat.PortSet{},
+					PortBindings:   nat.PortMap{},
+					ConfigOptions:  "",
+					JobOptions:     "",
+					AutoRemove:     false,
+					ValidVolumes: []string{
+						"WORKFLOW_JOB",
+						"WORKFLOW_JOB-env",
+						"/var/run/docker.sock",
+					},
+				},
+				{
+					Name:           "WORKFLOW-JOB-service2-7137cecabbdb942ae7bbfc8953de8f2a68e8dc9c92ad98cd6d095481b216f979",
+					Image:          "service2:image",
+					Username:       "service2username",
+					Password:       "service2password",
+					Entrypoint:     nil,
+					Cmd:            []string{},
+					WorkingDir:     "",
+					Env:            []string{},
+					ToolCache:      "/opt/hostedtoolcache",
+					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
+					Mounts:         map[string]string{},
+					NetworkMode:    "WORKFLOW_JOB-job-network",
+					Privileged:     false,
+					UsernsMode:     "",
+					Platform:       "",
+					NetworkAliases: []string{"service2"},
+					ExposedPorts:   nat.PortSet{},
+					PortBindings:   nat.PortMap{},
+					ConfigOptions:  "",
+					JobOptions:     "",
+					AutoRemove:     false,
+					ValidVolumes: []string{
+						"WORKFLOW_JOB",
+						"WORKFLOW_JOB-env",
+						"/var/run/docker.sock",
+					},
+				},
+				{
+					Name:       "WORKFLOW_JOB",
+					Image:      "some:image",
+					Username:   "containerusername",
+					Password:   "containerpassword",
+					Entrypoint: []string{"tail", "-f", "/dev/null"},
+					Cmd:        nil,
+					WorkingDir: "/my/workdir",
+					Env:        []string{},
+					ToolCache:  "/opt/hostedtoolcache",
+					Binds:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
+					Mounts: map[string]string{
+						"WORKFLOW_JOB":     "/my/workdir",
+						"WORKFLOW_JOB-env": "/var/run/act",
+					},
+					NetworkMode:    "WORKFLOW_JOB-job-network",
+					Privileged:     false,
+					UsernsMode:     "",
+					Platform:       "",
+					NetworkAliases: []string{""},
+					ExposedPorts:   nil,
+					PortBindings:   nil,
+					ConfigOptions:  "",
+					JobOptions:     "",
+					AutoRemove:     false,
+					ValidVolumes: []string{
+						"WORKFLOW_JOB",
+						"WORKFLOW_JOB-env",
+						"/var/run/docker.sock",
+					},
+				},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			containerInputs := make([]container.NewContainerInput, 0, 5)
+			newContainer := container.NewContainer
+			defer testutils.MockVariable(&container.NewContainer, func(input *container.NewContainerInput) container.ExecutionsEnvironment {
+				c := *input
+				c.Stdout = nil
+				c.Stderr = nil
+				c.Env = []string{}
+				containerInputs = append(containerInputs, c)
+				return newContainer(input)
+			})()
+
+			ctx := context.Background()
+			rc := testCase.step.getRunContext()
+			rc.ExprEval = rc.NewExpressionEvaluator(ctx)
+
+			require.NoError(t, rc.prepareJobContainer(ctx))
+			slices.SortFunc(containerInputs, func(a, b container.NewContainerInput) int { return cmp.Compare(a.Name, b.Name) })
+			assert.EqualValues(t, testCase.inputs, containerInputs)
 		})
 	}
 }
