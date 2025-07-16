@@ -11,8 +11,8 @@ import (
 	"github.com/nektos/act/pkg/model"
 )
 
-func Parse(content []byte, options ...ParseOption) ([]*SingleWorkflow, error) {
-	origin, err := model.ReadWorkflow(bytes.NewReader(content))
+func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWorkflow, error) {
+	origin, err := model.ReadWorkflow(bytes.NewReader(content), validate)
 	if err != nil {
 		return nil, fmt.Errorf("model.ReadWorkflow: %w", err)
 	}

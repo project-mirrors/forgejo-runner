@@ -47,7 +47,7 @@ func TestParse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			content := ReadTestdata(t, tt.name+".in.yaml")
 			want := ReadTestdata(t, tt.name+".out.yaml")
-			got, err := Parse(content, tt.options...)
+			got, err := Parse(content, false, tt.options...)
 			if tt.wantErr {
 				require.Error(t, err)
 			}

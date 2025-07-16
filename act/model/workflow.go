@@ -94,7 +94,9 @@ func (w *Workflow) OnSchedule() []string {
 	return []string{}
 }
 
-func (w *Workflow) UnmarshalYAML(node *yaml.Node) error {
+type WorkflowValidate Workflow
+
+func (w *WorkflowValidate) UnmarshalYAML(node *yaml.Node) error {
 	// Validate the schema before deserializing it into our model
 	if err := (&schema.Node{
 		Definition: "workflow-root",
@@ -733,7 +735,12 @@ func (s *Step) Type() StepType {
 }
 
 // ReadWorkflow returns a list of jobs for a given workflow file reader
-func ReadWorkflow(in io.Reader) (*Workflow, error) {
+func ReadWorkflow(in io.Reader, validate bool) (*Workflow, error) {
+	if validate {
+		w := new(WorkflowValidate)
+		err := yaml.NewDecoder(in).Decode(w)
+		return (*Workflow)(w), err
+	}
 	w := new(Workflow)
 	err := yaml.NewDecoder(in).Decode(w)
 	return w, err

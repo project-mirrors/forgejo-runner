@@ -208,7 +208,7 @@ func TestParseRawOn(t *testing.T) {
 	}
 	for _, kase := range kases {
 		t.Run(kase.input, func(t *testing.T) {
-			origin, err := model.ReadWorkflow(strings.NewReader(kase.input))
+			origin, err := model.ReadWorkflow(strings.NewReader(kase.input), false)
 			assert.NoError(t, err)
 
 			events, err := ParseRawOn(&origin.RawOn)
@@ -222,7 +222,7 @@ func TestSingleWorkflow_SetJob(t *testing.T) {
 	t.Run("erase needs", func(t *testing.T) {
 		content := ReadTestdata(t, "erase_needs.in.yaml")
 		want := ReadTestdata(t, "erase_needs.out.yaml")
-		swf, err := Parse(content)
+		swf, err := Parse(content, false)
 		require.NoError(t, err)
 		builder := &strings.Builder{}
 		for _, v := range swf {
@@ -249,8 +249,7 @@ func TestParseMappingNode(t *testing.T) {
 		{
 			input:   "on:\n  push:\n    branches:\n      - master",
 			scalars: []string{"push"},
-			datas: []interface {
-			}{
+			datas: []interface{}{
 				map[string]interface{}{
 					"branches": []interface{}{"master"},
 				},
@@ -313,7 +312,7 @@ func TestParseMappingNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
-			workflow, err := model.ReadWorkflow(strings.NewReader(test.input))
+			workflow, err := model.ReadWorkflow(strings.NewReader(test.input), false)
 			assert.NoError(t, err)
 
 			scalars, datas, err := parseMappingNode[interface{}](&workflow.RawOn)

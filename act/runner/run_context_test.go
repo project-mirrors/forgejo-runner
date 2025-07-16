@@ -738,7 +738,7 @@ jobs:
     steps:
       - run: echo ok
 `
-	workflow, err := model.ReadWorkflow(strings.NewReader(yaml))
+	workflow, err := model.ReadWorkflow(strings.NewReader(yaml), true)
 	require.NoError(t, err)
 
 	testCases := []struct {
