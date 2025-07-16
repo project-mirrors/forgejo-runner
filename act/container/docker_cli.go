@@ -7,7 +7,7 @@
 // See DOCKER_LICENSE for the full license text.
 //
 
-//nolint:unparam,errcheck,depguard,deadcode,unused
+//nolint:unparam,errcheck,depguard,unused
 package container
 
 import (
@@ -37,9 +37,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var (
-	deviceCgroupRuleRegexp = regexp.MustCompile(`^[acb] ([0-9]+|\*):([0-9]+|\*) [rwm]{1,3}$`)
-)
+var deviceCgroupRuleRegexp = regexp.MustCompile(`^[acb] ([0-9]+|\*):([0-9]+|\*) [rwm]{1,3}$`)
 
 // containerOptions is a data object with all the options for creating a container
 type containerOptions struct {
@@ -988,7 +986,7 @@ func validateDeviceCgroupRule(val string) (string, error) {
 // validDeviceMode checks if the mode for device is valid or not.
 // Valid mode is a composition of r (read), w (write), and m (mknod).
 func validDeviceMode(mode string) bool {
-	var legalDeviceMode = map[rune]bool{
+	legalDeviceMode := map[rune]bool{
 		'r': true,
 		'w': true,
 		'm': true,
@@ -1006,7 +1004,7 @@ func validDeviceMode(mode string) bool {
 }
 
 // validateDevice validates a path for devices
-func validateDevice(val string, serverOS string) (string, error) {
+func validateDevice(val, serverOS string) (string, error) {
 	switch serverOS {
 	case "linux":
 		return validateLinuxPath(val, validDeviceMode)
