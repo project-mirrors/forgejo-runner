@@ -19,8 +19,8 @@
 ## 7.0.0
 
 * Breaking change: [forgejo-runner exec --forgejo-instance replaces --gitea-instance](https://code.forgejo.org/forgejo/runner/pulls/652).
+* Breaking change: [forge.FORGEJO_* can be used instead of github.GITHUB_*](https://code.forgejo.org/forgejo/act/pulls/171), e.g. `forge.FORGEJO_REPOSITORY` is the same as `github.GITHUB_REPOSITORY`. The `GITHUB_*` environment variables are preserved indefinitely for backward compatibiliy with existing workflows and actions. A workflow that previously set preset `FORGEJO_*` variables in any context, they will be overridden by this naming change. For instance if `secrets.FORGEJO_TOKEN` was set, it will be set to the automatic token and instead of the value from the secrets of the repository. The same is true for `forge.FORGEJO_REPOSITORY` etc.
 * [fix a v6.4.0 regression that fail a job when if: false](https://code.forgejo.org/forgejo/runner/issues/660).
-* [forge.FORGEJO_* can be used instead of github.GITHUB_*](https://code.forgejo.org/forgejo/act/pulls/171), e.g. `forge.FORGEJO_REPOSITORY` is the same as `github.GITHUB_REPOSITORY`. The `GITHUB_*` environment variables are preserved indefinitely for backward compatibiliy with existing workflows and actions.
 * [support for forgejo-runner exec --var](https://code.forgejo.org/forgejo/runner/pulls/645).
 * [do not force WORKING_DIR in service containers](https://code.forgejo.org/forgejo/runner/issues/304).
 * [remove the local action cache if the remote has changed](https://code.forgejo.org/forgejo/act/pulls/142), e.g. when [DEFAULT_ACTIONS_URL](https://forgejo.org/docs/next/admin/config-cheat-sheet/#actions-actions) is modified in the forgejo configuration.
