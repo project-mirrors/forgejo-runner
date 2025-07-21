@@ -1,9 +1,12 @@
 package model
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -732,6 +735,12 @@ func (s *Step) Type() StepType {
 		return StepTypeUsesActionLocal
 	}
 	return StepTypeUsesActionRemote
+}
+
+func (s *Step) UsesHash() string {
+	hashBytes := sha256.Sum256([]byte(s.Uses))
+	hashString := hex.EncodeToString(hashBytes[:])
+	return filepath.Join(hashString[:2], hashString[2:])
 }
 
 // ReadWorkflow returns a list of jobs for a given workflow file reader
