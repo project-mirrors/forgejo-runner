@@ -711,6 +711,14 @@ func Test_createSimpleContainerName(t *testing.T) {
 	}
 }
 
+func TestSanitizeNetworkAlias(t *testing.T) {
+	same := "SAME"
+	assert.Equal(t, same, sanitizeNetworkAlias(context.Background(), same))
+	original := "OR.IGIN'A-L"
+	sanitized := "OR_IGIN_A-L"
+	assert.Equal(t, sanitized, sanitizeNetworkAlias(context.Background(), original))
+}
+
 func TestPrepareJobContainer(t *testing.T) {
 	yaml := `
 on:

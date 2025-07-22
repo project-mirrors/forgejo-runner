@@ -402,6 +402,17 @@ func (rc *RunContext) getNetworkName(_ context.Context) (networkName string, cre
 	return networkName, createAndDeleteNetwork
 }
 
+var sanitizeNetworkAliasRegex = regexp.MustCompile("[^A-Z0-9-]")
+
+func sanitizeNetworkAlias(ctx context.Context, original string) string {
+	sanitized := sanitizeNetworkAliasRegex.ReplaceAllString(strings.ToUpper(original), "_")
+	if sanitized != original {
+		logger := common.Logger(ctx)
+		logger.Infof("The network alias is %s (sanitized version of %s)", original, sanitized)
+	}
+	return sanitized
+}
+
 func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 	logger := common.Logger(ctx)
 	image := rc.platformImage(ctx)
@@ -492,7 +503,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 			Platform:       rc.Config.ContainerArchitecture,
 			AutoRemove:     rc.Config.AutoRemove,
 			NetworkMode:    networkName,
-			NetworkAliases: []string{serviceID},
+			NetworkAliases: []string{sanitizeNetworkAlias(ctx, serviceID)},
 			ExposedPorts:   exposedPorts,
 			PortBindings:   portBindings,
 			ValidVolumes:   rc.Config.ValidVolumes,
@@ -547,7 +558,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 		ToolCache:      rc.getToolCache(ctx),
 		Mounts:         mounts,
 		NetworkMode:    networkName,
-		NetworkAliases: []string{rc.Name},
+		NetworkAliases: []string{sanitizeNetworkAlias(ctx, rc.Name)},
 		Binds:          binds,
 		Stdout:         logWriter,
 		Stderr:         logWriter,
