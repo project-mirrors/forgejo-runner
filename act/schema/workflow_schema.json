@@ -1588,6 +1588,7 @@
     },
     "runs-on": {
       "description": "Use `runs-on` to define the type of machine to run the job on.\n* The destination machine can be either a GitHub-hosted runner, larger runner, or a self-hosted runner.\n* You can target runners based on the labels assigned to them, or their group membership, or a combination of these.\n* You can provide `runs-on` as a single string or as an array of strings.\n* If you specify an array of strings, your workflow will execute on any runner that matches all of the specified `runs-on` values.\n* If you would like to run your workflow on multiple machines, use `jobs.<job_id>.strategy`.",
+      "required": true,
       "context": ["forge", "github", "inputs", "vars", "needs", "strategy", "matrix"],
       "one-of": [
         "non-empty-string",
