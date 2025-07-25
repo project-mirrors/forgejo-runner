@@ -263,10 +263,12 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 						if isInvalidOnType(k, act) {
 							return nil, fmt.Errorf("unknown on type: %#v", v)
 						}
-						acts = nil
 					default:
 						return nil, fmt.Errorf("unknown on type: %#v", branches)
 					}
+				}
+				if k == "workflow_dispatch" || k == "workflow_call" {
+					acts = nil
 				}
 				res = append(res, &Event{
 					Name: k,
