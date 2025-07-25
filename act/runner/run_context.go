@@ -94,7 +94,7 @@ func (rc *RunContext) GetEnv() map[string]string {
 }
 
 func (rc *RunContext) jobContainerName() string {
-	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+rc.Run.Workflow.Name, "JOB-"+rc.Name)
+	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+common.Sha256(rc.Run.Workflow.Name), "JOB-"+rc.Name)
 }
 
 // networkName return the name of the network which will be created by `act` automatically for job,

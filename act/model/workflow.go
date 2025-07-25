@@ -1,8 +1,6 @@
 package model
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -738,8 +736,7 @@ func (s *Step) Type() StepType {
 }
 
 func (s *Step) UsesHash() string {
-	hashBytes := sha256.Sum256([]byte(s.Uses))
-	hashString := hex.EncodeToString(hashBytes[:])
+	hashString := common.Sha256(s.Uses)
 	return filepath.Join(hashString[:2], hashString[2:])
 }
 
