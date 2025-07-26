@@ -1472,6 +1472,11 @@
             "type": "non-empty-string",
             "required": true
           },
+          "runs-on": {
+            "type": "runs-on",
+            "required": true
+          },
+          "container": "container",
           "with": "workflow-job-with",
           "secrets": "workflow-job-secrets",
           "needs": "needs",

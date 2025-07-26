@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
 
@@ -89,4 +90,33 @@ jobs:
 		Schema:     GetWorkflowSchema(),
 	}).UnmarshalYAML(&node)
 	assert.NoError(t, err)
+}
+
+func TestWorkflowCallRunsOn(t *testing.T) {
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(`
+name: Build Silo Frontend DEV
+on:
+  push:
+    branches:
+      - dev
+      - dev-*
+jobs:
+  build_frontend_dev:
+    name: Build Silo Frontend DEV
+    runs-on: ubuntu-latest
+    container:
+      image: code.forgejo.org/oci/node:22-bookworm
+    uses: ./.github/workflows/build.yaml
+    with:
+      STAGE: dev
+    secrets:
+      PACKAGE_WRITER_TOKEN: ${{ secrets.PACKAGE_WRITER_TOKEN }}
+`), &node)
+	require.NoError(t, err)
+	n := &Node{
+		Definition: "workflow-root",
+		Schema:     GetWorkflowSchema(),
+	}
+	require.NoError(t, n.UnmarshalYAML(&node))
 }
