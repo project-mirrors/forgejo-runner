@@ -23,7 +23,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
-	networktypes "github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/system"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -63,7 +62,7 @@ func (cr *containerReference) ConnectToNetwork(name string) common.Executor {
 
 func (cr *containerReference) connectToNetwork(name string, aliases []string) common.Executor {
 	return func(ctx context.Context) error {
-		return cr.cli.NetworkConnect(ctx, name, cr.input.Name, &networktypes.EndpointSettings{
+		return cr.cli.NetworkConnect(ctx, name, cr.input.Name, &network.EndpointSettings{
 			Aliases: aliases,
 		})
 	}
@@ -578,7 +577,7 @@ func (cr *containerReference) extractFromImageEnv(env *map[string]string) common
 	return func(ctx context.Context) error {
 		logger := common.Logger(ctx)
 
-		inspect, _, err := cr.cli.ImageInspectWithRaw(ctx, cr.input.Image)
+		inspect, err := cr.cli.ImageInspect(ctx, cr.input.Image)
 		if err != nil {
 			err = fmt.Errorf("inspect image: %w", err)
 			logger.Error(err)
@@ -727,7 +726,7 @@ func (cr *containerReference) tryReadGID() common.Executor {
 	return cr.tryReadID("-g", func(id int) { cr.GID = id })
 }
 
-func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal bool, resp types.HijackedResponse, _ types.IDResponse, _ string, _ string) error {
+func (cr *containerReference) waitForCommand(ctx context.Context, isTerminal bool, resp types.HijackedResponse, _ container.ExecCreateResponse, _ string, _ string) error {
 	logger := common.Logger(ctx)
 
 	cmdResponse := make(chan error)

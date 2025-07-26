@@ -440,9 +440,10 @@ func (e *HostEnvironment) GetActPath() string {
 }
 
 func (*HostEnvironment) GetPathVariableName() string {
-	if runtime.GOOS == "plan9" {
+	switch runtime.GOOS {
+	case "plan9":
 		return "path"
-	} else if runtime.GOOS == "windows" {
+	case "windows":
 		return "Path" // Actually we need a case insensitive map
 	}
 	return "PATH"

@@ -3,7 +3,6 @@ package artifacts
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -136,11 +135,11 @@ func uploads(router *httprouter.Router, baseDir string, fsys WriteFS) {
 
 		writer, ok := file.(io.Writer)
 		if !ok {
-			panic(errors.New("File is not writable"))
+			panic("File is not writable")
 		}
 
 		if req.Body == nil {
-			panic(errors.New("No body given"))
+			panic("No body given")
 		}
 
 		_, err = io.Copy(writer, req.Body)

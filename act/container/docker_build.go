@@ -8,12 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/pkg/archive"
+	"github.com/docker/docker/api/types/build"
 
-	// github.com/docker/docker/builder/dockerignore is deprecated
-	"github.com/moby/buildkit/frontend/dockerfile/dockerignore"
+	"github.com/moby/go-archive"
 	"github.com/moby/patternmatcher"
+	"github.com/moby/patternmatcher/ignorefile"
 
 	"github.com/nektos/act/pkg/common"
 )
@@ -40,7 +39,7 @@ func NewDockerBuildExecutor(input NewDockerBuildExecutorInput) common.Executor {
 		logger.Debugf("Building image from '%v'", input.ContextDir)
 
 		tags := []string{input.ImageTag}
-		options := types.ImageBuildOptions{
+		options := build.ImageBuildOptions{
 			Tags:        tags,
 			Remove:      true,
 			Platform:    input.Platform,
@@ -83,7 +82,7 @@ func createBuildContext(ctx context.Context, contextDir string, relDockerfile st
 
 	var excludes []string
 	if err == nil {
-		excludes, err = dockerignore.ReadAll(f)
+		excludes, err = ignorefile.ReadAll(f)
 		if err != nil {
 			return nil, err
 		}
