@@ -712,10 +712,10 @@ func Test_createSimpleContainerName(t *testing.T) {
 }
 
 func TestSanitizeNetworkAlias(t *testing.T) {
-	same := "SAME"
+	same := "same"
 	assert.Equal(t, same, sanitizeNetworkAlias(context.Background(), same))
-	original := "OR.IGIN'A-L"
-	sanitized := "OR_IGIN_A-L"
+	original := "or.igin'A-L"
+	sanitized := "or_igin_a-l"
 	assert.Equal(t, sanitized, sanitizeNetworkAlias(context.Background(), original))
 }
 

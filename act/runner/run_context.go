@@ -402,13 +402,13 @@ func (rc *RunContext) getNetworkName(_ context.Context) (networkName string, cre
 	return networkName, createAndDeleteNetwork
 }
 
-var sanitizeNetworkAliasRegex = regexp.MustCompile("[^A-Z0-9-]")
+var sanitizeNetworkAliasRegex = regexp.MustCompile("[^a-z0-9-]")
 
 func sanitizeNetworkAlias(ctx context.Context, original string) string {
-	sanitized := sanitizeNetworkAliasRegex.ReplaceAllString(strings.ToUpper(original), "_")
+	sanitized := sanitizeNetworkAliasRegex.ReplaceAllString(strings.ToLower(original), "_")
 	if sanitized != original {
 		logger := common.Logger(ctx)
-		logger.Infof("The network alias is %s (sanitized version of %s)", original, sanitized)
+		logger.Infof("The network alias is %s (sanitized version of %s)", sanitized, original)
 	}
 	return sanitized
 }
