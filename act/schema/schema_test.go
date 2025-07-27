@@ -120,3 +120,32 @@ jobs:
 	}
 	require.NoError(t, n.UnmarshalYAML(&node))
 }
+
+func TestActionSchema(t *testing.T) {
+	var node yaml.Node
+	err := yaml.Unmarshal([]byte(`
+name: 'action name'
+author: 'action authors'
+description: |
+  action description
+inputs:
+  url:
+    description: 'url description'
+    default: '${{ env.GITHUB_SERVER_URL }}'
+  repo:
+    description: 'repo description'
+    default: '${{ github.repository }}'
+runs:
+  using: "composite"
+  steps:
+    - run: echo "${{ github.action_path }}"
+`), &node)
+	if !assert.NoError(t, err) {
+		return
+	}
+	err = (&Node{
+		Definition: "action-root",
+		Schema:     GetActionSchema(),
+	}).UnmarshalYAML(&node)
+	assert.NoError(t, err)
+}
