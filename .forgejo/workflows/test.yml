@@ -31,13 +31,13 @@ jobs:
           FORGEJO__security__INSTALL_LOCK: "true"
           FORGEJO__log__LEVEL: "debug"
           FORGEJO__actions__ENABLED: "true"
-          FORGEJO_ADMIN_USER: ${{ env.FORGEJO_ADMIN_USER }}
-          FORGEJO_ADMIN_PASSWORD: ${{ env.FORGEJO_ADMIN_PASSWORD }}
-          FORGEJO_RUNNER_SECRET: ${{ env.FORGEJO_RUNNER_SECRET }}
+          FORGEJO_ADMIN_USER: root
+          FORGEJO_ADMIN_PASSWORD: admin1234
+          FORGEJO_RUNNER_SECRET: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
         cmd:
           - 'bash'
           - '-c'
-          - ${{ env.FORGEJO_SCRIPT }}
+          - '/usr/bin/s6-svscan /etc/s6 & sleep 10 ; su -c "forgejo admin user create --admin --username $FORGEJO_ADMIN_USER --password $FORGEJO_ADMIN_PASSWORD --email root@example.com" git && su -c "forgejo forgejo-cli actions register --labels docker --name therunner --secret $FORGEJO_RUNNER_SECRET" git && sleep infinity'
 
     steps:
       - uses: actions/checkout@v4
