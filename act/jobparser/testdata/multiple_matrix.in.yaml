@@ -2,6 +2,8 @@ name: test
 jobs:
   job1:
     strategy:
+      fail-fast: true
+      max-parallel: 5
       matrix:
         os: [ubuntu-22.04, ubuntu-20.04]
         version: [1.17, 1.18, 1.19]

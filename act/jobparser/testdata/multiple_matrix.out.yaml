@@ -9,6 +9,8 @@ jobs:
           go-version: ${{ matrix.version }}
       - run: uname -a && go version
     strategy:
+      fail-fast: "true"
+      max-parallel: "5"
       matrix:
         os:
           - ubuntu-20.04
@@ -26,6 +28,8 @@ jobs:
           go-version: ${{ matrix.version }}
       - run: uname -a && go version
     strategy:
+      fail-fast: "true"
+      max-parallel: "5"
       matrix:
         os:
           - ubuntu-20.04
@@ -43,6 +47,8 @@ jobs:
           go-version: ${{ matrix.version }}
       - run: uname -a && go version
     strategy:
+      fail-fast: "true"
+      max-parallel: "5"
       matrix:
         os:
           - ubuntu-20.04
@@ -60,6 +66,8 @@ jobs:
           go-version: ${{ matrix.version }}
       - run: uname -a && go version
     strategy:
+      fail-fast: "true"
+      max-parallel: "5"
       matrix:
         os:
           - ubuntu-22.04
@@ -77,6 +85,8 @@ jobs:
           go-version: ${{ matrix.version }}
       - run: uname -a && go version
     strategy:
+      fail-fast: "true"
+      max-parallel: "5"
       matrix:
         os:
           - ubuntu-22.04
@@ -94,6 +104,8 @@ jobs:
           go-version: ${{ matrix.version }}
       - run: uname -a && go version
     strategy:
+      fail-fast: "true"
+      max-parallel: "5"
       matrix:
         os:
           - ubuntu-22.04

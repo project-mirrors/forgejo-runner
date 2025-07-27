@@ -1,9 +1,12 @@
 package jobparser
 
 import (
+	"bytes"
 	"embed"
 	"path/filepath"
 	"testing"
+
+	"github.com/nektos/act/pkg/model"
 
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +15,11 @@ import (
 var testdata embed.FS
 
 func ReadTestdata(t *testing.T, name string) []byte {
-	content, err := testdata.ReadFile(filepath.Join("testdata", name))
-	require.NoError(t, err)
+	t.Helper()
+	filename := filepath.Join("testdata", name)
+	content, err := testdata.ReadFile(filename)
+	require.NoError(t, err, filename)
+	_, err = model.ReadWorkflow(bytes.NewReader(content), true)
+	require.NoError(t, err, filename)
 	return content
 }

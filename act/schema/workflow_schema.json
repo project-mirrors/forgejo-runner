@@ -1440,10 +1440,10 @@
             "required": true
           },
           "timeout-minutes": {
-            "type": "number-strategy-context",
+            "type": "job-timeout-minutes",
             "description": "The maximum number of minutes to let a workflow run before GitHub automatically cancels it. Default: 360"
           },
-          "cancel-timeout-minutes": "number-strategy-context",
+          "cancel-timeout-minutes": "job-timeout-minutes",
           "continue-on-error": {
             "type": "boolean-strategy-context",
             "description": "Prevents a workflow run from failing when a job fails. Set to true to allow a workflow run to pass when this job fails."
@@ -1552,16 +1552,52 @@
       "mapping": {
         "properties": {
           "fail-fast": {
-            "type": "boolean",
+            "type": "fail-fast",
             "description": "Setting `fail-fast` to `false` prevents GitHub from canceling all in-progress jobs if any matrix job fails. Default: `true`"
           },
           "max-parallel": {
-            "type": "number",
+            "type": "max-parallel",
             "description": "The maximum number of jobs that can run simultaneously when using a matrix job strategy. By default, GitHub will maximize the number of jobs run in parallel depending on runner availability."
           },
           "matrix": "matrix"
         }
       }
+    },
+    "fail-fast": {
+      "context": [
+        "forge",
+        "github",
+        "inputs",
+        "vars",
+        "needs",
+        "strategy",
+        "matrix",
+        "secrets",
+        "steps",
+        "job",
+        "runner",
+        "env",
+        "hashFiles(1,255)"
+      ],
+      "one-of": ["boolean", "string"]
+    },
+    "max-parallel": {
+      "context": [
+        "forge",
+        "github",
+        "inputs",
+        "vars",
+        "needs",
+        "strategy",
+        "matrix",
+        "secrets",
+        "steps",
+        "job",
+        "runner",
+        "env",
+        "hashFiles(1,255)"
+      ],
+      "one-of": ["number", "string"]
     },
     "matrix": {
       "description": "Use `matrix` to define a matrix of different job configurations. Within your matrix, define one or more variables followed by an array of values.",
@@ -1895,7 +1931,7 @@
         "env",
         "hashFiles(1,255)"
       ],
-      "number": {},
+      "one-of": ["number", "string"],
       "description": "The maximum number of minutes to run the step before killing the process."
     },
     "step-with": {
@@ -2032,6 +2068,10 @@
     "string-strategy-context": {
       "context": ["forge", "github", "inputs", "vars", "needs", "strategy", "matrix"],
       "string": {}
+    },
+    "job-timeout-minutes": {
+      "context": ["forge", "github", "inputs", "vars", "needs", "strategy", "matrix"],
+      "one-of": ["number", "string"]
     },
     "boolean-steps-context": {
       "context": [
