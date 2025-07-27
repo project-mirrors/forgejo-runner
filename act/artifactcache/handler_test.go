@@ -158,7 +158,7 @@ func TestHandler(t *testing.T) {
 		req.Header.Set("Content-Range", "bytes 0-99/*")
 		resp, err := httpClient.Do(req)
 		require.NoError(t, err)
-		assert.Equal(t, 400, resp.StatusCode)
+		assert.Equal(t, 404, resp.StatusCode)
 	})
 
 	t.Run("upload with complete", func(t *testing.T) {
@@ -260,7 +260,7 @@ func TestHandler(t *testing.T) {
 		{
 			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, 100), "", nil)
 			require.NoError(t, err)
-			assert.Equal(t, 400, resp.StatusCode)
+			assert.Equal(t, 404, resp.StatusCode)
 		}
 	})
 
