@@ -1,0 +1,23 @@
+name: remote-action-composite-js-pre-with-defaults
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/composite-js-pre-with-defaults/js@main
+      with:
+        in: nix
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/composite-js-pre-with-defaults@main
+      with:
+        in: secretval
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/composite-js-pre-with-defaults@main
+      with:
+        in: secretval
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/composite-js-pre-with-defaults/js@main
+      with:
+        pre: "true"
+        in: nix
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/composite-js-pre-with-defaults/js@main
+      with:
+        in: nix

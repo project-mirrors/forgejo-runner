@@ -1,0 +1,8 @@
+on: push
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: cat {0}
+        run: |
+          exit 1

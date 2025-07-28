@@ -1,0 +1,12 @@
+name: remote-action-js
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: https://github.com/actions/hello-world-javascript-action@v1
+      with:
+        who-to-greet: 'Mona the Octocat'
+
+    - uses: https://github.com/cloudposse/actions/github/slash-command-dispatch@0.14.0

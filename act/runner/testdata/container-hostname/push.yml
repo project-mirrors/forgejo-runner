@@ -1,0 +1,26 @@
+name: container-hostname
+on: push
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  with-hostname:
+    runs-on: ubuntu-latest
+    container:
+      image: code.forgejo.org/oci/node:22-bookworm
+      options: "--hostname my.host.local"
+    steps:
+      - run: |
+          echo "HOST: $(uname -n)"
+          [[ "$(uname -n)" == "my.host.local" ]]
+
+  default-hostname:
+    runs-on: ubuntu-latest
+    container:
+      image: code.forgejo.org/oci/node:22-bookworm
+    steps:
+      - run: |
+          echo "HOST: $(uname -n)"
+          [[ "$(uname -n)" != "my.host.local" ]]
