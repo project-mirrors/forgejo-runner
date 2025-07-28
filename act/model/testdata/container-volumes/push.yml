@@ -1,0 +1,18 @@
+name: Job Container
+on: push
+
+jobs:
+  with-volumes:
+    runs-on: ubuntu-latest
+    container:
+      image: code.forgejo.org/oci/node:22-bookworm
+      volumes:
+        - my_docker_volume:/path/to/volume
+        - /path/to/nonexist/directory
+        - /proc/sys/kernel/random/boot_id:/current/boot_id
+    steps:
+      - run: |
+          set -ex
+          test -d /path/to/volume
+          test "$(cat /proc/sys/kernel/random/boot_id)" = "$(cat /current/boot_id)"
+          test -d /path/to/nonexist/directory

@@ -1,0 +1,18 @@
+on: push
+env:
+  MY_SHELL: node
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - shell: ${{ env.MY_SHELL }}
+        run: |
+          console.log(process.version)
+  check-job-default:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: ${{ env.MY_SHELL }}
+    steps:
+      - run: |
+          console.log(process.version)

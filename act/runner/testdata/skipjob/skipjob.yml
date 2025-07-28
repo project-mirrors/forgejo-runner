@@ -1,0 +1,11 @@
+name: skipjob
+on: push
+
+jobs:
+  checkjob:
+    runs-on: ubuntu-latest
+
+    if: false
+
+    steps:
+      - run: echo nothing
