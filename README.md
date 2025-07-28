@@ -21,7 +21,7 @@ Work may be in progress for other architectures and you can browse the correspon
 
 # Hacking
 
-The Forgejo runner depends on [a fork of ACT](https://code.forgejo.org/forgejo/act) and is a dependency of the [setup-forgejo action](https://code.forgejo.org/actions/setup-forgejo). See [the full dependency graph](https://code.forgejo.org/actions/cascading-pr/#forgejo-dependencies) for a global view.
+The Forgejo runner is a dependency of the [setup-forgejo action](https://code.forgejo.org/actions/setup-forgejo). See [the full dependency graph](https://code.forgejo.org/actions/cascading-pr/#forgejo-dependencies) for a global view.
 
 ## Building
 
@@ -42,7 +42,6 @@ If there are changes, commit them to the repository.
 The repositories are checked out in the same directory:
 
 - **runner**: [Forgejo runner](https://code.forgejo.org/forgejo/runner)
-- **act**: [ACT](https://code.forgejo.org/forgejo/act)
 - **setup-forgejo**: [setup-forgejo](https://code.forgejo.org/actions/setup-forgejo)
 
 ### Install dependencies
@@ -53,21 +52,7 @@ The dependencies are installed manually or with:
 setup-forgejo/forgejo-dependencies.sh
 ```
 
-### Build the Forgejo runner with the local ACT
-
-The Forgejo runner is rebuilt with the ACT directory by changing the `runner/go.mod` file to:
-
-```
-replace github.com/nektos/act => ../act
-```
-
-Running:
-
-```
-cd runner ; go mod tidy
-```
-
-Building:
+### Build the Forgejo runner
 
 ```shell
 cd runner ; rm -f forgejo-runner ; make forgejo-runner
@@ -88,7 +73,7 @@ The user is `root` with password `admin1234`. The runner is registered with:
 ```
 cd setup-forgejo
 docker exec --user 1000 forgejo forgejo actions generate-runner-token > forgejo-runner-token
-../runner/forgejo-runner register --no-interactive --instance "$(cat forgejo-url)" --name runner --token $(cat forgejo-runner-token) --labels docker:docker://node:20-bullseye,self-hosted:host://-self-hosted,lxc:lxc://debian:bullseye
+../runner/forgejo-runner register --no-interactive --instance "$(cat forgejo-url)" --name runner --token $(cat forgejo-runner-token) --labels docker:docker://node:22-bookworm,self-hosted:host,lxc:lxc://debian:bookworm
 ```
 
 And launched with:
