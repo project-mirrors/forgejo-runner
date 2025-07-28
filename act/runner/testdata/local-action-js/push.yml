@@ -1,23 +1,8 @@
-name: local-action-node12
+name: local-action-node
 on: push
 
 jobs:
-  test-node12:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: https://data.forgejo.org/actions/checkout@v2
-    - uses: ./actions/node12
-      with:
-        who-to-greet: 'Mona the Octocat'
 
-  test-node16:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: https://data.forgejo.org/actions/checkout@v2
-    - uses: ./actions/node16
-      with:
-        who-to-greet: 'Mona the Octocat'
-  
   test-node20:
     runs-on: ubuntu-latest
     steps:
