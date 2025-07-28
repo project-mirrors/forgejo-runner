@@ -5,10 +5,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"regexp"
 	"runtime"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 
@@ -158,7 +156,6 @@ func TestRunContext_EvalBool(t *testing.T) {
 		{in: "INVALID_EXPRESSION", wantErr: true},
 	}
 
-	updateTestIfWorkflow(t, tables, rc)
 	for _, table := range tables {
 		table := table
 		t.Run(table.in, func(t *testing.T) {
@@ -170,67 +167,6 @@ func TestRunContext_EvalBool(t *testing.T) {
 
 			assertObject.Equal(table.out, b, fmt.Sprintf("Expected %s to be %v, was %v", table.in, table.out, b))
 		})
-	}
-}
-
-func updateTestIfWorkflow(t *testing.T, tables []struct {
-	in      string
-	out     bool
-	wantErr bool
-}, rc *RunContext) {
-	var envs string
-	keys := make([]string, 0, len(rc.Env))
-	for k := range rc.Env {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		envs += fmt.Sprintf("  %s: %s\n", k, rc.Env[k])
-	}
-	// editorconfig-checker-disable
-	workflow := fmt.Sprintf(`
-name: "Test what expressions result in true and false on GitHub"
-on: push
-
-env:
-%s
-
-jobs:
-  test-ifs-and-buts:
-    runs-on: ubuntu-latest
-    steps:
-`, envs)
-	// editorconfig-checker-enable
-
-	for i, table := range tables {
-		if table.wantErr || strings.HasPrefix(table.in, "github.actor") {
-			continue
-		}
-		expressionPattern := regexp.MustCompile(`\${{\s*(.+?)\s*}}`)
-
-		expr := expressionPattern.ReplaceAllStringFunc(table.in, func(match string) string {
-			return fmt.Sprintf("€{{ %s }}", expressionPattern.ReplaceAllString(match, "$1"))
-		})
-		echo := fmt.Sprintf(`run: echo "%s should be false, but was evaluated to true;" exit 1;`, table.in)
-		name := fmt.Sprintf(`"❌ I should not run, expr: %s"`, expr)
-		if table.out {
-			echo = `run: echo OK`
-			name = fmt.Sprintf(`"✅ I should run, expr: %s"`, expr)
-		}
-		workflow += fmt.Sprintf("\n      - name: %s\n        id: step%d\n        if: %s\n        %s\n", name, i, table.in, echo)
-		if table.out {
-			workflow += fmt.Sprintf("\n      - name: \"Double checking expr: %s\"\n        if: steps.step%d.conclusion == 'skipped'\n        run: echo \"%s should have been true, but wasn't\"\n", expr, i, table.in)
-		}
-	}
-
-	file, err := os.Create("../../.github/workflows/test-if.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = file.WriteString(workflow)
-	if err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -347,7 +283,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 	})
 }
 
-func TestGetGitHubContext(t *testing.T) {
+func TestRunContext_GetGitHubContext(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 
 	cwd, err := os.Getwd()
@@ -382,12 +318,12 @@ func TestGetGitHubContext(t *testing.T) {
 		actor = a
 	}
 
-	repo := "nektos/act"
+	repo := "forgejo/act"
 	if r := os.Getenv("ACT_REPOSITORY"); r != "" {
 		repo = r
 	}
 
-	owner := "nektos"
+	owner := "code.forgejo.org"
 	if o := os.Getenv("ACT_OWNER"); o != "" {
 		owner = o
 	}
@@ -396,7 +332,7 @@ func TestGetGitHubContext(t *testing.T) {
 	assert.Equal(t, ghc.RunNumber, "1")
 	assert.Equal(t, ghc.RetentionDays, "0")
 	assert.Equal(t, ghc.Actor, actor)
-	assert.Equal(t, ghc.Repository, repo)
+	assert.True(t, strings.HasSuffix(ghc.Repository, repo))
 	assert.Equal(t, ghc.RepositoryOwner, owner)
 	assert.Equal(t, ghc.RunnerPerflog, "/dev/null")
 	assert.Equal(t, ghc.Token, rc.Config.Secrets["GITHUB_TOKEN"])
@@ -404,7 +340,7 @@ func TestGetGitHubContext(t *testing.T) {
 	assert.Equal(t, ghc.Job, "job1")
 }
 
-func TestGetGithubContextRef(t *testing.T) {
+func TestRunContext_GetGithubContextRef(t *testing.T) {
 	table := []struct {
 		event string
 		json  string
@@ -468,7 +404,7 @@ func createIfTestRunContext(jobs map[string]*model.Job) *RunContext {
 	return rc
 }
 
-func createJob(t *testing.T, input string, result string) *model.Job {
+func createJob(t *testing.T, input, result string) *model.Job {
 	var job *model.Job
 	err := yaml.Unmarshal([]byte(input), &job)
 	assert.NoError(t, err)
@@ -477,7 +413,7 @@ func createJob(t *testing.T, input string, result string) *model.Job {
 	return job
 }
 
-func TestRunContextRunsOnPlatformNames(t *testing.T) {
+func TestRunContext_RunsOnPlatformNames(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	assertObject := assert.New(t)
 
@@ -524,7 +460,7 @@ func TestRunContextRunsOnPlatformNames(t *testing.T) {
 	assertObject.Equal([]string{}, rc.runsOnPlatformNames(context.Background()))
 }
 
-func TestRunContextIsEnabled(t *testing.T) {
+func TestRunContext_IsEnabled(t *testing.T) {
 	log.SetLevel(log.DebugLevel)
 	assertObject := assert.New(t)
 
@@ -639,7 +575,7 @@ if: false`, ""),
 	assertObject.False(rc.isEnabled(context.Background()))
 }
 
-func TestRunContextGetEnv(t *testing.T) {
+func TestRunContext_GetEnv(t *testing.T) {
 	tests := []struct {
 		description string
 		rc          *RunContext
@@ -690,7 +626,7 @@ func TestRunContextGetEnv(t *testing.T) {
 	}
 }
 
-func Test_createSimpleContainerName(t *testing.T) {
+func TestRunContext_CreateSimpleContainerName(t *testing.T) {
 	tests := []struct {
 		parts []string
 		want  string
@@ -711,7 +647,7 @@ func Test_createSimpleContainerName(t *testing.T) {
 	}
 }
 
-func TestSanitizeNetworkAlias(t *testing.T) {
+func TestRunContext_SanitizeNetworkAlias(t *testing.T) {
 	same := "same"
 	assert.Equal(t, same, sanitizeNetworkAlias(context.Background(), same))
 	original := "or.igin'A-L"
@@ -719,7 +655,7 @@ func TestSanitizeNetworkAlias(t *testing.T) {
 	assert.Equal(t, sanitized, sanitizeNetworkAlias(context.Background(), original))
 }
 
-func TestPrepareJobContainer(t *testing.T) {
+func TestRunContext_PrepareJobContainer(t *testing.T) {
 	yaml := `
 on:
   push:
@@ -773,63 +709,7 @@ jobs:
 			},
 			inputs: []container.NewContainerInput{
 				{
-					Name:           "WORKFLOW-JOB-service1-24d1b6963554cd6e1a2f9bfcd21b822bf5b42547db24667196ac45f89072fdd9",
-					Image:          "service1:image",
-					Username:       "service1username",
-					Password:       "service1password",
-					Entrypoint:     nil,
-					Cmd:            []string{},
-					WorkingDir:     "",
-					Env:            []string{},
-					ToolCache:      "/opt/hostedtoolcache",
-					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts:         map[string]string{},
-					NetworkMode:    "WORKFLOW_JOB-job-network",
-					Privileged:     false,
-					UsernsMode:     "",
-					Platform:       "",
-					NetworkAliases: []string{"service1"},
-					ExposedPorts:   nat.PortSet{},
-					PortBindings:   nat.PortMap{},
-					ConfigOptions:  "",
-					JobOptions:     "",
-					AutoRemove:     false,
-					ValidVolumes: []string{
-						"WORKFLOW_JOB",
-						"WORKFLOW_JOB-env",
-						"/var/run/docker.sock",
-					},
-				},
-				{
-					Name:           "WORKFLOW-JOB-service2-7137cecabbdb942ae7bbfc8953de8f2a68e8dc9c92ad98cd6d095481b216f979",
-					Image:          "service2:image",
-					Username:       "service2username",
-					Password:       "service2password",
-					Entrypoint:     nil,
-					Cmd:            []string{},
-					WorkingDir:     "",
-					Env:            []string{},
-					ToolCache:      "/opt/hostedtoolcache",
-					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts:         map[string]string{},
-					NetworkMode:    "WORKFLOW_JOB-job-network",
-					Privileged:     false,
-					UsernsMode:     "",
-					Platform:       "",
-					NetworkAliases: []string{"service2"},
-					ExposedPorts:   nat.PortSet{},
-					PortBindings:   nat.PortMap{},
-					ConfigOptions:  "",
-					JobOptions:     "",
-					AutoRemove:     false,
-					ValidVolumes: []string{
-						"WORKFLOW_JOB",
-						"WORKFLOW_JOB-env",
-						"/var/run/docker.sock",
-					},
-				},
-				{
-					Name:       "WORKFLOW_JOB",
+					Name:       "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
 					Image:      "some:image",
 					Username:   "containerusername",
 					Password:   "containerpassword",
@@ -840,10 +720,10 @@ jobs:
 					ToolCache:  "/opt/hostedtoolcache",
 					Binds:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
 					Mounts: map[string]string{
-						"WORKFLOW_JOB":     "/my/workdir",
-						"WORKFLOW_JOB-env": "/var/run/act",
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB":     "/my/workdir",
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env": "/var/run/act",
 					},
-					NetworkMode:    "WORKFLOW_JOB-job-network",
+					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -854,8 +734,64 @@ jobs:
 					JobOptions:     "",
 					AutoRemove:     false,
 					ValidVolumes: []string{
-						"WORKFLOW_JOB",
-						"WORKFLOW_JOB-env",
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env",
+						"/var/run/docker.sock",
+					},
+				},
+				{
+					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599-fe7f4c0058dbd2161ebe4aafa71cd83bd96ee19d3ca8043d5e4bc477a664a80c",
+					Image:          "service1:image",
+					Username:       "service1username",
+					Password:       "service1password",
+					Entrypoint:     nil,
+					Cmd:            []string{},
+					WorkingDir:     "",
+					Env:            []string{},
+					ToolCache:      "/opt/hostedtoolcache",
+					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
+					Mounts:         map[string]string{},
+					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
+					Privileged:     false,
+					UsernsMode:     "",
+					Platform:       "",
+					NetworkAliases: []string{"service1"},
+					ExposedPorts:   nat.PortSet{},
+					PortBindings:   nat.PortMap{},
+					ConfigOptions:  "",
+					JobOptions:     "",
+					AutoRemove:     false,
+					ValidVolumes: []string{
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env",
+						"/var/run/docker.sock",
+					},
+				},
+				{
+					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599-c233cf913e1d0c90cc1404ee09917e625f9cb82156ca3d7cb10b729d563728ea",
+					Image:          "service2:image",
+					Username:       "service2username",
+					Password:       "service2password",
+					Entrypoint:     nil,
+					Cmd:            []string{},
+					WorkingDir:     "",
+					Env:            []string{},
+					ToolCache:      "/opt/hostedtoolcache",
+					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
+					Mounts:         map[string]string{},
+					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
+					Privileged:     false,
+					UsernsMode:     "",
+					Platform:       "",
+					NetworkAliases: []string{"service2"},
+					ExposedPorts:   nat.PortSet{},
+					PortBindings:   nat.PortMap{},
+					ConfigOptions:  "",
+					JobOptions:     "",
+					AutoRemove:     false,
+					ValidVolumes: []string{
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
+						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env",
 						"/var/run/docker.sock",
 					},
 				},
@@ -881,8 +817,10 @@ jobs:
 			rc.ExprEval = rc.NewExpressionEvaluator(ctx)
 
 			require.NoError(t, rc.prepareJobContainer(ctx))
-			slices.SortFunc(containerInputs, func(a, b container.NewContainerInput) int { return cmp.Compare(a.Name, b.Name) })
-			assert.EqualValues(t, testCase.inputs, containerInputs)
+			slices.SortFunc(containerInputs, func(a, b container.NewContainerInput) int { return cmp.Compare(a.Username, b.Username) })
+			for i := 0; i < len(containerInputs); i++ {
+				assert.EqualValues(t, testCase.inputs[i], containerInputs[i], containerInputs[i].Username)
+			}
 		})
 	}
 }

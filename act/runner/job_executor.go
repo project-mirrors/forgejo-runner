@@ -66,7 +66,6 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 		stepModel.Number = i
 
 		step, err := sf.newStep(stepModel, rc)
-
 		if err != nil {
 			return common.NewErrorExecutor(err)
 		}

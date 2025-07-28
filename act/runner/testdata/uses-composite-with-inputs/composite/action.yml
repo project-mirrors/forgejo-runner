@@ -14,7 +14,7 @@ runs:
         echo "input value 1=${{ inputs.composite-input }}"
         [[ "${{ inputs.composite-input == 'value' }}" = "true" ]] || exit 1
       shell: bash
-    - uses: nektos/act-test-actions/js@main
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/js@main
     - name: test input value again
       run: |
         echo "input value 2=${{ inputs.composite-input }}"

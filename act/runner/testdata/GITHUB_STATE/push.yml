@@ -3,7 +3,7 @@ jobs:
   _:
     runs-on: ubuntu-latest
     steps:
-    - uses: nektos/act-test-actions/script@main
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/script@main
       with:
         pre: |
           env
@@ -22,7 +22,7 @@ jobs:
   test-id-collision-bug:
     runs-on: ubuntu-latest
     steps:
-    - uses: nektos/act-test-actions/script@main
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/script@main
       id: script
       with:
         pre: |
@@ -39,7 +39,7 @@ jobs:
           [ "$STATE_mystate1" = "mystateval" ]
           [ "$STATE_mystate2" = "mystateval" ]
           [ "$STATE_mystate3" = "mystateval" ]
-    - uses: nektos/act-test-actions/script@main
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/script@main
       id: pre-script
       with:
         main: |

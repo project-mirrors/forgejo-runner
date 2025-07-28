@@ -5,7 +5,7 @@ jobs:
     runs-on: ubuntu-latest
     # https://docs.github.com/en/actions/using-containerized-services/about-service-containers#running-jobs-in-a-container
     container:
-      image: "ubuntu:latest"
+      image: code.forgejo.org/oci/node:22-bookworm
     services:
       nginx:
         image: "nginx:latest"

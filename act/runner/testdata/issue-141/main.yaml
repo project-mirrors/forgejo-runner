@@ -5,7 +5,7 @@ jobs:
   kind:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@master
+    - uses: https://data.forgejo.org/actions/checkout@master
     - uses: engineerd/setup-kind@v0.3.0
     - name: Testing
       run: |

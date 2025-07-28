@@ -2,10 +2,6 @@ package runner
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"regexp"
-	"sort"
 	"testing"
 
 	"github.com/nektos/act/pkg/exprparser"
@@ -78,7 +74,7 @@ func createRunContext(t *testing.T) *RunContext {
 	}
 }
 
-func TestEvaluateRunContext(t *testing.T) {
+func TestExpressionEvaluateRunContext(t *testing.T) {
 	rc := createRunContext(t)
 	ee := rc.NewExpressionEvaluator(context.Background())
 
@@ -101,8 +97,8 @@ func TestEvaluateRunContext(t *testing.T) {
 		{"join(fromJSON('[\"hello\"]'),'octocat')", "hello", ""},
 		{"join(fromJSON('[\"hello\",\"mona\",\"the\"]'),'octocat')", "hellooctocatmonaoctocatthe", ""},
 		{"join('hello','mona')", "hello", ""},
-		{"toJSON(env)", "{\n  \"ACT\": \"true\",\n  \"key\": \"value\"\n}", ""},
-		{"toJson(env)", "{\n  \"ACT\": \"true\",\n  \"key\": \"value\"\n}", ""},
+		{"toJSON(env)", "{\n  \"ACT\": \"true\",\n  \"ACT_SKIP_CHECKOUT\": \"true\",\n  \"key\": \"value\"\n}", ""},
+		{"toJson(env)", "{\n  \"ACT\": \"true\",\n  \"ACT_SKIP_CHECKOUT\": \"true\",\n  \"key\": \"value\"\n}", ""},
 		{"(fromJSON('{\"foo\":\"bar\"}')).foo", "bar", ""},
 		{"(fromJson('{\"foo\":\"bar\"}')).foo", "bar", ""},
 		{"(fromJson('[\"foo\",\"bar\"]'))[1]", "bar", ""},
@@ -153,7 +149,7 @@ func TestEvaluateRunContext(t *testing.T) {
 	}
 }
 
-func TestEvaluateStep(t *testing.T) {
+func TestExpressionEvaluateStep(t *testing.T) {
 	rc := createRunContext(t)
 	step := &stepRun{
 		RunContext: rc,
@@ -193,7 +189,7 @@ func TestEvaluateStep(t *testing.T) {
 	}
 }
 
-func TestInterpolate(t *testing.T) {
+func TestExpressionInterpolate(t *testing.T) {
 	rc := &RunContext{
 		Config: &Config{
 			Workdir: ".",
@@ -260,7 +256,6 @@ func TestInterpolate(t *testing.T) {
 		{"${{ fromJSON('{}') < 2 }}", "false"},
 	}
 
-	updateTestExpressionWorkflow(t, tables, rc)
 	for _, table := range tables {
 		table := table
 		t.Run("interpolate", func(t *testing.T) {
@@ -271,57 +266,7 @@ func TestInterpolate(t *testing.T) {
 	}
 }
 
-func updateTestExpressionWorkflow(t *testing.T, tables []struct {
-	in  string
-	out string
-}, rc *RunContext) {
-	var envs string
-	keys := make([]string, 0, len(rc.Env))
-	for k := range rc.Env {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		envs += fmt.Sprintf("  %s: %s\n", k, rc.Env[k])
-	}
-
-	// editorconfig-checker-disable
-	workflow := fmt.Sprintf(`
-name: "Test how expressions are handled on GitHub"
-on: push
-
-env:
-%s
-
-jobs:
-  test-espressions:
-    runs-on: ubuntu-latest
-    steps:
-`, envs)
-	// editorconfig-checker-enable
-	for _, table := range tables {
-		expressionPattern := regexp.MustCompile(`\${{\s*(.+?)\s*}}`)
-
-		expr := expressionPattern.ReplaceAllStringFunc(table.in, func(match string) string {
-			return fmt.Sprintf("€{{ %s }}", expressionPattern.ReplaceAllString(match, "$1"))
-		})
-		name := fmt.Sprintf(`%s -> %s should be equal to %s`, expr, table.in, table.out)
-		echo := `run: echo "Done "`
-		workflow += fmt.Sprintf("\n      - name: %s\n        %s\n", name, echo)
-	}
-
-	file, err := os.Create("../../.github/workflows/test-expressions.yml")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = file.WriteString(workflow)
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestRewriteSubExpression(t *testing.T) {
+func TestExpressionRewriteSubExpression(t *testing.T) {
 	table := []struct {
 		in  string
 		out string
@@ -351,7 +296,7 @@ func TestRewriteSubExpression(t *testing.T) {
 	}
 }
 
-func TestRewriteSubExpressionForceFormat(t *testing.T) {
+func TestExpressionRewriteSubExpressionForceFormat(t *testing.T) {
 	table := []struct {
 		in  string
 		out string

@@ -95,7 +95,7 @@ func (sfm *stepFactoryMock) newStep(model *model.Step, rc *RunContext) (step, er
 	return args.Get(0).(step), args.Error(1)
 }
 
-func TestNewJobExecutor(t *testing.T) {
+func TestJobExecutorNewJobExecutor(t *testing.T) {
 	table := []struct {
 		name          string
 		steps         []*model.Step

@@ -19,7 +19,7 @@ func TestActionCache(t *testing.T) {
 	}
 	ctx := context.Background()
 	cacheDir := "nektos/act-test-actions"
-	repo := "https://github.com/nektos/act-test-actions"
+	repo := "https://code.forgejo.org/forgejo/act-test-actions"
 	refs := []struct {
 		Name     string
 		CacheDir string

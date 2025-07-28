@@ -4,4 +4,4 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/hello-world-docker-action@b136eb8
+      - uses: https://github.com/actions/hello-world-docker-action@b136eb8

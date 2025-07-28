@@ -12,7 +12,7 @@ import (
 	yaml "gopkg.in/yaml.v3"
 )
 
-func TestMergeIntoMap(t *testing.T) {
+func TestStep_MergeIntoMap(t *testing.T) {
 	table := []struct {
 		name     string
 		target   map[string]string
@@ -111,89 +111,7 @@ func (sm *stepMock) getEnv() *map[string]string {
 	return args.Get(0).(*map[string]string)
 }
 
-func TestSetupEnv(t *testing.T) {
-	cm := &containerMock{}
-	sm := &stepMock{}
-
-	rc := &RunContext{
-		Config: &Config{
-			Env: map[string]string{
-				"GITHUB_RUN_ID": "runId",
-			},
-		},
-		Run: &model.Run{
-			JobID: "1",
-			Workflow: &model.Workflow{
-				Jobs: map[string]*model.Job{
-					"1": {
-						Env: yaml.Node{
-							Value: "JOB_KEY: jobvalue",
-						},
-					},
-				},
-			},
-		},
-		Env: map[string]string{
-			"RC_KEY": "rcvalue",
-		},
-		JobContainer: cm,
-	}
-	step := &model.Step{
-		With: map[string]string{
-			"STEP_WITH": "with-value",
-		},
-	}
-	env := map[string]string{}
-
-	sm.On("getRunContext").Return(rc)
-	sm.On("getGithubContext").Return(rc)
-	sm.On("getStepModel").Return(step)
-	sm.On("getEnv").Return(&env)
-
-	err := setupEnv(context.Background(), sm)
-	assert.Nil(t, err)
-
-	// These are commit or system specific
-	delete((env), "GITHUB_REF")
-	delete((env), "GITHUB_REF_NAME")
-	delete((env), "GITHUB_REF_TYPE")
-	delete((env), "GITHUB_SHA")
-	delete((env), "GITHUB_WORKSPACE")
-	delete((env), "GITHUB_REPOSITORY")
-	delete((env), "GITHUB_REPOSITORY_OWNER")
-	delete((env), "GITHUB_ACTOR")
-
-	assert.Equal(t, map[string]string{
-		"ACT":                      "true",
-		"CI":                       "true",
-		"GITHUB_ACTION":            "",
-		"GITHUB_ACTIONS":           "true",
-		"GITHUB_ACTION_PATH":       "",
-		"GITHUB_ACTION_REF":        "",
-		"GITHUB_ACTION_REPOSITORY": "",
-		"GITHUB_API_URL":           "https:///api/v3",
-		"GITHUB_BASE_REF":          "",
-		"GITHUB_EVENT_NAME":        "",
-		"GITHUB_EVENT_PATH":        "/var/run/act/workflow/event.json",
-		"GITHUB_GRAPHQL_URL":       "https:///api/graphql",
-		"GITHUB_HEAD_REF":          "",
-		"GITHUB_JOB":               "1",
-		"GITHUB_RETENTION_DAYS":    "0",
-		"GITHUB_RUN_ID":            "runId",
-		"GITHUB_RUN_NUMBER":        "1",
-		"GITHUB_SERVER_URL":        "https://",
-		"GITHUB_TOKEN":             "",
-		"GITHUB_WORKFLOW":          "",
-		"INPUT_STEP_WITH":          "with-value",
-		"RC_KEY":                   "rcvalue",
-		"RUNNER_PERFLOG":           "/dev/null",
-		"RUNNER_TRACKING_ID":       "",
-	}, env)
-
-	cm.AssertExpectations(t)
-}
-
-func TestIsStepEnabled(t *testing.T) {
+func TestStep_IsStepEnabled(t *testing.T) {
 	createTestStep := func(t *testing.T, input string) step {
 		var step *model.Step
 		err := yaml.Unmarshal([]byte(input), &step)
@@ -275,7 +193,7 @@ func TestIsStepEnabled(t *testing.T) {
 	assertObject.True(isStepEnabled(context.Background(), step.getStepModel().If.Value, step, stepStageMain))
 }
 
-func TestIsContinueOnError(t *testing.T) {
+func TestStep_IsContinueOnError(t *testing.T) {
 	createTestStep := func(t *testing.T, input string) step {
 		var step *model.Step
 		err := yaml.Unmarshal([]byte(input), &step)

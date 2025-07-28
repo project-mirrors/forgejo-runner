@@ -14,7 +14,7 @@ import (
 	"github.com/nektos/act/pkg/model"
 )
 
-func TestSetEnv(t *testing.T) {
+func TestCommandSetEnv(t *testing.T) {
 	a := assert.New(t)
 	ctx := context.Background()
 	rc := new(RunContext)
@@ -24,7 +24,7 @@ func TestSetEnv(t *testing.T) {
 	a.Equal("valz", rc.Env["x"])
 }
 
-func TestSetOutput(t *testing.T) {
+func TestCommandSetOutput(t *testing.T) {
 	a := assert.New(t)
 	ctx := context.Background()
 	rc := new(RunContext)
@@ -54,7 +54,7 @@ func TestSetOutput(t *testing.T) {
 	a.Equal("percent2%\ntest", rc.StepResults["my-step"].Outputs["x:,\n%\r:"])
 }
 
-func TestAddpath(t *testing.T) {
+func TestCommandAddpath(t *testing.T) {
 	a := assert.New(t)
 	ctx := context.Background()
 	rc := new(RunContext)
@@ -67,7 +67,7 @@ func TestAddpath(t *testing.T) {
 	a.Equal("/boo", rc.ExtraPath[0])
 }
 
-func TestStopCommands(t *testing.T) {
+func TestCommandStopCommands(t *testing.T) {
 	logger, hook := test.NewNullLogger()
 
 	a := assert.New(t)
@@ -92,7 +92,7 @@ func TestStopCommands(t *testing.T) {
 	a.Contains(messages, "  \U00002699  ::set-env name=x::abcd\n")
 }
 
-func TestAddpathADO(t *testing.T) {
+func TestCommandAddpathADO(t *testing.T) {
 	a := assert.New(t)
 	ctx := context.Background()
 	rc := new(RunContext)
@@ -105,7 +105,7 @@ func TestAddpathADO(t *testing.T) {
 	a.Equal("/boo", rc.ExtraPath[0])
 }
 
-func TestAddmask(t *testing.T) {
+func TestCommandAddmask(t *testing.T) {
 	logger, hook := test.NewNullLogger()
 
 	a := assert.New(t)
@@ -147,7 +147,7 @@ func captureOutput(t *testing.T, f func()) string {
 	return out
 }
 
-func TestAddmaskUsemask(t *testing.T) {
+func TestCommandAddmaskUsemask(t *testing.T) {
 	rc := new(RunContext)
 	rc.StepResults = make(map[string]*model.StepResult)
 	rc.CurrentStep = "my-step"
@@ -174,7 +174,7 @@ func TestAddmaskUsemask(t *testing.T) {
 	a.Equal("[testjob]   \U00002699  ***\n[testjob]   \U00002699  ::set-output:: = token=***\n", re)
 }
 
-func TestSaveState(t *testing.T) {
+func TestCommandSaveState(t *testing.T) {
 	rc := &RunContext{
 		CurrentStep: "step",
 		StepResults: map[string]*model.StepResult{},

@@ -5,4 +5,4 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-    - uses: nektos/act-test-actions/composite-assert-action-ref-action@main
+    - uses: https://code.forgejo.org/forgejo/act-test-actions/composite-assert-action-ref-action@main
