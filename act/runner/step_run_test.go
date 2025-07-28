@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/container"
+	"code.forgejo.org/forgejo/runner/act/model"
 )
 
 func TestStepRun(t *testing.T) {

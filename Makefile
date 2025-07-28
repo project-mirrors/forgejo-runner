@@ -11,7 +11,7 @@ LINUX_ARCHS ?= linux/amd64,linux/arm64
 DARWIN_ARCHS ?= darwin-12/amd64,darwin-12/arm64
 WINDOWS_ARCHS ?= windows/amd64
 GO_FMT_FILES := $(shell find . -type f -name "*.go" ! -name "generated.*")
-GOFILES := $(shell find main.go internal -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
+GOFILES := $(shell find . -type f -name "*.go" -o -name "go.mod" ! -name "generated.*")
 
 MOCKERY_PACKAGE ?= github.com/vektra/mockery/v2@v2.53.4 # renovate: datasource=go
 GOLANGCI_LINT_PACKAGE ?= github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.3.0 # renovate: datasource=go

@@ -6,9 +6,9 @@ import (
 	"context"
 	"runtime"
 
+	"code.forgejo.org/forgejo/runner/act/common"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/system"
-	"github.com/nektos/act/pkg/common"
 	"github.com/pkg/errors"
 )
 

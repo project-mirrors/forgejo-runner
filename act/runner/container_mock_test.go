@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/container"
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/container"
 	"github.com/stretchr/testify/mock"
 )
 

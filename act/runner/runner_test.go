@@ -16,8 +16,8 @@ import (
 	assert "github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/model"
 )
 
 var (

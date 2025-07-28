@@ -5,9 +5,9 @@ package container
 import (
 	"context"
 
+	"code.forgejo.org/forgejo/runner/act/common"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
-	"github.com/nektos/act/pkg/common"
 )
 
 func NewDockerVolumeRemoveExecutor(volumeName string, force bool) common.Executor {

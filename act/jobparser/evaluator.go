@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/nektos/act/pkg/exprparser"
+	"code.forgejo.org/forgejo/runner/act/exprparser"
 	"gopkg.in/yaml.v3"
 )
 

@@ -3,7 +3,7 @@ package jobparser
 import (
 	"fmt"
 
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"gopkg.in/yaml.v3"
 )
 

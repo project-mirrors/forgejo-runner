@@ -16,13 +16,13 @@ import (
 	"time"
 
 	runnerv1 "code.forgejo.org/forgejo/actions-proto/runner/v1"
+	"code.forgejo.org/forgejo/runner/act/artifactcache"
+	"code.forgejo.org/forgejo/runner/act/cacheproxy"
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/model"
+	"code.forgejo.org/forgejo/runner/act/runner"
 	"connectrpc.com/connect"
 	"github.com/docker/docker/api/types/container"
-	"github.com/nektos/act/pkg/artifactcache"
-	"github.com/nektos/act/pkg/cacheproxy"
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/model"
-	"github.com/nektos/act/pkg/runner"
 	log "github.com/sirupsen/logrus"
 
 	"code.forgejo.org/forgejo/runner/internal/pkg/client"

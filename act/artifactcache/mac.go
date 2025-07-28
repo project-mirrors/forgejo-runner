@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/nektos/act/pkg/cacheproxy"
+	"code.forgejo.org/forgejo/runner/act/cacheproxy"
 )
 
 var ErrValidation = errors.New("validation error")

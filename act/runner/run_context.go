@@ -20,12 +20,12 @@ import (
 	"text/template"
 	"time"
 
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/container"
+	"code.forgejo.org/forgejo/runner/act/exprparser"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/exprparser"
-	"github.com/nektos/act/pkg/model"
 	"github.com/opencontainers/selinux/go-selinux"
 )
 
