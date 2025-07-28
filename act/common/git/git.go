@@ -52,7 +52,7 @@ func (e *Error) Commit() string {
 }
 
 // FindGitRevision get the current git revision
-func FindGitRevision(ctx context.Context, file string) (shortSha string, sha string, err error) {
+func FindGitRevision(ctx context.Context, file string) (shortSha, sha string, err error) {
 	logger := common.Logger(ctx)
 
 	gitDir, err := git.PlainOpenWithOptions(
@@ -62,7 +62,6 @@ func FindGitRevision(ctx context.Context, file string) (shortSha string, sha str
 			EnableDotGitCommonDir: true,
 		},
 	)
-
 	if err != nil {
 		logger.WithError(err).Error("path", file, "not located inside a git repository")
 		return "", "", err
@@ -96,8 +95,8 @@ func FindGitRef(ctx context.Context, file string) (string, error) {
 	logger.Debugf("HEAD points to '%s'", ref)
 
 	// Prefer the git library to iterate over the references and find a matching tag or branch.
-	var refTag = ""
-	var refBranch = ""
+	refTag := ""
+	refBranch := ""
 	repo, err := git.PlainOpenWithOptions(
 		file,
 		&git.PlainOpenOptions{
@@ -105,7 +104,6 @@ func FindGitRef(ctx context.Context, file string) (string, error) {
 			EnableDotGitCommonDir: true,
 		},
 	)
-
 	if err != nil {
 		return "", err
 	}
@@ -144,7 +142,6 @@ func FindGitRef(ctx context.Context, file string) (string, error) {
 
 		return nil
 	})
-
 	if err != nil {
 		return "", err
 	}
@@ -198,7 +195,7 @@ func findGitRemoteURL(_ context.Context, file, remoteName string) (string, error
 	return remote.Config().URLs[0], nil
 }
 
-func findGitSlug(url string, githubInstance string) (string, string, error) {
+func findGitSlug(url, githubInstance string) (string, string, error) {
 	if matches := codeCommitHTTPRegex.FindStringSubmatch(url); matches != nil {
 		return "CodeCommit", matches[2], nil
 	} else if matches := codeCommitSSHRegex.FindStringSubmatch(url); matches != nil {

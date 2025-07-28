@@ -68,7 +68,7 @@ func NewPipelineExecutor(executors ...Executor) Executor {
 }
 
 // NewConditionalExecutor creates a new executor based on conditions
-func NewConditionalExecutor(conditional Conditional, trueExecutor Executor, falseExecutor Executor) Executor {
+func NewConditionalExecutor(conditional Conditional, trueExecutor, falseExecutor Executor) Executor {
 	return func(ctx context.Context) error {
 		if conditional(ctx) {
 			if trueExecutor != nil {

@@ -350,7 +350,7 @@ func (impl *interperterImpl) evaluateCompare(compareNode *actionlint.CompareOpNo
 	return impl.compareValues(leftValue, rightValue, compareNode.Kind)
 }
 
-func (impl *interperterImpl) compareValues(leftValue reflect.Value, rightValue reflect.Value, kind actionlint.CompareOpNodeKind) (interface{}, error) {
+func (impl *interperterImpl) compareValues(leftValue, rightValue reflect.Value, kind actionlint.CompareOpNodeKind) (interface{}, error) {
 	if leftValue.Kind() != rightValue.Kind() {
 		if !impl.isNumber(leftValue) {
 			leftValue = impl.coerceToNumber(leftValue)
@@ -462,7 +462,7 @@ func (impl *interperterImpl) coerceToString(value reflect.Value) reflect.Value {
 	return value
 }
 
-func (impl *interperterImpl) compareString(left string, right string, kind actionlint.CompareOpNodeKind) (bool, error) {
+func (impl *interperterImpl) compareString(left, right string, kind actionlint.CompareOpNodeKind) (bool, error) {
 	switch kind {
 	case actionlint.CompareOpNodeKindLess:
 		return left < right, nil
@@ -481,7 +481,7 @@ func (impl *interperterImpl) compareString(left string, right string, kind actio
 	}
 }
 
-func (impl *interperterImpl) compareNumber(left float64, right float64, kind actionlint.CompareOpNodeKind) (bool, error) {
+func (impl *interperterImpl) compareNumber(left, right float64, kind actionlint.CompareOpNodeKind) (bool, error) {
 	switch kind {
 	case actionlint.CompareOpNodeKindLess:
 		return left < right, nil

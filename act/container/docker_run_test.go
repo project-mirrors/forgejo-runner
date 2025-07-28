@@ -85,7 +85,7 @@ func (m *mockDockerClient) ContainerExecInspect(ctx context.Context, execID stri
 	return args.Get(0).(container.ExecInspect), args.Error(1)
 }
 
-func (m *mockDockerClient) CopyToContainer(ctx context.Context, id string, path string, content io.Reader, options container.CopyToContainerOptions) error {
+func (m *mockDockerClient) CopyToContainer(ctx context.Context, id, path string, content io.Reader, options container.CopyToContainerOptions) error {
 	args := m.Called(ctx, id, path, content, options)
 	return args.Error(0)
 }

@@ -263,7 +263,7 @@ func (rc *RunContext) stopHostEnvironment(ctx context.Context) error {
 	return common.NewPipelineExecutor(
 		rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
 			Name: "workflow/stop-lxc.sh",
-			Mode: 0755,
+			Mode: 0o755,
 			Body: stopScript.String(),
 		}),
 		rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/stop-lxc.sh"}, map[string]string{}, "root", "/tmp"),
@@ -360,17 +360,17 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 			executors = append(executors,
 				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
 					Name: "workflow/lxc-helpers-lib.sh",
-					Mode: 0755,
+					Mode: 0o755,
 					Body: lxcHelpersLib,
 				}),
 				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
 					Name: "workflow/lxc-helpers.sh",
-					Mode: 0755,
+					Mode: 0o755,
 					Body: lxcHelpers,
 				}),
 				rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{
 					Name: "workflow/start-lxc.sh",
-					Mode: 0755,
+					Mode: 0o755,
 					Body: startScript.String(),
 				}),
 				rc.JobContainer.Exec([]string{rc.JobContainer.GetActPath() + "/workflow/start-lxc.sh"}, map[string]string{}, "root", "/tmp"),
@@ -819,7 +819,7 @@ func (rc *RunContext) IsLXCHostEnv(ctx context.Context) bool {
 func (rc *RunContext) GetLXCInfo(ctx context.Context) (isLXC bool, template, release, config string) {
 	platform := rc.runsOnImage(ctx)
 	if !strings.HasPrefix(platform, lxcPrefix) {
-		return
+		return isLXC, template, release, config
 	}
 	isLXC = true
 	s := strings.SplitN(strings.TrimPrefix(platform, lxcPrefix), ":", 3)
@@ -830,7 +830,7 @@ func (rc *RunContext) GetLXCInfo(ctx context.Context) (isLXC bool, template, rel
 	if len(s) > 2 {
 		config = s[2]
 	}
-	return
+	return isLXC, template, release, config
 }
 
 func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
@@ -1247,9 +1247,9 @@ func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) 
 		return rval
 	} else if m, ok = rval.(map[string]interface{}); !ok {
 		return nil
-	} else { // 1+ more keys
-		return nestedMapLookup(m, ks[1:]...)
 	}
+	// 1+ more keys
+	return nestedMapLookup(m, ks[1:]...)
 }
 
 func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubContext, env map[string]string) map[string]string {
@@ -1365,25 +1365,25 @@ func (rc *RunContext) handleCredentials(ctx context.Context) (string, string, er
 
 func (rc *RunContext) handleServiceCredentials(ctx context.Context, creds map[string]string) (username, password string, err error) {
 	if creds == nil {
-		return
+		return username, password, err
 	}
 	if len(creds) != 2 {
 		err = fmt.Errorf("invalid property count for key 'credentials:'")
-		return
+		return username, password, err
 	}
 
 	ee := rc.NewExpressionEvaluator(ctx)
 	if username = ee.Interpolate(ctx, creds["username"]); username == "" {
 		err = fmt.Errorf("failed to interpolate credentials.username")
-		return
+		return username, password, err
 	}
 
 	if password = ee.Interpolate(ctx, creds["password"]); password == "" {
 		err = fmt.Errorf("failed to interpolate credentials.password")
-		return
+		return username, password, err
 	}
 
-	return
+	return username, password, err
 }
 
 // GetServiceBindsAndMounts returns the binds and mounts for the service container, resolving paths as appopriate

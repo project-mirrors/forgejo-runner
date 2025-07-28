@@ -19,7 +19,7 @@ import (
 func TestFindGitSlug(t *testing.T) {
 	assert := assert.New(t)
 
-	var slugTests = []struct {
+	slugTests := []struct {
 		url      string // input
 		provider string // expected result
 		slug     string // expected result

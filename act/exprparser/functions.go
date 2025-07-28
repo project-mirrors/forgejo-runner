@@ -137,7 +137,7 @@ func (impl *interperterImpl) format(str reflect.Value, replaceValue ...reflect.V
 	return output, nil
 }
 
-func (impl *interperterImpl) join(array reflect.Value, sep reflect.Value) (string, error) {
+func (impl *interperterImpl) join(array, sep reflect.Value) (string, error) {
 	separator := impl.coerceToString(sep).String()
 	switch array.Kind() {
 	case reflect.Slice:

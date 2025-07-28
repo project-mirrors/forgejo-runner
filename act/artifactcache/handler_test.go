@@ -18,35 +18,39 @@ import (
 	"go.etcd.io/bbolt"
 )
 
-const cache_repo = "testuser/repo"
-const cache_runnum = "1"
-const cache_timestamp = "0"
-const cache_mac = "c13854dd1ac599d1d61680cd93c26b77ba0ee10f374a3408bcaea82f38ca1865"
+const (
+	cacheRepo      = "testuser/repo"
+	cacheRunnum    = "1"
+	cacheTimestamp = "0"
+	cacheMac       = "c13854dd1ac599d1d61680cd93c26b77ba0ee10f374a3408bcaea82f38ca1865"
+)
 
-var handlerExternalUrl string
+var handlerExternalURL string
 
 type AuthHeaderTransport struct {
 	T http.RoundTripper
 }
 
 func (t *AuthHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	req.Header.Set("Forgejo-Cache-Repo", cache_repo)
-	req.Header.Set("Forgejo-Cache-RunNumber", cache_runnum)
-	req.Header.Set("Forgejo-Cache-Timestamp", cache_timestamp)
-	req.Header.Set("Forgejo-Cache-MAC", cache_mac)
-	req.Header.Set("Forgejo-Cache-Host", handlerExternalUrl)
+	req.Header.Set("Forgejo-Cache-Repo", cacheRepo)
+	req.Header.Set("Forgejo-Cache-RunNumber", cacheRunnum)
+	req.Header.Set("Forgejo-Cache-Timestamp", cacheTimestamp)
+	req.Header.Set("Forgejo-Cache-MAC", cacheMac)
+	req.Header.Set("Forgejo-Cache-Host", handlerExternalURL)
 	return t.T.RoundTrip(req)
 }
 
-var httpClientTransport = AuthHeaderTransport{http.DefaultTransport}
-var httpClient = http.Client{Transport: &httpClientTransport}
+var (
+	httpClientTransport = AuthHeaderTransport{http.DefaultTransport}
+	httpClient          = http.Client{Transport: &httpClientTransport}
+)
 
 func TestHandler(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "artifactcache")
 	handler, err := StartHandler(dir, "", 0, "secret", nil)
 	require.NoError(t, err)
 
-	handlerExternalUrl = handler.ExternalURL()
+	handlerExternalURL = handler.ExternalURL()
 	base := fmt.Sprintf("%s%s", handler.ExternalURL(), urlBase)
 
 	defer func() {
@@ -386,11 +390,11 @@ func TestHandler(t *testing.T) {
 		// Perform the same request with incorrect MAC data
 		req, err := http.NewRequest("GET", fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version), nil)
 		require.NoError(t, err)
-		req.Header.Set("Forgejo-Cache-Repo", cache_repo)
-		req.Header.Set("Forgejo-Cache-RunNumber", cache_runnum)
-		req.Header.Set("Forgejo-Cache-Timestamp", cache_timestamp)
+		req.Header.Set("Forgejo-Cache-Repo", cacheRepo)
+		req.Header.Set("Forgejo-Cache-RunNumber", cacheRunnum)
+		req.Header.Set("Forgejo-Cache-Timestamp", cacheTimestamp)
 		req.Header.Set("Forgejo-Cache-MAC", "33f0e850ba0bdfd2f3e66ff79c1f8004b8226114e3b2e65c229222bb59df0f9d") // ! This is not the correct MAC
-		req.Header.Set("Forgejo-Cache-Host", handlerExternalUrl)
+		req.Header.Set("Forgejo-Cache-Host", handlerExternalURL)
 		resp, err = http.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
 		require.NoError(t, err)
 		require.Equal(t, 403, resp.StatusCode)

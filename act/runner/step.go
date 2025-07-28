@@ -139,7 +139,7 @@ func runStepExecutor(step step, stage stepStage, executor common.Executor) commo
 			Mode: 0o666,
 		}, &container.FileEntry{
 			Name: envFileCommand,
-			Mode: 0666,
+			Mode: 0o666,
 		}, &container.FileEntry{
 			Name: summaryFileCommand,
 			Mode: 0o666,

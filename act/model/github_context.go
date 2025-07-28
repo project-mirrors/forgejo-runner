@@ -62,9 +62,9 @@ func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) 
 		return rval
 	} else if m, ok = rval.(map[string]interface{}); !ok {
 		return nil
-	} else { // 1+ more keys
-		return nestedMapLookup(m, ks[1:]...)
 	}
+	// 1+ more keys
+	return nestedMapLookup(m, ks[1:]...)
 }
 
 func withDefaultBranch(ctx context.Context, b string, event map[string]interface{}) map[string]interface{} {
@@ -90,10 +90,12 @@ func withDefaultBranch(ctx context.Context, b string, event map[string]interface
 	return event
 }
 
-var findGitRef = git.FindGitRef
-var findGitRevision = git.FindGitRevision
+var (
+	findGitRef      = git.FindGitRef
+	findGitRevision = git.FindGitRevision
+)
 
-func (ghc *GithubContext) SetRef(ctx context.Context, defaultBranch string, repoPath string) {
+func (ghc *GithubContext) SetRef(ctx context.Context, defaultBranch, repoPath string) {
 	logger := common.Logger(ctx)
 
 	// https://docs.github.com/en/actions/learn-github-actions/events-that-trigger-workflows
@@ -164,7 +166,7 @@ func (ghc *GithubContext) SetSha(ctx context.Context, repoPath string) {
 	}
 }
 
-func (ghc *GithubContext) SetRepositoryAndOwner(ctx context.Context, githubInstance string, remoteName string, repoPath string) {
+func (ghc *GithubContext) SetRepositoryAndOwner(ctx context.Context, githubInstance, remoteName, repoPath string) {
 	if ghc.Repository == "" {
 		repo, err := git.FindGithubRepo(ctx, repoPath, githubInstance, remoteName)
 		if err != nil {

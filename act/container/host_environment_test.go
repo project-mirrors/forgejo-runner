@@ -28,10 +28,10 @@ func TestCopyDir(t *testing.T) {
 		StdOut:    os.Stdout,
 		Workdir:   path.Join("testdata", "scratch"),
 	}
-	_ = os.MkdirAll(e.Path, 0700)
-	_ = os.MkdirAll(e.TmpDir, 0700)
-	_ = os.MkdirAll(e.ToolCache, 0700)
-	_ = os.MkdirAll(e.ActPath, 0700)
+	_ = os.MkdirAll(e.Path, 0o700)
+	_ = os.MkdirAll(e.TmpDir, 0o700)
+	_ = os.MkdirAll(e.ToolCache, 0o700)
+	_ = os.MkdirAll(e.ActPath, 0o700)
 	err = e.CopyDir(e.Workdir, e.Path, true)(ctx)
 	assert.NoError(t, err)
 }
@@ -49,12 +49,12 @@ func TestGetContainerArchive(t *testing.T) {
 		StdOut:    os.Stdout,
 		Workdir:   path.Join("testdata", "scratch"),
 	}
-	_ = os.MkdirAll(e.Path, 0700)
-	_ = os.MkdirAll(e.TmpDir, 0700)
-	_ = os.MkdirAll(e.ToolCache, 0700)
-	_ = os.MkdirAll(e.ActPath, 0700)
+	_ = os.MkdirAll(e.Path, 0o700)
+	_ = os.MkdirAll(e.TmpDir, 0o700)
+	_ = os.MkdirAll(e.ToolCache, 0o700)
+	_ = os.MkdirAll(e.ActPath, 0o700)
 	expectedContent := []byte("sdde/7sh")
-	err = os.WriteFile(filepath.Join(e.Path, "action.yml"), expectedContent, 0600)
+	err = os.WriteFile(filepath.Join(e.Path, "action.yml"), expectedContent, 0o600)
 	assert.NoError(t, err)
 	archive, err := e.GetContainerArchive(ctx, e.Path)
 	assert.NoError(t, err)

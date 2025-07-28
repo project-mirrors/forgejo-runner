@@ -6,7 +6,7 @@
 // See DOCKER_LICENSE for the full license text.
 //
 
-//nolint:unparam,whitespace,depguard,dupl,gocritic
+//nolint:unparam,gocritic
 package container
 
 import (
@@ -192,7 +192,6 @@ func TestParseRunWithInvalidArgs(t *testing.T) {
 }
 
 func TestParseWithVolumes(t *testing.T) {
-
 	// A single volume
 	arr, tryit := setupPlatformVolume([]string{`/tmp`}, []string{`c:\tmp`})
 	if config, hostConfig := mustParse(t, tryit); hostConfig.Binds != nil {
@@ -260,14 +259,13 @@ func TestParseWithVolumes(t *testing.T) {
 			t.Fatalf("Error parsing %s. Should have a single bind mount and no volumes", arr[0])
 		}
 	}
-
 }
 
 // setupPlatformVolume takes two arrays of volume specs - a Unix style
 // spec and a Windows style spec. Depending on the platform being unit tested,
 // it returns one of them, along with a volume string that would be passed
 // on the docker CLI (e.g. -v /bar -v /foo).
-func setupPlatformVolume(u []string, w []string) ([]string, string) {
+func setupPlatformVolume(u, w []string) ([]string, string) {
 	var a []string
 	if runtime.GOOS == "windows" {
 		a = w
@@ -301,9 +299,9 @@ func TestParseWithMacAddress(t *testing.T) {
 		t.Fatalf("Expected an error with %v mac-address, got %v", invalidMacAddress, err)
 	}
 	config, _ := mustParse(t, validMacAddress)
-	if config.MacAddress != "92:d0:c6:0a:29:33" { //nolint:staticcheck // ignore SA1019: field is deprecated, but still used on API < v1.44.
+	if config.MacAddress != "92:d0:c6:0a:29:33" {
 		t.Fatalf("Expected the config to have '92:d0:c6:0a:29:33' as container-wide MacAddress, got '%v'",
-			config.MacAddress) //nolint:staticcheck // ignore SA1019: field is deprecated, but still used on API < v1.44.
+			config.MacAddress)
 	}
 }
 
@@ -459,7 +457,6 @@ func TestParseDevice(t *testing.T) {
 			t.Fatalf("Expected %v, got %v", deviceMapping, hostconfig.Devices)
 		}
 	}
-
 }
 
 func TestParseNetworkConfig(t *testing.T) {
@@ -964,7 +961,6 @@ func TestConvertToStandardNotation(t *testing.T) {
 
 	for key, ports := range valid {
 		convertedPorts, err := convertToStandardNotation(ports)
-
 		if err != nil {
 			assert.NilError(t, err)
 		}

@@ -31,7 +31,7 @@ func (s *Storage) Exist(id uint64) (bool, error) {
 	return true, nil
 }
 
-func (s *Storage) Write(id uint64, offset uint64, reader io.Reader) error {
+func (s *Storage) Write(id, offset uint64, reader io.Reader) error {
 	name := s.tempName(id, offset)
 	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
 		return err
@@ -110,7 +110,7 @@ func (s *Storage) tempDir(id uint64) string {
 	return filepath.Join(s.rootDir, "tmp", fmt.Sprint(id))
 }
 
-func (s *Storage) tempName(id uint64, offset uint64) string {
+func (s *Storage) tempName(id, offset uint64) string {
 	return filepath.Join(s.tempDir(id), fmt.Sprintf("%016x", offset))
 }
 

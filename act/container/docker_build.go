@@ -68,7 +68,8 @@ func NewDockerBuildExecutor(input NewDockerBuildExecutorInput) common.Executor {
 		return nil
 	}
 }
-func createBuildContext(ctx context.Context, contextDir string, relDockerfile string) (io.ReadCloser, error) {
+
+func createBuildContext(ctx context.Context, contextDir, relDockerfile string) (io.ReadCloser, error) {
 	common.Logger(ctx).Debugf("Creating archive for build context dir '%s' with relative dockerfile '%s'", contextDir, relDockerfile)
 
 	// And canonicalize dockerfile name to a platform-independent one
@@ -95,7 +96,7 @@ func createBuildContext(ctx context.Context, contextDir string, relDockerfile st
 	// removed. The daemon will remove them for us, if needed, after it
 	// parses the Dockerfile. Ignore errors here, as they will have been
 	// caught by validateContextDirectory above.
-	var includes = []string{"."}
+	includes := []string{"."}
 	keepThem1, _ := patternmatcher.Matches(".dockerignore", excludes)
 	keepThem2, _ := patternmatcher.Matches(relDockerfile, excludes)
 	if keepThem1 || keepThem2 {

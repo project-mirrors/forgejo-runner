@@ -97,8 +97,7 @@ type Fs interface {
 	Readlink(path string) (string, error)
 }
 
-type DefaultFs struct {
-}
+type DefaultFs struct{}
 
 func (*DefaultFs) Walk(root string, fn filepath.WalkFunc) error {
 	return filepath.Walk(root, fn)

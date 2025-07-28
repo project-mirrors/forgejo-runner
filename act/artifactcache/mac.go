@@ -14,9 +14,7 @@ import (
 	"github.com/nektos/act/pkg/cacheproxy"
 )
 
-var (
-	ErrValidation = errors.New("validation error")
-)
+var ErrValidation = errors.New("validation error")
 
 func (h *Handler) validateMac(rundata cacheproxy.RunData) (string, error) {
 	// TODO: allow configurable max age

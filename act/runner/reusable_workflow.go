@@ -113,9 +113,7 @@ func newActionCacheReusableWorkflowExecutor(rc *RunContext, filename string, rem
 	}
 }
 
-var (
-	executorLock sync.Mutex
-)
+var executorLock sync.Mutex
 
 func newMutexExecutor(executor common.Executor) common.Executor {
 	return func(ctx context.Context) error {
@@ -150,7 +148,7 @@ func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkfl
 	)
 }
 
-func newReusableWorkflowExecutor(rc *RunContext, directory string, workflow string) common.Executor {
+func newReusableWorkflowExecutor(rc *RunContext, directory, workflow string) common.Executor {
 	return func(ctx context.Context) error {
 		planner, err := model.NewWorkflowPlanner(path.Join(directory, workflow), true, false)
 		if err != nil {

@@ -8,8 +8,10 @@ import (
 	"github.com/nektos/act/pkg/common"
 )
 
-var commandPatternGA *regexp.Regexp
-var commandPatternADO *regexp.Regexp
+var (
+	commandPatternGA  *regexp.Regexp
+	commandPatternADO *regexp.Regexp
+)
 
 func init() {
 	commandPatternGA = regexp.MustCompile("^::([^ ]+)( (.+))?::([^\r\n]*)[\r\n]+$")
@@ -28,7 +30,7 @@ func tryParseRawActionCommand(line string) (command string, kvPairs map[string]s
 		arg = m[4]
 		ok = true
 	}
-	return
+	return command, kvPairs, arg, ok
 }
 
 func (rc *RunContext) commandHandler(ctx context.Context) common.LineHandler {
@@ -101,6 +103,7 @@ func (rc *RunContext) setEnv(ctx context.Context, kvPairs map[string]string, arg
 	mergeIntoMap(rc.Env, newenv)
 	mergeIntoMap(rc.GlobalEnv, newenv)
 }
+
 func (rc *RunContext) setOutput(ctx context.Context, kvPairs map[string]string, arg string) {
 	logger := common.Logger(ctx)
 	stepID := rc.CurrentStep
@@ -119,6 +122,7 @@ func (rc *RunContext) setOutput(ctx context.Context, kvPairs map[string]string, 
 	logger.Infof("  \U00002699  ::set-output:: %s=%s", outputName, arg)
 	result.Outputs[outputName] = arg
 }
+
 func (rc *RunContext) addPath(ctx context.Context, arg string) {
 	common.Logger(ctx).Infof("  \U00002699  ::add-path:: %s", arg)
 	extraPath := []string{arg}
@@ -130,7 +134,7 @@ func (rc *RunContext) addPath(ctx context.Context, arg string) {
 	rc.ExtraPath = extraPath
 }
 
-func parseKeyValuePairs(kvPairs string, separator string) map[string]string {
+func parseKeyValuePairs(kvPairs, separator string) map[string]string {
 	rtn := make(map[string]string)
 	kvPairList := strings.Split(kvPairs, separator)
 	for _, kvPair := range kvPairList {
@@ -141,6 +145,7 @@ func parseKeyValuePairs(kvPairs string, separator string) map[string]string {
 	}
 	return rtn
 }
+
 func unescapeCommandData(arg string) string {
 	escapeMap := map[string]string{
 		"%25": "%",
@@ -152,6 +157,7 @@ func unescapeCommandData(arg string) string {
 	}
 	return arg
 }
+
 func unescapeCommandProperty(arg string) string {
 	escapeMap := map[string]string{
 		"%25": "%",
@@ -165,6 +171,7 @@ func unescapeCommandProperty(arg string) string {
 	}
 	return arg
 }
+
 func unescapeKvPairs(kvPairs map[string]string) map[string]string {
 	for k, v := range kvPairs {
 		kvPairs[k] = unescapeCommandProperty(v)

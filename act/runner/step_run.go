@@ -195,16 +195,16 @@ func (sr *stepRun) setupShell(ctx context.Context) {
 				step.Shell = shellWithFallback[1]
 			}
 		} else {
-			shell_fallback := `
+			shellFallback := `
 if command -v bash >/dev/null; then
 	echo -n bash
 else
 	echo -n sh
 fi
 `
-			stdout, _, err := rc.sh(ctx, shell_fallback)
+			stdout, _, err := rc.sh(ctx, shellFallback)
 			if err != nil {
-				common.Logger(ctx).Error("fail to run %q: %v", shell_fallback, err)
+				common.Logger(ctx).Error("fail to run %q: %v", shellFallback, err)
 				return
 			}
 			step.Shell = stdout
@@ -215,7 +215,7 @@ fi
 func (sr *stepRun) setupWorkingDirectory(ctx context.Context) {
 	rc := sr.RunContext
 	step := sr.Step
-	workingdirectory := ""
+	var workingdirectory string
 
 	if step.WorkingDirectory == "" {
 		workingdirectory = rc.Run.Job().Defaults.Run.WorkingDirectory

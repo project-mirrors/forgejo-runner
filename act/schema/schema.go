@@ -89,14 +89,11 @@ type StringDefinition struct {
 	IsExpression bool `json:"is-expression"`
 }
 
-type NumberDefinition struct {
-}
+type NumberDefinition struct{}
 
-type BooleanDefinition struct {
-}
+type BooleanDefinition struct{}
 
-type NullDefinition struct {
-}
+type NullDefinition struct{}
 
 func GetWorkflowSchema() *Schema {
 	sh := &Schema{}

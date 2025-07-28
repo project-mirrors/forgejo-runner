@@ -72,6 +72,7 @@ func (p *Pen) drawTopBars(buf io.Writer, labels ...string) {
 	}
 	fmt.Fprintf(buf, "\n")
 }
+
 func (p *Pen) drawBottomBars(buf io.Writer, labels ...string) {
 	style := styleDefs[p.style]
 	for _, label := range labels {
@@ -83,6 +84,7 @@ func (p *Pen) drawBottomBars(buf io.Writer, labels ...string) {
 	}
 	fmt.Fprintf(buf, "\n")
 }
+
 func (p *Pen) drawLabels(buf io.Writer, labels ...string) {
 	style := styleDefs[p.style]
 	for _, label := range labels {

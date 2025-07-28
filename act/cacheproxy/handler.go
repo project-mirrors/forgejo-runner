@@ -29,9 +29,7 @@ const (
 	urlBase = "/_apis/artifactcache"
 )
 
-var (
-	urlRegex = regexp.MustCompile(`/(\w+)(/_apis/artifactcache/.+)`)
-)
+var urlRegex = regexp.MustCompile(`/(\w+)(/_apis/artifactcache/.+)`)
 
 type Handler struct {
 	router   *httprouter.Router
@@ -55,7 +53,7 @@ type RunData struct {
 	RepositoryMAC      string
 }
 
-func (h *Handler) CreateRunData(fullName string, runNumber string, timestamp string) RunData {
+func (h *Handler) CreateRunData(fullName, runNumber, timestamp string) RunData {
 	mac := computeMac(h.cacheSecret, fullName, runNumber, timestamp)
 	return RunData{
 		RepositoryFullName: fullName,
@@ -65,7 +63,7 @@ func (h *Handler) CreateRunData(fullName string, runNumber string, timestamp str
 	}
 }
 
-func StartHandler(targetHost string, outboundIP string, port uint16, cacheSecret string, logger logrus.FieldLogger) (*Handler, error) {
+func StartHandler(targetHost, outboundIP string, port uint16, cacheSecret string, logger logrus.FieldLogger) (*Handler, error) {
 	h := &Handler{}
 
 	if logger == nil {
@@ -142,7 +140,7 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 				h.logger.Warn(fmt.Sprintf("Tried starting a cache proxy with id %s, which does not exist.", id))
 				return
 			}
-			var runData = data.(RunData)
+			runData := data.(RunData)
 			uri := matches[2]
 
 			r.SetURL(targetURL)

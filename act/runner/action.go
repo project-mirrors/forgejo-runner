@@ -29,7 +29,7 @@ type actionStep interface {
 	getCompositeSteps() *compositeSteps
 }
 
-type readAction func(ctx context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error)
+type readAction func(ctx context.Context, step *model.Step, actionDir, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error)
 
 type actionYamlReader func(filename string) (io.Reader, io.Closer, error)
 
@@ -40,7 +40,7 @@ type runAction func(step actionStep, actionDir string, remoteAction *remoteActio
 //go:embed res/trampoline.js
 var trampoline embed.FS
 
-func readActionImpl(ctx context.Context, step *model.Step, actionDir string, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
+func readActionImpl(ctx context.Context, step *model.Step, actionDir, actionPath string, readFile actionYamlReader, writeFile fileWriter) (*model.Action, error) {
 	logger := common.Logger(ctx)
 	allErrors := []error{}
 	addError := func(fileName string, err error) {
@@ -116,7 +116,7 @@ func readActionImpl(ctx context.Context, step *model.Step, actionDir string, act
 	return action, err
 }
 
-func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir string, actionPath string, containerActionDir string) error {
+func maybeCopyToActionDir(ctx context.Context, step actionStep, actionDir, actionPath, containerActionDir string) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()
 	stepModel := step.getStepModel()
@@ -274,7 +274,7 @@ func removeGitIgnore(ctx context.Context, directory string) error {
 }
 
 // TODO: break out parts of function to reduce complexicity
-func execAsDocker(ctx context.Context, step actionStep, actionName string, basedir string, localAction bool) error {
+func execAsDocker(ctx context.Context, step actionStep, actionName, basedir string, localAction bool) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()
 	action := step.getActionModel()
@@ -402,7 +402,7 @@ func evalDockerArgs(ctx context.Context, step step, action *model.Action, cmd *[
 	}
 }
 
-func newStepContainer(ctx context.Context, step step, image string, cmd []string, entrypoint []string) container.Container {
+func newStepContainer(ctx context.Context, step step, image string, cmd, entrypoint []string) container.Container {
 	rc := step.getRunContext()
 	stepModel := step.getStepModel()
 	rawLogger := common.Logger(ctx).WithField("raw_output", true)
@@ -557,7 +557,7 @@ func runPreStep(step actionStep) common.Executor {
 				actionPath = ""
 			}
 
-			actionLocation := ""
+			var actionLocation string
 			if actionPath != "" {
 				actionLocation = path.Join(actionDir, actionPath)
 			} else {
@@ -608,7 +608,7 @@ func runPreStep(step actionStep) common.Executor {
 				actionPath = ""
 			}
 
-			actionLocation := ""
+			var actionLocation string
 			if actionPath != "" {
 				actionLocation = path.Join(actionDir, actionPath)
 			} else {
@@ -695,7 +695,7 @@ func runPostStep(step actionStep) common.Executor {
 			actionPath = ""
 		}
 
-		actionLocation := ""
+		var actionLocation string
 		if actionPath != "" {
 			actionLocation = path.Join(actionDir, actionPath)
 		} else {

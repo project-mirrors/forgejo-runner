@@ -642,7 +642,7 @@ func (s *Step) GetEnv() map[string]string {
 
 // ShellCommand returns the command for the shell
 func (s *Step) ShellCommand() string {
-	shellCommand := ""
+	var shellCommand string
 
 	// Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L9-L17
 	switch s.Shell {
