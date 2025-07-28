@@ -1,8 +1,8 @@
 package jobparser
 
 import (
-	"github.com/nektos/act/pkg/exprparser"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/exprparser"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"gopkg.in/yaml.v3"
 )
 

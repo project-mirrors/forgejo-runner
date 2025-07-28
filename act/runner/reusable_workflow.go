@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/common/git"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/common/git"
+	"code.forgejo.org/forgejo/runner/act/model"
 )
 
 func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {

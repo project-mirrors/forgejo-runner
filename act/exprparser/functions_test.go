@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"github.com/stretchr/testify/assert"
 )
 

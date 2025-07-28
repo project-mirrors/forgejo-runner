@@ -4,8 +4,8 @@ import (
 	"context"
 	"io"
 
+	"code.forgejo.org/forgejo/runner/act/common"
 	"github.com/docker/go-connections/nat"
-	"github.com/nektos/act/pkg/common"
 )
 
 // NewContainerInput the input for the New function

@@ -12,7 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nektos/act/pkg/filecollector"
+	"code.forgejo.org/forgejo/runner/act/filecollector"
 )
 
 type LocalRepositoryCache struct {

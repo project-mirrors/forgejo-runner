@@ -11,8 +11,8 @@ import (
 	docker_container "github.com/docker/docker/api/types/container"
 	log "github.com/sirupsen/logrus"
 
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/model"
 )
 
 // Runner provides capabilities to run GitHub actions

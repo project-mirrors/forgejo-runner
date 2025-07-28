@@ -6,8 +6,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/container"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )

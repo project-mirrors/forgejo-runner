@@ -5,8 +5,8 @@ package container
 import (
 	"context"
 
+	"code.forgejo.org/forgejo/runner/act/common"
 	"github.com/docker/docker/api/types/network"
-	"github.com/nektos/act/pkg/common"
 )
 
 func NewDockerNetworkCreateExecutor(name string, config *network.CreateOptions) common.Executor {

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/nektos/act/pkg/common"
+	"code.forgejo.org/forgejo/runner/act/common"
 )
 
 var (

@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/exprparser"
-	"github.com/nektos/act/pkg/model"
-	"github.com/nektos/act/pkg/testutils"
+	"code.forgejo.org/forgejo/runner/act/container"
+	"code.forgejo.org/forgejo/runner/act/exprparser"
+	"code.forgejo.org/forgejo/runner/act/model"
+	"code.forgejo.org/forgejo/runner/act/testutils"
 
 	"github.com/docker/go-connections/nat"
 	log "github.com/sirupsen/logrus"

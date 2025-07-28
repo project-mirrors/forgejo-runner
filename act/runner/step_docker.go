@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/container"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"github.com/kballard/go-shellquote"
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/model"
 )
 
 type stepDocker struct {

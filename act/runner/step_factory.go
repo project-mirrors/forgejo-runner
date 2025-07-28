@@ -3,7 +3,7 @@ package runner
 import (
 	"fmt"
 
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/model"
 )
 
 type stepFactory interface {

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	runnerv1 "code.forgejo.org/forgejo/actions-proto/runner/v1"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/v3/assert"
 )

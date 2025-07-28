@@ -12,10 +12,10 @@ import (
 
 	_ "embed"
 
-	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/exprparser"
-	"github.com/nektos/act/pkg/model"
+	"code.forgejo.org/forgejo/runner/act/common"
+	"code.forgejo.org/forgejo/runner/act/container"
+	"code.forgejo.org/forgejo/runner/act/exprparser"
+	"code.forgejo.org/forgejo/runner/act/model"
 	"gopkg.in/yaml.v3"
 )
 

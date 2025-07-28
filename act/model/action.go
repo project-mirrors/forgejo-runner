@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/nektos/act/pkg/schema"
+	"code.forgejo.org/forgejo/runner/act/schema"
 	"gopkg.in/yaml.v3"
 )
 

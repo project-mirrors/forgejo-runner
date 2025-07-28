@@ -11,7 +11,7 @@ import (
 
 	"code.forgejo.org/forgejo/runner/internal/pkg/config"
 
-	"github.com/nektos/act/pkg/artifactcache"
+	"code.forgejo.org/forgejo/runner/act/artifactcache"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
