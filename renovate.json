@@ -4,9 +4,14 @@
   "prConcurrentLimit": 1,
   "packageRules": [
     {
-      "description": "Disable nektos/act, it's replaced",
-      "matchDepNames": ["github.com/nektos/act"],
+      "description": "Disable act test data",
+      "matchFileNames": ["act/*/testdata/**"],
       "enabled": false
+    },
+    {
+      "description": "Separate minor and patch for some packages",
+      "matchDepNames": ["github.com/rhysd/actionlint"],
+      "separateMinorPatch": true
     }
   ],
   "ignorePaths": []
