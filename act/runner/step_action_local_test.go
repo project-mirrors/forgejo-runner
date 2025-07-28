@@ -262,7 +262,7 @@ func TestStepActionLocalPost(t *testing.T) {
 						return strings.HasSuffix(array[1], suffix)
 					})
 				}
-				cm.On("Exec", suffixMatcher("pkg/runner/local/action/post.js"), sal.env, "", "").Return(func(ctx context.Context) error { return tt.err })
+				cm.On("Exec", suffixMatcher("act/runner/local/action/post.js"), sal.env, "", "").Return(func(ctx context.Context) error { return tt.err })
 
 				cm.On("Copy", "/var/run/act", mock.AnythingOfType("[]*container.FileEntry")).Return(func(ctx context.Context) error {
 					return nil

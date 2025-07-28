@@ -318,7 +318,7 @@ func TestRunContext_GetGitHubContext(t *testing.T) {
 		actor = a
 	}
 
-	repo := "forgejo/act"
+	repo := "forgejo/runner"
 	if r := os.Getenv("ACT_REPOSITORY"); r != "" {
 		repo = r
 	}
