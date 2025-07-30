@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"os"
 	"testing"
@@ -14,27 +13,15 @@ import (
 	"code.forgejo.org/forgejo/runner/internal/pkg/ver"
 	"connectrpc.com/connect"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 )
-
-func executeCommand(ctx context.Context, cmd *cobra.Command, args ...string) (string, error) {
-	buf := new(bytes.Buffer)
-	cmd.SetOut(buf)
-	cmd.SetErr(buf)
-	cmd.SetArgs(args)
-
-	err := cmd.ExecuteContext(ctx)
-
-	return buf.String(), err
-}
 
 func Test_createRunnerFileCmd(t *testing.T) {
 	configFile := "config.yml"
 	ctx := context.Background()
 	cmd := createRunnerFileCmd(ctx, &configFile)
-	output, err := executeCommand(ctx, cmd)
+	output, _, _, err := executeCommand(ctx, t, cmd)
 	assert.ErrorContains(t, err, `required flag(s) "instance", "secret" not set`)
 	assert.Contains(t, output, "Usage:")
 }
@@ -89,7 +76,7 @@ func Test_runCreateRunnerFile(t *testing.T) {
 	//
 	ctx := context.Background()
 	cmd := createRunnerFileCmd(ctx, &configFile)
-	output, err := executeCommand(ctx, cmd, "--connect", "--secret", secret, "--instance", instance, "--name", name)
+	output, _, _, err := executeCommand(ctx, t, cmd, "--connect", "--secret", secret, "--instance", instance, "--name", name)
 	assert.NoError(t, err)
 	assert.EqualValues(t, "", output)
 
