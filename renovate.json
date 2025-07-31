@@ -4,15 +4,10 @@
   "prConcurrentLimit": 1,
   "packageRules": [
     {
-      "description": "Disable act test data",
-      "matchFileNames": ["**/testdata/**"],
-      "enabled": false
-    },
-    {
       "description": "Separate minor and patch for some packages",
       "matchDepNames": ["github.com/rhysd/actionlint"],
       "separateMinorPatch": true
     }
   ],
-  "ignorePaths": []
+  "ignorePaths": ["**/node_modules/**"]
 }
