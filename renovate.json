@@ -9,5 +9,5 @@
       "separateMinorPatch": true
     }
   ],
-  "ignorePaths": ["act/*/testdata/**", "**/node_modules/**"]
+  "ignorePaths": ["**/testdata/**", "**/node_modules/**"]
 }
