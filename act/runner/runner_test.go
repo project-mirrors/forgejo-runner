@@ -256,9 +256,8 @@ func TestRunner_RunEvent(t *testing.T) {
 		{workdir, "uses-composite-check-for-input-in-if-uses", "push", "", platforms, secrets},
 		//		{workdir, "remote-action-composite-js-pre-with-defaults", "push", "", platforms, secrets},
 		{workdir, "remote-action-composite-action-ref", "push", "", platforms, secrets},
-		// reusable workflow not fully implemented yet
-		// {workdir, "uses-workflow", "push", "", platforms, map[string]string{"secret": "keep_it_private"}},
-		// {workdir, "uses-workflow", "pull_request", "", platforms, map[string]string{"secret": "keep_it_private"}},
+		{workdir, "uses-workflow", "push", "", platforms, map[string]string{"secret": "keep_it_private"}},
+		{workdir, "uses-workflow", "pull_request", "", platforms, map[string]string{"secret": "keep_it_private"}},
 		{workdir, "uses-docker-url", "push", "", platforms, secrets},
 		{workdir, "act-composite-env-test", "push", "", platforms, secrets},
 
