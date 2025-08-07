@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"strings"
 	"sync"
@@ -158,6 +159,7 @@ func withStepLogger(ctx context.Context, stepNumber int, stepID, stepName, stage
 type entryProcessor func(entry *logrus.Entry) *logrus.Entry
 
 func valueMasker(insecureSecrets bool, secrets map[string]string) entryProcessor {
+	secrets = maps.Clone(secrets)
 	return func(entry *logrus.Entry) *logrus.Entry {
 		if insecureSecrets {
 			return entry
