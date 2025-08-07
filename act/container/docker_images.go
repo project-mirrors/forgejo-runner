@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"code.forgejo.org/forgejo/runner/v9/act/common"
 	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/image"
 )
@@ -26,9 +27,14 @@ func ImageExistsLocally(ctx context.Context, imageName, platform string) (bool, 
 		return false, err
 	}
 
-	if platform == "" || platform == "any" || fmt.Sprintf("%s/%s", inspectImage.Os, inspectImage.Architecture) == platform {
+	imagePlatform := fmt.Sprintf("%s/%s", inspectImage.Os, inspectImage.Architecture)
+
+	if platform == "" || platform == "any" || imagePlatform == platform {
 		return true, nil
 	}
+
+	logger := common.Logger(ctx)
+	logger.Infof("image found but platform does not match: %s (image) != %s (platform)\n", imagePlatform, platform)
 
 	return false, nil
 }
