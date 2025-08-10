@@ -262,6 +262,16 @@ func mergeEnv(ctx context.Context, step step) {
 	}
 
 	rc.withGithubEnv(ctx, step.getGithubContext(ctx), *env)
+
+	if step.getStepModel().Uses != "" {
+		// prevent uses action input pollution of unset parameters, skip this for run steps
+		// due to design flaw
+		for key := range *env {
+			if strings.HasPrefix(key, "INPUT_") {
+				delete(*env, key)
+			}
+		}
+	}
 }
 
 func isStepEnabled(ctx context.Context, expr string, step step, stage stepStage) (bool, error) {
@@ -274,7 +284,7 @@ func isStepEnabled(ctx context.Context, expr string, step step, stage stepStage)
 		defaultStatusCheck = exprparser.DefaultStatusCheckSuccess
 	}
 
-	runStep, err := EvalBool(ctx, rc.NewStepExpressionEvaluator(ctx, step), expr, defaultStatusCheck)
+	runStep, err := EvalBool(ctx, rc.NewStepExpressionEvaluatorExt(ctx, step, stage == stepStageMain), expr, defaultStatusCheck)
 	if err != nil {
 		return false, fmt.Errorf("  \u274C  Error in if-expression: \"if: %s\" (%s)", expr, err)
 	}
