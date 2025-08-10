@@ -227,12 +227,16 @@ func (impl *interperterImpl) evaluateIndexAccess(indexAccessNode *actionlint.Ind
 	}
 }
 
-func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.ObjectDerefNode) (interface{}, error) {
+func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.ObjectDerefNode) (any, error) {
 	left, err := impl.evaluateNode(objectDerefNode.Receiver)
 	if err != nil {
 		return nil, err
 	}
 
+	_, receiverIsDeref := objectDerefNode.Receiver.(*actionlint.ArrayDerefNode)
+	if receiverIsDeref {
+		return impl.getPropertyValueDereferenced(reflect.ValueOf(left), objectDerefNode.Property)
+	}
 	return impl.getPropertyValue(reflect.ValueOf(left), objectDerefNode.Property)
 }
 
@@ -311,6 +315,29 @@ func (impl *interperterImpl) getPropertyValue(left reflect.Value, property strin
 		}
 
 		return values, nil
+	}
+
+	return nil, nil
+}
+
+func (impl *interperterImpl) getPropertyValueDereferenced(left reflect.Value, property string) (value any, err error) {
+	switch left.Kind() {
+	case reflect.Map:
+		iter := left.MapRange()
+
+		var values []any
+		for iter.Next() {
+			value, err := impl.getPropertyValue(iter.Value(), property)
+			if err != nil {
+				return nil, err
+			}
+
+			values = append(values, value)
+		}
+
+		return values, nil
+	case reflect.Ptr, reflect.Struct, reflect.Slice:
+		return impl.getPropertyValue(left, property)
 	}
 
 	return nil, nil
