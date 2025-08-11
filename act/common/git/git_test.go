@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -54,13 +53,6 @@ func TestFindGitSlug(t *testing.T) {
 	}
 }
 
-func testDir(t *testing.T) string {
-	basedir, err := os.MkdirTemp("", "act-test")
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = os.RemoveAll(basedir) })
-	return basedir
-}
-
 func cleanGitHooks(dir string) error {
 	hooksDir := filepath.Join(dir, ".git", "hooks")
 	files, err := os.ReadDir(hooksDir)
@@ -85,7 +77,7 @@ func cleanGitHooks(dir string) error {
 func TestFindGitRemoteURL(t *testing.T) {
 	assert := assert.New(t)
 
-	basedir := testDir(t)
+	basedir := t.TempDir()
 	gitConfig()
 	err := gitCmd("init", basedir)
 	assert.NoError(err)
@@ -96,20 +88,20 @@ func TestFindGitRemoteURL(t *testing.T) {
 	err = gitCmd("-C", basedir, "remote", "add", "origin", remoteURL)
 	assert.NoError(err)
 
-	u, err := findGitRemoteURL(context.Background(), basedir, "origin")
+	u, err := findGitRemoteURL(t.Context(), basedir, "origin")
 	assert.NoError(err)
 	assert.Equal(remoteURL, u)
 
 	remoteURL = "git@github.com/AwesomeOwner/MyAwesomeRepo.git"
 	err = gitCmd("-C", basedir, "remote", "add", "upstream", remoteURL)
 	assert.NoError(err)
-	u, err = findGitRemoteURL(context.Background(), basedir, "upstream")
+	u, err = findGitRemoteURL(t.Context(), basedir, "upstream")
 	assert.NoError(err)
 	assert.Equal(remoteURL, u)
 }
 
 func TestGitFindRef(t *testing.T) {
-	basedir := testDir(t)
+	basedir := t.TempDir()
 	gitConfig()
 
 	for name, tt := range map[string]struct {
@@ -184,7 +176,7 @@ func TestGitFindRef(t *testing.T) {
 			require.NoError(t, gitCmd("-C", dir, "config", "user.email", "user@example.com"))
 			require.NoError(t, cleanGitHooks(dir))
 			tt.Prepare(t, dir)
-			ref, err := FindGitRef(context.Background(), dir)
+			ref, err := FindGitRef(t.Context(), dir)
 			tt.Assert(t, ref, err)
 		})
 	}
@@ -220,10 +212,10 @@ func TestGitCloneExecutor(t *testing.T) {
 			clone := NewGitCloneExecutor(NewGitCloneExecutorInput{
 				URL: tt.URL,
 				Ref: tt.Ref,
-				Dir: testDir(t),
+				Dir: t.TempDir(),
 			})
 
-			err := clone(context.Background())
+			err := clone(t.Context())
 			if tt.Err != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.Err, err)
@@ -263,7 +255,7 @@ func gitCmd(args ...string) error {
 
 func TestCloneIfRequired(t *testing.T) {
 	tempDir := t.TempDir()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("clone", func(t *testing.T) {
 		repo, err := CloneIfRequired(ctx, "refs/heads/main", NewGitCloneExecutorInput{
