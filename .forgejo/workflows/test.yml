@@ -146,8 +146,8 @@ jobs:
 
       - name: integration test
         run: |
-          go test ./act/container
-          go test -timeout 30m ./act/runner/...
+          go test -race ./act/container
+          go test -race -timeout 30m ./act/runner/...
 
   runner-integration-tests:
     name: runner integration tests
