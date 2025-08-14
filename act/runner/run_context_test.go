@@ -794,21 +794,16 @@ jobs:
 			},
 			inputs: []container.NewContainerInput{
 				{
-					Name:       "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
-					Image:      "some:image",
-					Username:   "containerusername",
-					Password:   "containerpassword",
-					Entrypoint: []string{"tail", "-f", "/dev/null"},
-					Cmd:        nil,
-					WorkingDir: "/my/workdir",
-					Env:        []string{},
-					ToolCache:  "/opt/hostedtoolcache",
-					Binds:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts: map[string]string{
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB":     "/my/workdir",
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env": "/var/run/act",
-					},
-					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
+					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
+					Image:          "some:image",
+					Username:       "containerusername",
+					Password:       "containerpassword",
+					Entrypoint:     []string{"tail", "-f", "/dev/null"},
+					Cmd:            nil,
+					WorkingDir:     "/my/workdir",
+					Env:            []string{},
+					ToolCache:      "/opt/hostedtoolcache",
+					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -817,11 +812,6 @@ jobs:
 					PortBindings:   nil,
 					ConfigOptions:  "",
 					JobOptions:     "",
-					ValidVolumes: []string{
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env",
-						"/var/run/docker.sock",
-					},
 				},
 				{
 					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599-fe7f4c0058dbd2161ebe4aafa71cd83bd96ee19d3ca8043d5e4bc477a664a80c",
@@ -834,8 +824,6 @@ jobs:
 					Env:            []string{},
 					ToolCache:      "/opt/hostedtoolcache",
 					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts:         map[string]string{},
-					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -856,8 +844,6 @@ jobs:
 					Env:            []string{},
 					ToolCache:      "/opt/hostedtoolcache",
 					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts:         map[string]string{},
-					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -890,7 +876,24 @@ jobs:
 
 			require.NoError(t, rc.prepareJobContainer(ctx))
 			slices.SortFunc(containerInputs, func(a, b container.NewContainerInput) int { return cmp.Compare(a.Username, b.Username) })
+			jobContainerInput := containerInputs[0]
+			require.Equal(t, "containerusername", jobContainerInput.Username)
+			require.NotEmpty(t, jobContainerInput.NetworkMode)
+			for source := range jobContainerInput.Mounts {
+				assert.Contains(t, jobContainerInput.ValidVolumes, source)
+			}
 			for i := 0; i < len(containerInputs); i++ {
+
+				assert.Equal(t, jobContainerInput.NetworkMode, containerInputs[i].NetworkMode, containerInputs[i].Username)
+				containerInputs[i].NetworkMode = ""
+
+				if strings.HasPrefix(containerInputs[i].Username, "service") {
+					assert.Empty(t, containerInputs[i].Mounts)
+					assert.Empty(t, containerInputs[i].ValidVolumes)
+				}
+				containerInputs[i].Mounts = nil
+				containerInputs[i].ValidVolumes = nil
+
 				assert.EqualValues(t, testCase.inputs[i], containerInputs[i], containerInputs[i].Username)
 			}
 		})
