@@ -229,7 +229,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 						}
 						assert.Contains(t, gotbind, fullBind)
 					} else {
-						mountkey := testcase.rc.jobContainerName()
+						mountkey := testcase.rc.getInternalVolumeWorkdir(t.Context())
 						assert.EqualValues(t, testcase.wantmount, gotmount[mountkey])
 					}
 				})

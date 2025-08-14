@@ -117,10 +117,23 @@ func getDockerDaemonSocketMountPath(daemonPath string) string {
 	return daemonPath
 }
 
+func (rc *RunContext) getInternalVolumeNames(ctx context.Context) []string {
+	return []string{
+		rc.getInternalVolumeWorkdir(ctx),
+		rc.getInternalVolumeEnv(ctx),
+	}
+}
+
+func (rc *RunContext) getInternalVolumeWorkdir(ctx context.Context) string {
+	return rc.jobContainerName()
+}
+
+func (rc *RunContext) getInternalVolumeEnv(ctx context.Context) string {
+	return fmt.Sprintf("%s-env", rc.jobContainerName())
+}
+
 // Returns the binds and mounts for the container, resolving paths as appopriate
 func (rc *RunContext) GetBindsAndMounts(ctx context.Context) ([]string, map[string]string, []string) {
-	name := rc.jobContainerName()
-
 	if rc.Config.ContainerDaemonSocket == "" {
 		rc.Config.ContainerDaemonSocket = "/var/run/docker.sock"
 	}
@@ -134,7 +147,7 @@ func (rc *RunContext) GetBindsAndMounts(ctx context.Context) ([]string, map[stri
 	ext := container.LinuxContainerEnvironmentExtensions{}
 
 	mounts := map[string]string{
-		name + "-env": ext.GetActPath(),
+		rc.getInternalVolumeEnv(ctx): ext.GetActPath(),
 	}
 
 	if job := rc.Run.Job(); job != nil {
@@ -162,14 +175,10 @@ func (rc *RunContext) GetBindsAndMounts(ctx context.Context) ([]string, map[stri
 		}
 		binds = append(binds, fmt.Sprintf("%s:%s%s", rc.Config.Workdir, ext.ToContainerPath(rc.Config.Workdir), bindModifiers))
 	} else {
-		mounts[name] = ext.ToContainerPath(rc.Config.Workdir)
+		mounts[rc.getInternalVolumeWorkdir(ctx)] = ext.ToContainerPath(rc.Config.Workdir)
 	}
 
-	validVolumes := []string{
-		name,
-		name + "-env",
-		getDockerDaemonSocketMountPath(rc.Config.ContainerDaemonSocket),
-	}
+	validVolumes := append(rc.getInternalVolumeNames(ctx), getDockerDaemonSocketMountPath(rc.Config.ContainerDaemonSocket))
 	validVolumes = append(validVolumes, rc.Config.ValidVolumes...)
 	return binds, mounts, validVolumes
 }
@@ -523,7 +532,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 
 		if rc.JobContainer != nil {
 			return rc.JobContainer.Remove().IfNot(reuseJobContainer).
-				Then(container.NewDockerVolumesRemoveExecutor([]string{rc.jobContainerName(), rc.jobContainerName() + "-env"})).IfNot(reuseJobContainer).
+				Then(container.NewDockerVolumesRemoveExecutor(rc.getInternalVolumeNames(ctx))).IfNot(reuseJobContainer).
 				Then(func(ctx context.Context) error {
 					if len(rc.ServiceContainers) > 0 {
 						logger.Infof("Cleaning up services for job %s", rc.JobName)
