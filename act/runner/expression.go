@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"path"
 	"reflect"
 	"regexp"
@@ -21,7 +22,7 @@ import (
 
 // ExpressionEvaluator is the interface for evaluating expressions
 type ExpressionEvaluator interface {
-	evaluate(context.Context, string, exprparser.DefaultStatusCheck) (interface{}, error)
+	evaluate(context.Context, string, exprparser.DefaultStatusCheck) (any, error)
 	EvaluateYamlNode(context.Context, *yaml.Node) error
 	Interpolate(context.Context, string) string
 }
@@ -36,7 +37,7 @@ func (rc *RunContext) NewExpressionEvaluatorWithEnv(ctx context.Context, env map
 
 	// todo: cleanup EvaluationEnvironment creation
 	using := make(map[string]exprparser.Needs)
-	strategy := make(map[string]interface{})
+	strategy := make(map[string]any)
 	if rc.Run != nil {
 		job := rc.Run.Job()
 		if job != nil && job.Strategy != nil {
@@ -64,9 +65,7 @@ func (rc *RunContext) NewExpressionEvaluatorWithEnv(ctx context.Context, env map
 				result := model.WorkflowCallResult{
 					Outputs: map[string]string{},
 				}
-				for k, v := range job.Outputs {
-					result.Outputs[k] = v
-				}
+				maps.Copy(result.Outputs, job.Outputs)
 				workflowCallResult[jobName] = &result
 			}
 		}
@@ -120,10 +119,10 @@ func (rc *RunContext) NewStepExpressionEvaluatorExt(ctx context.Context, step st
 	return rc.newStepExpressionEvaluator(ctx, step, ghc, getEvaluatorInputs(ctx, rc, step, ghc))
 }
 
-func (rc *RunContext) newStepExpressionEvaluator(ctx context.Context, step step, ghc *model.GithubContext, inputs map[string]interface{}) ExpressionEvaluator {
+func (rc *RunContext) newStepExpressionEvaluator(ctx context.Context, step step, ghc *model.GithubContext, inputs map[string]any) ExpressionEvaluator {
 	// todo: cleanup EvaluationEnvironment creation
 	job := rc.Run.Job()
-	strategy := make(map[string]interface{})
+	strategy := make(map[string]any)
 	if job.Strategy != nil {
 		strategy["fail-fast"] = job.Strategy.FailFast
 		strategy["max-parallel"] = job.Strategy.MaxParallel
@@ -167,8 +166,8 @@ func (rc *RunContext) newStepExpressionEvaluator(ctx context.Context, step step,
 	}
 }
 
-func getHashFilesFunction(ctx context.Context, rc *RunContext) func(v []reflect.Value) (interface{}, error) {
-	hashFiles := func(v []reflect.Value) (interface{}, error) {
+func getHashFilesFunction(ctx context.Context, rc *RunContext) func(v []reflect.Value) (any, error) {
+	hashFiles := func(v []reflect.Value) (any, error) {
 		if rc.JobContainer != nil {
 			timeed, cancel := context.WithTimeout(ctx, time.Minute)
 			defer cancel()
@@ -192,9 +191,7 @@ func getHashFilesFunction(ctx context.Context, rc *RunContext) func(v []reflect.
 				patterns = append(patterns, s)
 			}
 			env := map[string]string{}
-			for k, v := range rc.Env {
-				env[k] = v
-			}
+			maps.Copy(env, rc.Env)
 			env["patterns"] = strings.Join(patterns, "\n")
 			if followSymlink {
 				env["followSymbolicLinks"] = "true"
@@ -232,7 +229,7 @@ type expressionEvaluator struct {
 	interpreter exprparser.Interpreter
 }
 
-func (ee expressionEvaluator) evaluate(ctx context.Context, in string, defaultStatusCheck exprparser.DefaultStatusCheck) (interface{}, error) {
+func (ee expressionEvaluator) evaluate(ctx context.Context, in string, defaultStatusCheck exprparser.DefaultStatusCheck) (any, error) {
 	logger := common.Logger(ctx)
 	logger.Debugf("evaluating expression '%s'", in)
 	evaluated, err := ee.interpreter.Evaluate(in, defaultStatusCheck)
@@ -479,8 +476,8 @@ func rewriteSubExpression(ctx context.Context, in string, forceFormat bool) (str
 	return out, nil
 }
 
-func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *model.GithubContext) map[string]interface{} {
-	inputs := map[string]interface{}{}
+func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *model.GithubContext) map[string]any {
+	inputs := map[string]any{}
 
 	setupWorkflowInputs(ctx, &inputs, rc)
 
@@ -492,8 +489,8 @@ func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *mod
 	}
 
 	for k, v := range env {
-		if strings.HasPrefix(k, "INPUT_") {
-			inputs[strings.ToLower(strings.TrimPrefix(k, "INPUT_"))] = v
+		if after, ok := strings.CutPrefix(k, "INPUT_"); ok {
+			inputs[strings.ToLower(after)] = v
 		}
 	}
 
@@ -533,7 +530,7 @@ func getEvaluatorInputs(ctx context.Context, rc *RunContext, step step, ghc *mod
 	return inputs
 }
 
-func setupWorkflowInputs(ctx context.Context, inputs *map[string]interface{}, rc *RunContext) {
+func setupWorkflowInputs(ctx context.Context, inputs *map[string]any, rc *RunContext) {
 	if rc.caller != nil {
 		config := rc.Run.Workflow.WorkflowCallConfig()
 

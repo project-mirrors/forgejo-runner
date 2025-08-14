@@ -49,7 +49,7 @@ func mockReporter(t *testing.T) (*Reporter, *mocks.Client, func()) {
 
 	client := mocks.NewClient(t)
 	ctx, cancel := context.WithCancel(context.Background())
-	taskCtx, err := structpb.NewStruct(map[string]interface{}{})
+	taskCtx, err := structpb.NewStruct(map[string]any{})
 	require.NoError(t, err)
 	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
 		Context: taskCtx,
@@ -64,7 +64,7 @@ func TestReporterSetOutputs(t *testing.T) {
 	assertEqual := func(t *testing.T, expected map[string]string, actual *sync.Map) {
 		t.Helper()
 		actualMap := map[string]string{}
-		actual.Range(func(k, v interface{}) bool {
+		actual.Range(func(k, v any) bool {
 			val, ok := v.(string)
 			require.True(t, ok)
 			actualMap[k.(string)] = val
@@ -268,7 +268,7 @@ func TestReporter_Fire(t *testing.T) {
 			return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
 		})
 
-		dataStep0 := map[string]interface{}{
+		dataStep0 := map[string]any{
 			"stage":      "Main",
 			"stepNumber": 0,
 			"raw_output": true,

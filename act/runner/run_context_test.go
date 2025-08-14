@@ -27,7 +27,7 @@ import (
 
 func TestRunContext_EvalBool(t *testing.T) {
 	var yml yaml.Node
-	err := yml.Encode(map[string][]interface{}{
+	err := yml.Encode(map[string][]any{
 		"os":  {"Linux", "Windows"},
 		"foo": {"bar", "baz"},
 	})
@@ -55,7 +55,7 @@ func TestRunContext_EvalBool(t *testing.T) {
 				},
 			},
 		},
-		Matrix: map[string]interface{}{
+		Matrix: map[string]any{
 			"os":  "Linux",
 			"foo": "bar",
 		},
@@ -160,7 +160,6 @@ func TestRunContext_EvalBool(t *testing.T) {
 	}
 
 	for _, table := range tables {
-		table := table
 		t.Run(table.in, func(t *testing.T) {
 			assertObject := assert.New(t)
 			b, err := EvalBool(t.Context(), rc.ExprEval, table.in, exprparser.DefaultStatusCheckSuccess)
@@ -203,11 +202,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 	isWindows := runtime.GOOS == "windows"
 
 	for _, testcase := range tests {
-		// pin for scopelint
-		testcase := testcase
 		for _, bindWorkDir := range []bool{true, false} {
-			// pin for scopelint
-			bindWorkDir := bindWorkDir
 			testBindSuffix := ""
 			if bindWorkDir {
 				testBindSuffix = "Bind"
@@ -304,7 +299,7 @@ func TestRunContext_GetGitHubContext(t *testing.T) {
 		},
 		Name:           "GitHubContextTest",
 		CurrentStep:    "step",
-		Matrix:         map[string]interface{}{},
+		Matrix:         map[string]any{},
 		Env:            map[string]string{},
 		ExtraPath:      []string{},
 		StepResults:    map[string]*model.StepResult{},
@@ -363,7 +358,6 @@ func TestRunContext_GetGithubContextRef(t *testing.T) {
 	}
 
 	for _, data := range table {
-		data := data
 		t.Run(data.event, func(t *testing.T) {
 			rc := &RunContext{
 				EventJSON: data.json,

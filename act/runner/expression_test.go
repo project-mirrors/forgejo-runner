@@ -11,7 +11,7 @@ import (
 
 func createRunContext(t *testing.T) *RunContext {
 	var yml yaml.Node
-	err := yml.Encode(map[string][]interface{}{
+	err := yml.Encode(map[string][]any{
 		"os":  {"Linux", "Windows"},
 		"foo": {"bar", "baz"},
 	})
@@ -43,7 +43,7 @@ func createRunContext(t *testing.T) *RunContext {
 				},
 			},
 		},
-		Matrix: map[string]interface{}{
+		Matrix: map[string]any{
 			"os":  "Linux",
 			"foo": "bar",
 		},
@@ -79,7 +79,7 @@ func TestExpressionEvaluateRunContext(t *testing.T) {
 
 	tables := []struct {
 		in      string
-		out     interface{}
+		out     any
 		errMesg string
 	}{
 		{" 1 ", 1, ""},
@@ -133,7 +133,6 @@ func TestExpressionEvaluateRunContext(t *testing.T) {
 	}
 
 	for _, table := range tables {
-		table := table
 		t.Run(table.in, func(t *testing.T) {
 			assertObject := assert.New(t)
 			out, err := ee.evaluate(t.Context(), table.in, exprparser.DefaultStatusCheckNone)
@@ -158,7 +157,7 @@ func TestExpressionEvaluateStep(t *testing.T) {
 
 	tables := []struct {
 		in      string
-		out     interface{}
+		out     any
 		errMesg string
 	}{
 		{"steps.idwithnothing.conclusion", model.StepStatusSuccess.String(), ""},
@@ -173,7 +172,6 @@ func TestExpressionEvaluateStep(t *testing.T) {
 	}
 
 	for _, table := range tables {
-		table := table
 		t.Run(table.in, func(t *testing.T) {
 			assertObject := assert.New(t)
 			out, err := ee.evaluate(t.Context(), table.in, exprparser.DefaultStatusCheckNone)
@@ -256,7 +254,6 @@ func TestExpressionInterpolate(t *testing.T) {
 	}
 
 	for _, table := range tables {
-		table := table
 		t.Run("interpolate", func(t *testing.T) {
 			assertObject := assert.New(t)
 			out := ee.Interpolate(t.Context(), table.in)

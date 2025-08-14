@@ -11,7 +11,7 @@ import (
 func TestLiterals(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"true", true, "true"},
@@ -40,7 +40,7 @@ func TestLiterals(t *testing.T) {
 func TestOperators(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 		error    string
 	}{
@@ -68,7 +68,7 @@ func TestOperators(t *testing.T) {
 		{`true && false`, false, "and", ""},
 		{`true || false`, true, "or", ""},
 		{`fromJSON('{}') && true`, true, "and-boolean-object", ""},
-		{`fromJSON('{}') || false`, make(map[string]interface{}), "or-boolean-object", ""},
+		{`fromJSON('{}') || false`, make(map[string]any), "or-boolean-object", ""},
 		{"github.event.commits[0].author.username != github.event.commits[1].author.username", true, "property-comparison1", ""},
 		{"github.event.commits[0].author.username1 != github.event.commits[1].author.username", true, "property-comparison2", ""},
 		{"github.event.commits[0].author.username != github.event.commits[1].author.username1", true, "property-comparison3", ""},
@@ -79,15 +79,15 @@ func TestOperators(t *testing.T) {
 	env := &EvaluationEnvironment{
 		Github: &model.GithubContext{
 			Action: "push",
-			Event: map[string]interface{}{
-				"commits": []interface{}{
-					map[string]interface{}{
-						"author": map[string]interface{}{
+			Event: map[string]any{
+				"commits": []any{
+					map[string]any{
+						"author": map[string]any{
 							"username": "someone",
 						},
 					},
-					map[string]interface{}{
-						"author": map[string]interface{}{
+					map[string]any{
+						"author": map[string]any{
 							"username": "someone-else",
 						},
 					},
@@ -114,7 +114,7 @@ func TestOperators(t *testing.T) {
 func TestOperatorsCompare(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"!null", true, "not-null"},
@@ -162,7 +162,7 @@ func TestOperatorsCompare(t *testing.T) {
 func TestOperatorsBooleanEvaluation(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		// true &&
@@ -529,7 +529,7 @@ func TestOperatorsBooleanEvaluation(t *testing.T) {
 func TestContexts(t *testing.T) {
 	table := []struct {
 		input    string
-		expected interface{}
+		expected any
 		name     string
 	}{
 		{"github.action", "push", "github-context"},
@@ -588,7 +588,7 @@ func TestContexts(t *testing.T) {
 				Conclusion: model.StepStatusSkipped,
 			},
 		},
-		Runner: map[string]interface{}{
+		Runner: map[string]any{
 			"os":         "Linux",
 			"temp":       "/tmp",
 			"tool_cache": "/opt/hostedtoolcache",
@@ -599,10 +599,10 @@ func TestContexts(t *testing.T) {
 		Vars: map[string]string{
 			"name": "value",
 		},
-		Strategy: map[string]interface{}{
+		Strategy: map[string]any{
 			"fail-fast": true,
 		},
-		Matrix: map[string]interface{}{
+		Matrix: map[string]any{
 			"os": "Linux",
 		},
 		Needs: map[string]Needs{
@@ -619,7 +619,7 @@ func TestContexts(t *testing.T) {
 				Result: "success",
 			},
 		},
-		Inputs: map[string]interface{}{
+		Inputs: map[string]any{
 			"name": "value",
 		},
 	}

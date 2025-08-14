@@ -485,8 +485,8 @@ func goOsToActionOs(os string) string {
 	return os
 }
 
-func (e *HostEnvironment) GetRunnerContext(_ context.Context) map[string]interface{} {
-	return map[string]interface{}{
+func (e *HostEnvironment) GetRunnerContext(_ context.Context) map[string]any {
+	return map[string]any{
 		"os":         goOsToActionOs(runtime.GOOS),
 		"arch":       goArchToActionArch(runtime.GOARCH),
 		"temp":       e.TmpDir,

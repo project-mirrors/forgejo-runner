@@ -73,7 +73,7 @@ func WithJobLoggerFactory(ctx context.Context, factory JobLoggerFactory) context
 }
 
 // WithJobLogger attaches a new logger to context that is aware of steps
-func WithJobLogger(ctx context.Context, jobID, jobName string, config *Config, masks *[]string, matrix map[string]interface{}) context.Context {
+func WithJobLogger(ctx context.Context, jobID, jobName string, config *Config, masks *[]string, matrix map[string]any) context.Context {
 	ctx = WithMasks(ctx, masks)
 
 	var logger *logrus.Logger

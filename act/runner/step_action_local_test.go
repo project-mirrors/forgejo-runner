@@ -258,7 +258,7 @@ func TestStepActionLocalPost(t *testing.T) {
 			sal.RunContext.ExprEval = sal.RunContext.NewExpressionEvaluator(ctx)
 
 			if tt.mocks.exec {
-				suffixMatcher := func(suffix string) interface{} {
+				suffixMatcher := func(suffix string) any {
 					return mock.MatchedBy(func(array []string) bool {
 						return strings.HasSuffix(array[1], suffix)
 					})

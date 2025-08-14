@@ -81,7 +81,7 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, c client.Client
 func (r *Reporter) ResetSteps(l int) {
 	r.stateMu.Lock()
 	defer r.stateMu.Unlock()
-	for i := 0; i < l; i++ {
+	for i := range l {
 		r.state.Steps = append(r.state.Steps, &runnerv1.StepState{
 			Id: int64(i),
 		})
@@ -189,14 +189,14 @@ func (r *Reporter) RunDaemon() {
 	time.AfterFunc(r.reportInterval, r.RunDaemon)
 }
 
-func (r *Reporter) Logf(format string, a ...interface{}) {
+func (r *Reporter) Logf(format string, a ...any) {
 	r.stateMu.Lock()
 	defer r.stateMu.Unlock()
 
 	r.logf(format, a...)
 }
 
-func (r *Reporter) logf(format string, a ...interface{}) {
+func (r *Reporter) logf(format string, a ...any) {
 	if !r.duringSteps() {
 		r.logRows = append(r.logRows, &runnerv1.LogRow{
 			Time:    timestamppb.Now(),
@@ -210,7 +210,7 @@ func (r *Reporter) SetOutputs(outputs map[string]string) error {
 	defer r.stateMu.Unlock()
 
 	var errs []error
-	recordError := func(format string, a ...interface{}) {
+	recordError := func(format string, a ...any) {
 		r.logf(format, a...)
 		errs = append(errs, fmt.Errorf(format, a...))
 	}
@@ -341,7 +341,7 @@ func (r *Reporter) ReportState() error {
 	r.stateMu.RUnlock()
 
 	outputs := make(map[string]string)
-	r.outputs.Range(func(k, v interface{}) bool {
+	r.outputs.Range(func(k, v any) bool {
 		if val, ok := v.(string); ok {
 			outputs[k.(string)] = val
 		}
@@ -365,7 +365,7 @@ func (r *Reporter) ReportState() error {
 	}
 
 	var noSent []string
-	r.outputs.Range(func(k, v interface{}) bool {
+	r.outputs.Range(func(k, v any) bool {
 		if _, ok := v.(string); ok {
 			noSent = append(noSent, k.(string))
 		}
@@ -396,7 +396,7 @@ var stringToResult = map[string]runnerv1.Result{
 	"cancelled": runnerv1.Result_RESULT_CANCELLED,
 }
 
-func (r *Reporter) parseResult(result interface{}) (runnerv1.Result, bool) {
+func (r *Reporter) parseResult(result any) (runnerv1.Result, bool) {
 	str := ""
 	if v, ok := result.(string); ok { // for jobResult
 		str = v

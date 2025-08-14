@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -270,10 +271,8 @@ func (s *Node) UnmarshalYAML(node *yaml.Node) error {
 		return node.Decode(&b)
 	} else if def.AllowedValues != nil {
 		s := node.Value
-		for _, v := range *def.AllowedValues {
-			if s == v {
-				return nil
-			}
+		if slices.Contains(*def.AllowedValues, s) {
+			return nil
 		}
 		return fmt.Errorf("%sExpected one of %s got %s", formatLocation(node), strings.Join(*def.AllowedValues, ","), s)
 	} else if def.Null != nil {

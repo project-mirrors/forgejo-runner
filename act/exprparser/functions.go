@@ -165,12 +165,12 @@ func (impl *interperterImpl) toJSON(value reflect.Value) (string, error) {
 	return string(json), nil
 }
 
-func (impl *interperterImpl) fromJSON(value reflect.Value) (interface{}, error) {
+func (impl *interperterImpl) fromJSON(value reflect.Value) (any, error) {
 	if value.Kind() != reflect.String {
 		return nil, fmt.Errorf("Cannot parse non-string type %v as JSON", value.Kind())
 	}
 
-	var data interface{}
+	var data any
 
 	err := json.Unmarshal([]byte(value.String()), &data)
 	if err != nil {

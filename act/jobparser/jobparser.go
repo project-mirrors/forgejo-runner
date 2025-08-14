@@ -103,7 +103,7 @@ type parseContext struct {
 
 type ParseOption func(c *parseContext)
 
-func getMatrixes(job *model.Job) ([]map[string]interface{}, error) {
+func getMatrixes(job *model.Job) ([]map[string]any, error) {
 	ret, err := job.GetMatrixes()
 	if err != nil {
 		return nil, fmt.Errorf("GetMatrixes: %w", err)
@@ -114,13 +114,13 @@ func getMatrixes(job *model.Job) ([]map[string]interface{}, error) {
 	return ret, nil
 }
 
-func encodeMatrix(matrix map[string]interface{}) yaml.Node {
+func encodeMatrix(matrix map[string]any) yaml.Node {
 	if len(matrix) == 0 {
 		return yaml.Node{}
 	}
-	value := map[string][]interface{}{}
+	value := map[string][]any{}
 	for k, v := range matrix {
-		value[k] = []interface{}{v}
+		value[k] = []any{v}
 	}
 	node := yaml.Node{}
 	_ = node.Encode(value)
@@ -137,7 +137,7 @@ func encodeRunsOn(runsOn []string) yaml.Node {
 	return node
 }
 
-func nameWithMatrix(name string, m map[string]interface{}) string {
+func nameWithMatrix(name string, m map[string]any) string {
 	if len(m) == 0 {
 		return name
 	}
@@ -145,7 +145,7 @@ func nameWithMatrix(name string, m map[string]interface{}) string {
 	return name + " " + matrixName(m)
 }
 
-func matrixName(m map[string]interface{}) string {
+func matrixName(m map[string]any) string {
 	ks := make([]string, 0, len(m))
 	for k := range m {
 		ks = append(ks, k)
