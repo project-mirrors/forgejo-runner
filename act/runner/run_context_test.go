@@ -650,6 +650,88 @@ func TestRunContext_CreateSimpleContainerName(t *testing.T) {
 	}
 }
 
+func TestRunContext_ensureNetworkName(t *testing.T) {
+	t.Run("CreateNetworkForServices", func(t *testing.T) {
+		yaml := `
+on:
+  push:
+
+jobs:
+  job:
+    runs-on: docker
+    container:
+      image: some:image
+    services:
+      service1:
+        image: service1:image
+    steps:
+      - run: echo ok
+`
+		workflow, err := model.ReadWorkflow(strings.NewReader(yaml), true)
+		require.NoError(t, err)
+
+		rc := &RunContext{
+			Config: &Config{
+				ContainerNetworkMode: "host",
+			},
+			Run: &model.Run{
+				JobID:    "job",
+				Workflow: workflow,
+			},
+		}
+
+		rc.ensureNetworkName(t.Context())
+		assert.True(t, rc.getNetworkCreated(t.Context()))
+		assert.True(t, strings.HasPrefix(rc.getNetworkName(t.Context()), "WORKFLOW-"), rc.getNetworkName(t.Context()))
+	})
+
+	yaml := `
+on:
+  push:
+
+jobs:
+  job:
+    runs-on: docker
+    container:
+      image: some:image
+    steps:
+      - run: echo ok
+`
+	workflow, err := model.ReadWorkflow(strings.NewReader(yaml), true)
+	require.NoError(t, err)
+
+	run := &model.Run{
+		JobID:    "job",
+		Workflow: workflow,
+	}
+
+	t.Run("CreateNetworkIfEmptyNetworkMode", func(t *testing.T) {
+		rc := &RunContext{
+			Config: &Config{
+				ContainerNetworkMode: "",
+			},
+			Run: run,
+		}
+
+		rc.ensureNetworkName(t.Context())
+		assert.True(t, rc.getNetworkCreated(t.Context()))
+		assert.True(t, strings.HasPrefix(rc.getNetworkName(t.Context()), "WORKFLOW-"), rc.getNetworkName(t.Context()))
+	})
+
+	t.Run("FixedNetworkIfSetByNetworkMode", func(t *testing.T) {
+		rc := &RunContext{
+			Config: &Config{
+				ContainerNetworkMode: "host",
+			},
+			Run: run,
+		}
+
+		rc.ensureNetworkName(t.Context())
+		assert.False(t, rc.getNetworkCreated(t.Context()))
+		assert.Equal(t, "host", rc.getNetworkName(t.Context()))
+	})
+}
+
 func TestRunContext_SanitizeNetworkAlias(t *testing.T) {
 	same := "same"
 	assert.Equal(t, same, sanitizeNetworkAlias(t.Context(), same))
