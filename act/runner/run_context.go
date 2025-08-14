@@ -126,11 +126,13 @@ func (rc *RunContext) getInternalVolumeNames(ctx context.Context) []string {
 }
 
 func (rc *RunContext) getInternalVolumeWorkdir(ctx context.Context) string {
-	return rc.jobContainerName()
+	rc.ensureRandomName(ctx)
+	return rc.randomName
 }
 
 func (rc *RunContext) getInternalVolumeEnv(ctx context.Context) string {
-	return fmt.Sprintf("%s-env", rc.jobContainerName())
+	rc.ensureRandomName(ctx)
+	return fmt.Sprintf("%s-env", rc.randomName)
 }
 
 // Returns the binds and mounts for the container, resolving paths as appopriate
@@ -423,9 +425,10 @@ func (rc *RunContext) getNetworkName(ctx context.Context) string {
 
 func (rc *RunContext) ensureNetworkName(ctx context.Context) {
 	if rc.networkName == "" {
+		rc.ensureRandomName(ctx)
 		rc.networkName = string(rc.Config.ContainerNetworkMode)
 		if len(rc.Run.Job().Services) > 0 || rc.networkName == "" {
-			rc.networkName = fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID)
+			rc.networkName = fmt.Sprintf("WORKFLOW-%s", rc.randomName)
 			rc.networkCreated = true
 		}
 	}
