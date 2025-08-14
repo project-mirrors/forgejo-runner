@@ -130,12 +130,8 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 				logger.Errorf("Error while stop job container %s: %v", rc.jobContainerName(), err)
 			}
 
-			if !rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == "" {
-				// clean network in docker mode only
-				// if the value of `ContainerNetworkMode` is empty string,
-				// it means that the network to which containers are connecting is created by `act_runner`,
-				// so, we should remove the network at last.
-				networkName, _ := rc.networkName()
+			if !rc.IsHostEnv(ctx) && rc.getNetworkCreated(ctx) {
+				networkName := rc.getNetworkName(ctx)
 				logger.Debugf("Cleaning up network %s for job %s", networkName, rc.jobContainerName())
 				if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
 					logger.Errorf("Error while cleaning network %s: %v", networkName, err)

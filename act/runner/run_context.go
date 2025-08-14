@@ -52,6 +52,9 @@ type RunContext struct {
 	Masks               []string
 	cleanUpJobContainer common.Executor
 	caller              *caller // job calling this RunContext (reusable workflows)
+	randomName          string
+	networkName         string
+	networkCreated      bool
 }
 
 func (rc *RunContext) AddMask(mask string) {
@@ -97,14 +100,6 @@ func (rc *RunContext) jobContainerName() string {
 	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+common.Sha256(rc.Run.Workflow.Name), "JOB-"+rc.Name)
 }
 
-// networkName return the name of the network which will be created by `act` automatically for job,
-func (rc *RunContext) networkName() (string, bool) {
-	if len(rc.Run.Job().Services) > 0 || rc.Config.ContainerNetworkMode == "" {
-		return fmt.Sprintf("%s-%s-network", rc.jobContainerName(), rc.Run.JobID), true
-	}
-	return string(rc.Config.ContainerNetworkMode), false
-}
-
 func getDockerDaemonSocketMountPath(daemonPath string) string {
 	if protoIndex := strings.Index(daemonPath, "://"); protoIndex != -1 {
 		scheme := daemonPath[:protoIndex]
@@ -123,10 +118,25 @@ func getDockerDaemonSocketMountPath(daemonPath string) string {
 	return daemonPath
 }
 
-// Returns the binds and mounts for the container, resolving paths as appopriate
-func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string, []string) {
-	name := rc.jobContainerName()
+func (rc *RunContext) getInternalVolumeNames(ctx context.Context) []string {
+	return []string{
+		rc.getInternalVolumeWorkdir(ctx),
+		rc.getInternalVolumeEnv(ctx),
+	}
+}
 
+func (rc *RunContext) getInternalVolumeWorkdir(ctx context.Context) string {
+	rc.ensureRandomName(ctx)
+	return rc.randomName
+}
+
+func (rc *RunContext) getInternalVolumeEnv(ctx context.Context) string {
+	rc.ensureRandomName(ctx)
+	return fmt.Sprintf("%s-env", rc.randomName)
+}
+
+// Returns the binds and mounts for the container, resolving paths as appopriate
+func (rc *RunContext) GetBindsAndMounts(ctx context.Context) ([]string, map[string]string, []string) {
 	if rc.Config.ContainerDaemonSocket == "" {
 		rc.Config.ContainerDaemonSocket = "/var/run/docker.sock"
 	}
@@ -140,7 +150,7 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string, []string
 	ext := container.LinuxContainerEnvironmentExtensions{}
 
 	mounts := map[string]string{
-		name + "-env": ext.GetActPath(),
+		rc.getInternalVolumeEnv(ctx): ext.GetActPath(),
 	}
 
 	if job := rc.Run.Job(); job != nil {
@@ -168,14 +178,10 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string, []string
 		}
 		binds = append(binds, fmt.Sprintf("%s:%s%s", rc.Config.Workdir, ext.ToContainerPath(rc.Config.Workdir), bindModifiers))
 	} else {
-		mounts[name] = ext.ToContainerPath(rc.Config.Workdir)
+		mounts[rc.getInternalVolumeWorkdir(ctx)] = ext.ToContainerPath(rc.Config.Workdir)
 	}
 
-	validVolumes := []string{
-		name,
-		name + "-env",
-		getDockerDaemonSocketMountPath(rc.Config.ContainerDaemonSocket),
-	}
+	validVolumes := append(rc.getInternalVolumeNames(ctx), getDockerDaemonSocketMountPath(rc.Config.ContainerDaemonSocket))
 	validVolumes = append(validVolumes, rc.Config.ValidVolumes...)
 	return binds, mounts, validVolumes
 }
@@ -388,15 +394,44 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 	}
 }
 
-func (rc *RunContext) getNetworkName(_ context.Context) (networkName string, createAndDeleteNetwork bool) {
-	// specify the network to which the container will connect when `docker create` stage. (like execute command line: docker create --network <networkName> <image>)
-	networkName = string(rc.Config.ContainerNetworkMode)
-	if networkName == "" {
-		// if networkName is empty string, will create a new network for the containers.
-		// and it will be removed after at last.
-		networkName, createAndDeleteNetwork = rc.networkName()
+func (rc *RunContext) ensureRandomName(ctx context.Context) {
+	if rc.randomName == "" {
+		logger := common.Logger(ctx)
+		if rc.Parent != nil {
+			// composite actions inherit their run context from the parent job
+			rootRunContext := rc
+			for rootRunContext.Parent != nil {
+				rootRunContext = rootRunContext.Parent
+			}
+			rootRunContext.ensureRandomName(ctx)
+			rc.randomName = rootRunContext.randomName
+			logger.Debugf("RunContext inherited random name %s from its parent", rc.Name, rc.randomName)
+		} else {
+			rc.randomName = common.MustRandName(16)
+			logger.Debugf("RunContext %s is assigned random name %s", rc.Name, rc.randomName)
+		}
 	}
-	return networkName, createAndDeleteNetwork
+}
+
+func (rc *RunContext) getNetworkCreated(ctx context.Context) bool {
+	rc.ensureNetworkName(ctx)
+	return rc.networkCreated
+}
+
+func (rc *RunContext) getNetworkName(ctx context.Context) string {
+	rc.ensureNetworkName(ctx)
+	return rc.networkName
+}
+
+func (rc *RunContext) ensureNetworkName(ctx context.Context) {
+	if rc.networkName == "" {
+		rc.ensureRandomName(ctx)
+		rc.networkName = string(rc.Config.ContainerNetworkMode)
+		if len(rc.Run.Job().Services) > 0 || rc.networkName == "" {
+			rc.networkName = fmt.Sprintf("WORKFLOW-%s", rc.randomName)
+			rc.networkCreated = true
+		}
+	}
 }
 
 var sanitizeNetworkAliasRegex = regexp.MustCompile("[^a-z0-9-]")
@@ -443,9 +478,8 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 	envList = append(envList, fmt.Sprintf("%s=%s", "LANG", "C.UTF-8")) // Use same locale as GitHub Actions
 
 	ext := container.LinuxContainerEnvironmentExtensions{}
-	binds, mounts, validVolumes := rc.GetBindsAndMounts()
+	binds, mounts, validVolumes := rc.GetBindsAndMounts(ctx)
 
-	networkName, createAndDeleteNetwork := rc.getNetworkName(ctx)
 	// add service containers
 	for serviceID, spec := range rc.Run.Job().Services {
 		// interpolate env
@@ -498,7 +532,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 			Privileged:     rc.Config.Privileged,
 			UsernsMode:     rc.Config.UsernsMode,
 			Platform:       rc.Config.ContainerArchitecture,
-			NetworkMode:    networkName,
+			NetworkMode:    rc.getNetworkName(ctx),
 			NetworkAliases: []string{sanitizeNetworkAlias(ctx, serviceID)},
 			ExposedPorts:   exposedPorts,
 			PortBindings:   portBindings,
@@ -521,7 +555,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 
 		if rc.JobContainer != nil {
 			return rc.JobContainer.Remove().IfNot(reuseJobContainer).
-				Then(container.NewDockerVolumesRemoveExecutor([]string{rc.jobContainerName(), rc.jobContainerName() + "-env"})).IfNot(reuseJobContainer).
+				Then(container.NewDockerVolumesRemoveExecutor(rc.getInternalVolumeNames(ctx))).IfNot(reuseJobContainer).
 				Then(func(ctx context.Context) error {
 					if len(rc.ServiceContainers) > 0 {
 						logger.Infof("Cleaning up services for job %s", rc.JobName)
@@ -529,13 +563,9 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 							logger.Errorf("Error while cleaning services: %v", err)
 						}
 					}
-					if createAndDeleteNetwork {
-						// clean network if it has been created by act
-						// if using service containers
-						// it means that the network to which containers are connecting is created by `act_runner`,
-						// so, we should remove the network at last.
-						logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, networkName)
-						if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
+					if rc.getNetworkCreated(ctx) {
+						logger.Infof("Cleaning up network for job %s, and network name is: %s", rc.JobName, rc.getNetworkName(ctx))
+						if err := container.NewDockerNetworkRemoveExecutor(rc.getNetworkName(ctx))(ctx); err != nil {
 							logger.Errorf("Error while cleaning network: %v", err)
 						}
 					}
@@ -556,7 +586,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 		Env:            envList,
 		ToolCache:      rc.getToolCache(ctx),
 		Mounts:         mounts,
-		NetworkMode:    networkName,
+		NetworkMode:    rc.getNetworkName(ctx),
 		NetworkAliases: []string{sanitizeNetworkAlias(ctx, rc.Name)},
 		Binds:          binds,
 		Stdout:         logWriter,
@@ -581,7 +611,6 @@ func (rc *RunContext) startJobContainer() common.Executor {
 		if err := rc.prepareJobContainer(ctx); err != nil {
 			return err
 		}
-		networkName, _ := rc.getNetworkName(ctx)
 		networkConfig := network.CreateOptions{
 			Driver:     "bridge",
 			Scope:      "local",
@@ -591,8 +620,8 @@ func (rc *RunContext) startJobContainer() common.Executor {
 			rc.pullServicesImages(rc.Config.ForcePull),
 			rc.JobContainer.Pull(rc.Config.ForcePull),
 			rc.stopJobContainer(),
-			container.NewDockerNetworkCreateExecutor(networkName, &networkConfig).IfBool(!rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == ""), // if the value of `ContainerNetworkMode` is empty string, then will create a new network for containers.
-			rc.startServiceContainers(networkName),
+			container.NewDockerNetworkCreateExecutor(rc.getNetworkName(ctx), &networkConfig).IfBool(!rc.IsHostEnv(ctx) && rc.Config.ContainerNetworkMode == ""), // if the value of `ContainerNetworkMode` is empty string, then will create a new network for containers.
+			rc.startServiceContainers(rc.getNetworkName(ctx)),
 			rc.JobContainer.Create(rc.Config.ContainerCapAdd, rc.Config.ContainerCapDrop),
 			rc.JobContainer.Start(false),
 			rc.JobContainer.Copy(rc.JobContainer.GetActPath()+"/", &container.FileEntry{

@@ -219,7 +219,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 					config := testcase.rc.Config
 					config.Workdir = testcase.name
 					config.BindWorkdir = bindWorkDir
-					gotbind, gotmount, _ := rctemplate.GetBindsAndMounts()
+					gotbind, gotmount, _ := rctemplate.GetBindsAndMounts(t.Context())
 
 					// Name binds/mounts are either/or
 					if config.BindWorkdir {
@@ -229,7 +229,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 						}
 						assert.Contains(t, gotbind, fullBind)
 					} else {
-						mountkey := testcase.rc.jobContainerName()
+						mountkey := testcase.rc.getInternalVolumeWorkdir(t.Context())
 						assert.EqualValues(t, testcase.wantmount, gotmount[mountkey])
 					}
 				})
@@ -271,7 +271,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 				rc.Run.JobID = "job1"
 				rc.Run.Workflow.Jobs = map[string]*model.Job{"job1": job}
 
-				gotbind, gotmount, _ := rc.GetBindsAndMounts()
+				gotbind, gotmount, _ := rc.GetBindsAndMounts(t.Context())
 
 				if len(testcase.wantbind) > 0 {
 					assert.Contains(t, gotbind, testcase.wantbind)
@@ -650,6 +650,88 @@ func TestRunContext_CreateSimpleContainerName(t *testing.T) {
 	}
 }
 
+func TestRunContext_ensureNetworkName(t *testing.T) {
+	t.Run("CreateNetworkForServices", func(t *testing.T) {
+		yaml := `
+on:
+  push:
+
+jobs:
+  job:
+    runs-on: docker
+    container:
+      image: some:image
+    services:
+      service1:
+        image: service1:image
+    steps:
+      - run: echo ok
+`
+		workflow, err := model.ReadWorkflow(strings.NewReader(yaml), true)
+		require.NoError(t, err)
+
+		rc := &RunContext{
+			Config: &Config{
+				ContainerNetworkMode: "host",
+			},
+			Run: &model.Run{
+				JobID:    "job",
+				Workflow: workflow,
+			},
+		}
+
+		rc.ensureNetworkName(t.Context())
+		assert.True(t, rc.getNetworkCreated(t.Context()))
+		assert.True(t, strings.HasPrefix(rc.getNetworkName(t.Context()), "WORKFLOW-"), rc.getNetworkName(t.Context()))
+	})
+
+	yaml := `
+on:
+  push:
+
+jobs:
+  job:
+    runs-on: docker
+    container:
+      image: some:image
+    steps:
+      - run: echo ok
+`
+	workflow, err := model.ReadWorkflow(strings.NewReader(yaml), true)
+	require.NoError(t, err)
+
+	run := &model.Run{
+		JobID:    "job",
+		Workflow: workflow,
+	}
+
+	t.Run("CreateNetworkIfEmptyNetworkMode", func(t *testing.T) {
+		rc := &RunContext{
+			Config: &Config{
+				ContainerNetworkMode: "",
+			},
+			Run: run,
+		}
+
+		rc.ensureNetworkName(t.Context())
+		assert.True(t, rc.getNetworkCreated(t.Context()))
+		assert.True(t, strings.HasPrefix(rc.getNetworkName(t.Context()), "WORKFLOW-"), rc.getNetworkName(t.Context()))
+	})
+
+	t.Run("FixedNetworkIfSetByNetworkMode", func(t *testing.T) {
+		rc := &RunContext{
+			Config: &Config{
+				ContainerNetworkMode: "host",
+			},
+			Run: run,
+		}
+
+		rc.ensureNetworkName(t.Context())
+		assert.False(t, rc.getNetworkCreated(t.Context()))
+		assert.Equal(t, "host", rc.getNetworkName(t.Context()))
+	})
+}
+
 func TestRunContext_SanitizeNetworkAlias(t *testing.T) {
 	same := "same"
 	assert.Equal(t, same, sanitizeNetworkAlias(t.Context(), same))
@@ -712,21 +794,16 @@ jobs:
 			},
 			inputs: []container.NewContainerInput{
 				{
-					Name:       "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
-					Image:      "some:image",
-					Username:   "containerusername",
-					Password:   "containerpassword",
-					Entrypoint: []string{"tail", "-f", "/dev/null"},
-					Cmd:        nil,
-					WorkingDir: "/my/workdir",
-					Env:        []string{},
-					ToolCache:  "/opt/hostedtoolcache",
-					Binds:      []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts: map[string]string{
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB":     "/my/workdir",
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env": "/var/run/act",
-					},
-					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
+					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
+					Image:          "some:image",
+					Username:       "containerusername",
+					Password:       "containerpassword",
+					Entrypoint:     []string{"tail", "-f", "/dev/null"},
+					Cmd:            nil,
+					WorkingDir:     "/my/workdir",
+					Env:            []string{},
+					ToolCache:      "/opt/hostedtoolcache",
+					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -735,11 +812,6 @@ jobs:
 					PortBindings:   nil,
 					ConfigOptions:  "",
 					JobOptions:     "",
-					ValidVolumes: []string{
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
-						"WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-env",
-						"/var/run/docker.sock",
-					},
 				},
 				{
 					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599-fe7f4c0058dbd2161ebe4aafa71cd83bd96ee19d3ca8043d5e4bc477a664a80c",
@@ -752,8 +824,6 @@ jobs:
 					Env:            []string{},
 					ToolCache:      "/opt/hostedtoolcache",
 					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts:         map[string]string{},
-					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -774,8 +844,6 @@ jobs:
 					Env:            []string{},
 					ToolCache:      "/opt/hostedtoolcache",
 					Binds:          []string{"/var/run/docker.sock:/var/run/docker.sock"},
-					Mounts:         map[string]string{},
-					NetworkMode:    "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB-job-network",
 					Privileged:     false,
 					UsernsMode:     "",
 					Platform:       "",
@@ -808,7 +876,24 @@ jobs:
 
 			require.NoError(t, rc.prepareJobContainer(ctx))
 			slices.SortFunc(containerInputs, func(a, b container.NewContainerInput) int { return cmp.Compare(a.Username, b.Username) })
+			jobContainerInput := containerInputs[0]
+			require.Equal(t, "containerusername", jobContainerInput.Username)
+			require.NotEmpty(t, jobContainerInput.NetworkMode)
+			for source := range jobContainerInput.Mounts {
+				assert.Contains(t, jobContainerInput.ValidVolumes, source)
+			}
 			for i := 0; i < len(containerInputs); i++ {
+
+				assert.Equal(t, jobContainerInput.NetworkMode, containerInputs[i].NetworkMode, containerInputs[i].Username)
+				containerInputs[i].NetworkMode = ""
+
+				if strings.HasPrefix(containerInputs[i].Username, "service") {
+					assert.Empty(t, containerInputs[i].Mounts)
+					assert.Empty(t, containerInputs[i].ValidVolumes)
+				}
+				containerInputs[i].Mounts = nil
+				containerInputs[i].ValidVolumes = nil
+
 				assert.EqualValues(t, testCase.inputs[i], containerInputs[i], containerInputs[i].Username)
 			}
 		})
@@ -854,4 +939,19 @@ func Test_waitForServiceContainer(t *testing.T) {
 		require.ErrorContains(t, waitForServiceContainer(ctx, m), "ERROR")
 		m.AssertExpectations(t)
 	})
+}
+
+func TestRunContext_ensureRandomName(t *testing.T) {
+	parent := &RunContext{
+		Name: "parentname",
+	}
+	rc := &RunContext{
+		Name:   "runname",
+		Parent: parent,
+	}
+
+	parent.ensureRandomName(t.Context())
+	assert.NotEmpty(t, parent.randomName)
+	rc.ensureRandomName(t.Context())
+	assert.Equal(t, parent.randomName, rc.randomName)
 }
