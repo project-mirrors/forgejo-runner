@@ -52,6 +52,7 @@ type RunContext struct {
 	Masks               []string
 	cleanUpJobContainer common.Executor
 	caller              *caller // job calling this RunContext (reusable workflows)
+	randomName          string
 	networkName         string
 	networkCreated      bool
 }
@@ -388,6 +389,25 @@ func (rc *RunContext) startHostEnvironment() common.Executor {
 		}))
 
 		return common.NewPipelineExecutor(executors...)(ctx)
+	}
+}
+
+func (rc *RunContext) ensureRandomName(ctx context.Context) {
+	if rc.randomName == "" {
+		logger := common.Logger(ctx)
+		if rc.Parent != nil {
+			// composite actions inherit their run context from the parent job
+			rootRunContext := rc
+			for rootRunContext.Parent != nil {
+				rootRunContext = rootRunContext.Parent
+			}
+			rootRunContext.ensureRandomName(ctx)
+			rc.randomName = rootRunContext.randomName
+			logger.Debugf("RunContext inherited random name %s from its parent", rc.Name, rc.randomName)
+		} else {
+			rc.randomName = common.MustRandName(16)
+			logger.Debugf("RunContext %s is assigned random name %s", rc.Name, rc.randomName)
+		}
 	}
 }
 

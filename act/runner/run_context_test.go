@@ -937,3 +937,18 @@ func Test_waitForServiceContainer(t *testing.T) {
 		m.AssertExpectations(t)
 	})
 }
+
+func TestRunContext_ensureRandomName(t *testing.T) {
+	parent := &RunContext{
+		Name: "parentname",
+	}
+	rc := &RunContext{
+		Name:   "runname",
+		Parent: parent,
+	}
+
+	parent.ensureRandomName(t.Context())
+	assert.NotEmpty(t, parent.randomName)
+	rc.ensureRandomName(t.Context())
+	assert.Equal(t, parent.randomName, rc.randomName)
+}
