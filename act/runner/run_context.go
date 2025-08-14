@@ -124,7 +124,7 @@ func getDockerDaemonSocketMountPath(daemonPath string) string {
 }
 
 // Returns the binds and mounts for the container, resolving paths as appopriate
-func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string, []string) {
+func (rc *RunContext) GetBindsAndMounts(ctx context.Context) ([]string, map[string]string, []string) {
 	name := rc.jobContainerName()
 
 	if rc.Config.ContainerDaemonSocket == "" {
@@ -443,7 +443,7 @@ func (rc *RunContext) prepareJobContainer(ctx context.Context) error {
 	envList = append(envList, fmt.Sprintf("%s=%s", "LANG", "C.UTF-8")) // Use same locale as GitHub Actions
 
 	ext := container.LinuxContainerEnvironmentExtensions{}
-	binds, mounts, validVolumes := rc.GetBindsAndMounts()
+	binds, mounts, validVolumes := rc.GetBindsAndMounts(ctx)
 
 	networkName, createAndDeleteNetwork := rc.getNetworkName(ctx)
 	// add service containers

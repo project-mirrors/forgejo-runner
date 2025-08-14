@@ -219,7 +219,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 					config := testcase.rc.Config
 					config.Workdir = testcase.name
 					config.BindWorkdir = bindWorkDir
-					gotbind, gotmount, _ := rctemplate.GetBindsAndMounts()
+					gotbind, gotmount, _ := rctemplate.GetBindsAndMounts(t.Context())
 
 					// Name binds/mounts are either/or
 					if config.BindWorkdir {
@@ -271,7 +271,7 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 				rc.Run.JobID = "job1"
 				rc.Run.Workflow.Jobs = map[string]*model.Job{"job1": job}
 
-				gotbind, gotmount, _ := rc.GetBindsAndMounts()
+				gotbind, gotmount, _ := rc.GetBindsAndMounts(t.Context())
 
 				if len(testcase.wantbind) > 0 {
 					assert.Contains(t, gotbind, testcase.wantbind)
