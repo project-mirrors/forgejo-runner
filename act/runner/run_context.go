@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -33,7 +34,7 @@ import (
 type RunContext struct {
 	Name                string
 	Config              *Config
-	Matrix              map[string]interface{}
+	Matrix              map[string]any
 	Run                 *model.Run
 	EventJSON           string
 	Env                 map[string]string
@@ -645,9 +646,7 @@ func (rc *RunContext) sh(ctx context.Context, script string) (stdout, stderr str
 	herr := &bytes.Buffer{}
 
 	env := map[string]string{}
-	for k, v := range rc.Env {
-		env[k] = v
-	}
+	maps.Copy(env, rc.Env)
 
 	base := common.MustRandName(8)
 	name := base + ".sh"
@@ -912,7 +911,7 @@ func (rc *RunContext) closeContainer() common.Executor {
 	}
 }
 
-func (rc *RunContext) matrix() map[string]interface{} {
+func (rc *RunContext) matrix() map[string]any {
 	return rc.Matrix
 }
 
@@ -1056,12 +1055,10 @@ func (rc *RunContext) isEnabled(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-func mergeMaps(maps ...map[string]string) map[string]string {
+func mergeMaps(args ...map[string]string) map[string]string {
 	rtnMap := make(map[string]string)
-	for _, m := range maps {
-		for k, v := range m {
-			rtnMap[k] = v
-		}
+	for _, m := range args {
+		maps.Copy(rtnMap, m)
 	}
 	return rtnMap
 }
@@ -1126,7 +1123,7 @@ func (rc *RunContext) getStepsContext() map[string]*model.StepResult {
 func (rc *RunContext) getGithubContext(ctx context.Context) *model.GithubContext {
 	logger := common.Logger(ctx)
 	ghc := &model.GithubContext{
-		Event:            make(map[string]interface{}),
+		Event:            make(map[string]any),
 		Workflow:         rc.Run.Workflow.Name,
 		RunAttempt:       rc.Config.Env["GITHUB_RUN_ATTEMPT"],
 		RunID:            rc.Config.Env["GITHUB_RUN_ID"],
@@ -1294,7 +1291,7 @@ func isLocalCheckout(ghc *model.GithubContext, step *model.Step) bool {
 	return true
 }
 
-func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) {
+func nestedMapLookup(m map[string]any, ks ...string) (rval any) {
 	var ok bool
 
 	if len(ks) == 0 { // degenerate input
@@ -1304,7 +1301,7 @@ func nestedMapLookup(m map[string]interface{}, ks ...string) (rval interface{}) 
 		return nil
 	} else if len(ks) == 1 { // we've reached the final key
 		return rval
-	} else if m, ok = rval.(map[string]interface{}); !ok {
+	} else if m, ok = rval.(map[string]any); !ok {
 		return nil
 	}
 	// 1+ more keys

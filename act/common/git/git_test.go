@@ -166,8 +166,6 @@ func TestGitFindRef(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
-		name := name
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(basedir, name)
 			require.NoError(t, os.MkdirAll(dir, 0o755))

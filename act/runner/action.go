@@ -286,8 +286,8 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, basedir stri
 	var prepImage common.Executor
 	var image string
 	forcePull := false
-	if strings.HasPrefix(action.Runs.Image, "docker://") {
-		image = strings.TrimPrefix(action.Runs.Image, "docker://")
+	if after, ok := strings.CutPrefix(action.Runs.Image, "docker://"); ok {
+		image = after
 		// Apply forcePull only for prebuild docker images
 		forcePull = rc.Config.ForcePull
 	} else {

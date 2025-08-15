@@ -81,7 +81,7 @@ type Job struct {
 	Defaults       Defaults                  `yaml:"defaults,omitempty"`
 	Outputs        map[string]string         `yaml:"outputs,omitempty"`
 	Uses           string                    `yaml:"uses,omitempty"`
-	With           map[string]interface{}    `yaml:"with,omitempty"`
+	With           map[string]any            `yaml:"with,omitempty"`
 	RawSecrets     yaml.Node                 `yaml:"secrets,omitempty"`
 	RawConcurrency *model.RawConcurrency     `yaml:"concurrency,omitempty"`
 }
@@ -284,7 +284,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 			{Name: val},
 		}, nil
 	case yaml.SequenceNode:
-		var val []interface{}
+		var val []any
 		err := rawOn.Decode(&val)
 		if err != nil {
 			return nil, err
@@ -300,7 +300,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 		}
 		return res, nil
 	case yaml.MappingNode:
-		events, triggers, err := parseMappingNode[interface{}](rawOn)
+		events, triggers, err := parseMappingNode[any](rawOn)
 		if err != nil {
 			return nil, err
 		}
@@ -325,7 +325,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 					Name: k,
 					acts: map[string][]string{},
 				})
-			case map[string]interface{}:
+			case map[string]any:
 				acts := make(map[string][]string, len(t))
 				for act, branches := range t {
 					switch b := branches.(type) {
@@ -333,7 +333,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 						acts[act] = []string{b}
 					case []string:
 						acts[act] = b
-					case []interface{}:
+					case []any:
 						acts[act] = make([]string, len(b))
 						for i, v := range b {
 							var ok bool
@@ -341,7 +341,7 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 								return nil, fmt.Errorf("unknown on type: %#v", branches)
 							}
 						}
-					case map[string]interface{}:
+					case map[string]any:
 						if isInvalidOnType(k, act) {
 							return nil, fmt.Errorf("unknown on type: %#v", v)
 						}
@@ -356,13 +356,13 @@ func ParseRawOn(rawOn *yaml.Node) ([]*Event, error) {
 					Name: k,
 					acts: acts,
 				})
-			case []interface{}:
+			case []any:
 				if k != "schedule" {
 					return nil, fmt.Errorf("unknown on type: %#v", v)
 				}
 				schedules := make([]map[string]string, len(t))
 				for i, tt := range t {
-					vv, ok := tt.(map[string]interface{})
+					vv, ok := tt.(map[string]any)
 					if !ok {
 						return nil, fmt.Errorf("unknown on type: %#v", v)
 					}
@@ -431,7 +431,7 @@ func parseMappingNode[T any](node *yaml.Node) ([]string, []T, error) {
 	return scalars, datas, nil
 }
 
-func asString(v interface{}) string {
+func asString(v any) string {
 	if v == nil {
 		return ""
 	} else if s, ok := v.(string); ok {

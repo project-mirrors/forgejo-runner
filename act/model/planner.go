@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -286,11 +286,8 @@ func (wp *workflowPlanner) GetEvents() []string {
 	for _, w := range wp.workflows {
 		found := false
 		for _, e := range events {
-			for _, we := range w.On() {
-				if e == we {
-					found = true
-					break
-				}
+			if slices.Contains(w.On(), e) {
+				found = true
 			}
 			if found {
 				break
@@ -303,9 +300,7 @@ func (wp *workflowPlanner) GetEvents() []string {
 	}
 
 	// sort the list based on depth of dependencies
-	sort.Slice(events, func(i, j int) bool {
-		return events[i] < events[j]
-	})
+	slices.Sort(events)
 
 	return events
 }
@@ -336,7 +331,7 @@ func (s *Stage) GetJobIDs() []string {
 // Merge stages with existing stages in plan
 func (p *Plan) mergeStages(stages []*Stage) {
 	newStages := make([]*Stage, int(math.Max(float64(len(p.Stages)), float64(len(stages)))))
-	for i := 0; i < len(newStages); i++ {
+	for i := range newStages {
 		newStages[i] = new(Stage)
 		if i >= len(p.Stages) {
 			newStages[i].Runs = append(newStages[i].Runs, stages[i].Runs...)

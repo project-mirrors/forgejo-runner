@@ -178,7 +178,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 					}
 				}
 
-				var matrixes []map[string]interface{}
+				var matrixes []map[string]any
 				if m, err := job.GetMatrixes(); err != nil {
 					log.Errorf("Error while get job's matrix: %v", err)
 				} else {
@@ -198,7 +198,6 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 				}
 
 				for i, matrix := range matrixes {
-					matrix := matrix
 					rc := runner.newRunContext(ctx, run, matrix)
 					rc.JobName = rc.Name
 					if len(matrixes) > 1 {
@@ -219,10 +218,7 @@ func (runner *runnerImpl) NewPlanExecutor(plan *model.Plan) common.Executor {
 				}
 				pipeline = append(pipeline, common.NewParallelExecutor(maxParallel, stageExecutor...))
 			}
-			ncpu := runtime.NumCPU()
-			if 1 > ncpu {
-				ncpu = 1
-			}
+			ncpu := max(1, runtime.NumCPU())
 			log.Debugf("Detected CPUs: %d", ncpu)
 			return common.NewParallelExecutor(ncpu, pipeline...)(ctx)
 		})
@@ -244,8 +240,8 @@ func handleFailure(plan *model.Plan) common.Executor {
 	}
 }
 
-func selectMatrixes(originalMatrixes []map[string]interface{}, targetMatrixValues map[string]map[string]bool) []map[string]interface{} {
-	matrixes := make([]map[string]interface{}, 0)
+func selectMatrixes(originalMatrixes []map[string]any, targetMatrixValues map[string]map[string]bool) []map[string]any {
+	matrixes := make([]map[string]any, 0)
 	for _, original := range originalMatrixes {
 		flag := true
 		for key, val := range original {
@@ -263,7 +259,7 @@ func selectMatrixes(originalMatrixes []map[string]interface{}, targetMatrixValue
 	return matrixes
 }
 
-func (runner *runnerImpl) newRunContext(ctx context.Context, run *model.Run, matrix map[string]interface{}) *RunContext {
+func (runner *runnerImpl) newRunContext(ctx context.Context, run *model.Run, matrix map[string]any) *RunContext {
 	rc := &RunContext{
 		Config:      runner.config,
 		Run:         run,

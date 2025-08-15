@@ -7,6 +7,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -101,9 +102,7 @@ func readEnvs(path string, envs map[string]string) bool {
 		if err != nil {
 			log.Fatalf("Error loading from %s: %v", path, err)
 		}
-		for k, v := range env {
-			envs[k] = v
-		}
+		maps.Copy(envs, env)
 		return true
 	}
 	return false

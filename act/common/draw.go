@@ -127,11 +127,8 @@ func (p *Pen) DrawBoxes(labels ...string) *Drawing {
 
 // Draw to writer
 func (d *Drawing) Draw(writer io.Writer, centerOnWidth int) {
-	padSize := (centerOnWidth - d.GetWidth()) / 2
-	if padSize < 0 {
-		padSize = 0
-	}
-	for _, l := range strings.Split(d.buf.String(), "\n") {
+	padSize := max((centerOnWidth-d.GetWidth())/2, 0)
+	for l := range strings.SplitSeq(d.buf.String(), "\n") {
 		if len(l) > 0 {
 			padding := strings.Repeat(" ", padSize)
 			fmt.Fprintf(writer, "%s%s\n", padding, l)

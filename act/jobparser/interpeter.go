@@ -12,13 +12,13 @@ import (
 func NewInterpeter(
 	jobID string,
 	job *model.Job,
-	matrix map[string]interface{},
+	matrix map[string]any,
 	gitCtx *model.GithubContext,
 	results map[string]*JobResult,
 	vars map[string]string,
-	inputs map[string]interface{},
+	inputs map[string]any,
 ) exprparser.Interpreter {
-	strategy := make(map[string]interface{})
+	strategy := make(map[string]any)
 	if job.Strategy != nil {
 		strategy["fail-fast"] = job.Strategy.FailFast
 		strategy["max-parallel"] = job.Strategy.MaxParallel

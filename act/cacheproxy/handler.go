@@ -166,7 +166,7 @@ func (h *Handler) ExternalURL() string {
 // The RunData contains the information about the repository.
 // The function returns the 32-bit random key which the run will use to identify itself.
 func (h *Handler) AddRun(data RunData) (string, error) {
-	for retries := 0; retries < 3; retries++ {
+	for range 3 {
 		key := common.MustRandName(4)
 		_, loaded := h.runs.LoadOrStore(key, data)
 		if !loaded {

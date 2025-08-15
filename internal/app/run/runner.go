@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -66,9 +67,7 @@ func NewRunner(cfg *config.Config, reg *config.Registration, cli client.Client) 
 	cfg.Runner.Envs["GITHUB_SERVER_URL"] = reg.Address
 
 	envs := make(map[string]string, len(cfg.Runner.Envs))
-	for k, v := range cfg.Runner.Envs {
-		envs[k] = v
-	}
+	maps.Copy(envs, cfg.Runner.Envs)
 
 	var cacheProxy *cacheproxy.Handler
 	if cfg.Cache.Enabled == nil || *cfg.Cache.Enabled {
@@ -193,7 +192,7 @@ func explainFailedGenerateWorkflow(task *runnerv1.Task, log func(message string,
 		log("%5d: %s", n+1, line)
 	}
 	log("Errors were found and although they tend to be cryptic the line number they refer to gives a hint as to where the problem might be.")
-	for _, line := range strings.Split(err.Error(), "\n") {
+	for line := range strings.SplitSeq(err.Error(), "\n") {
 		log("%s", line)
 	}
 	return fmt.Errorf("the workflow file is not usable")
@@ -259,9 +258,7 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 
 	// Clone the runner default envs into a local envs map
 	runEnvs := make(map[string]string)
-	for id, v := range r.envs {
-		runEnvs[id] = v
-	}
+	maps.Copy(runEnvs, r.envs)
 
 	runtimeToken := client.BackwardCompatibleContext(task, "runtime_token")
 	if runtimeToken == "" {

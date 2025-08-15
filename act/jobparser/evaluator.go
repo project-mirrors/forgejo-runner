@@ -19,7 +19,7 @@ func NewExpressionEvaluator(interpreter exprparser.Interpreter) *ExpressionEvalu
 	return &ExpressionEvaluator{interpreter: interpreter}
 }
 
-func (ee ExpressionEvaluator) evaluate(in string, defaultStatusCheck exprparser.DefaultStatusCheck) (interface{}, error) {
+func (ee ExpressionEvaluator) evaluate(in string, defaultStatusCheck exprparser.DefaultStatusCheck) (any, error) {
 	evaluated, err := ee.interpreter.Evaluate(in, defaultStatusCheck)
 
 	return evaluated, err

@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"maps"
 	"runtime"
 	"strings"
 
@@ -186,9 +187,7 @@ func (sr *stepRun) setupShell(ctx context.Context) {
 			}
 			step.Shell = shellWithFallback[0]
 			lenv := &localEnv{env: map[string]string{}}
-			for k, v := range sr.env {
-				lenv.env[k] = v
-			}
+			maps.Copy(lenv.env, sr.env)
 			sr.getRunContext().ApplyExtraPath(ctx, &lenv.env)
 			_, err := lookpath.LookPath2(shellWithFallback[0], lenv)
 			if err != nil {

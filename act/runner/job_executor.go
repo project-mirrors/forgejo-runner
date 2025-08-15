@@ -11,7 +11,7 @@ import (
 )
 
 type jobInfo interface {
-	matrix() map[string]interface{}
+	matrix() map[string]any
 	steps() []*model.Step
 	startContainer() common.Executor
 	stopContainer() common.Executor
@@ -56,7 +56,6 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 	})
 
 	for i, stepModel := range infoSteps {
-		stepModel := stepModel
 		if stepModel == nil {
 			return func(ctx context.Context) error {
 				return fmt.Errorf("invalid Step %v: missing run or uses key", i)

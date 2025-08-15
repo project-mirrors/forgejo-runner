@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"path"
 	"strconv"
 	"strings"
@@ -316,11 +317,9 @@ func mergeIntoMap(step step, target *map[string]string, maps ...map[string]strin
 	}
 }
 
-func mergeIntoMapCaseSensitive(target map[string]string, maps ...map[string]string) {
-	for _, m := range maps {
-		for k, v := range m {
-			target[k] = v
-		}
+func mergeIntoMapCaseSensitive(target map[string]string, args ...map[string]string) {
+	for _, m := range args {
+		maps.Copy(target, m)
 	}
 }
 
