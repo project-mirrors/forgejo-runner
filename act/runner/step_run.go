@@ -94,6 +94,28 @@ func getScriptName(rc *RunContext, step *model.Step) string {
 	return fmt.Sprintf("workflow/%s", scriptName)
 }
 
+func shellCommand(shell string) string {
+	// Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L9-L17
+	switch shell {
+	case "", "bash":
+		return "bash --noprofile --norc -e -o pipefail {0}"
+	case "pwsh":
+		return "pwsh -command . '{0}'"
+	case "python":
+		return "python {0}"
+	case "sh":
+		return "sh -e {0}"
+	case "cmd":
+		return "cmd /D /E:ON /V:OFF /S /C \"CALL \"{0}\"\""
+	case "powershell":
+		return "powershell -command . '{0}'"
+	case "node":
+		return "node {0}"
+	default:
+		return shell
+	}
+}
+
 // TODO: Currently we just ignore top level keys, BUT we should return proper error on them
 // BUTx2 I leave this for when we rewrite act to use actionlint for workflow validation
 // so we return proper errors before any execution or spawning containers
@@ -101,22 +123,21 @@ func getScriptName(rc *RunContext, step *model.Step) string {
 // OCI runtime exec failed: exec failed: container_linux.go:380: starting container process caused: exec: "${{": executable file not found in $PATH: unknown
 func (sr *stepRun) setupShellCommand(ctx context.Context) (name, script string, err error) {
 	logger := common.Logger(ctx)
-	sr.setupShell(ctx)
+	shell := sr.interpretShell(ctx)
 	sr.setupWorkingDirectory(ctx)
 
 	step := sr.Step
 
 	script = sr.RunContext.NewStepExpressionEvaluator(ctx, sr).Interpolate(ctx, step.Run)
 
-	scCmd := step.ShellCommand()
-
+	shellCommand := shellCommand(shell)
 	name = getScriptName(sr.RunContext, step)
 
 	// Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L47-L64
 	// Reference: https://github.com/actions/runner/blob/8109c962f09d9acc473d92c595ff43afceddb347/src/Runner.Worker/Handlers/ScriptHandlerHelpers.cs#L19-L27
 	runPrepend := ""
 	runAppend := ""
-	switch step.Shell {
+	switch shell {
 	case "bash", "sh":
 		name += ".sh"
 	case "pwsh", "powershell":
@@ -142,7 +163,7 @@ func (sr *stepRun) setupShellCommand(ctx context.Context) (name, script string, 
 
 	rc := sr.getRunContext()
 	scriptPath := fmt.Sprintf("%s/%s", rc.JobContainer.GetActPath(), name)
-	sr.cmdline = strings.Replace(scCmd, `{0}`, scriptPath, 1)
+	sr.cmdline = strings.Replace(shellCommand, `{0}`, scriptPath, 1)
 	sr.cmd, err = shellquote.Split(sr.cmdline)
 
 	return name, script, err
@@ -164,34 +185,34 @@ func (l *localEnv) Getenv(name string) string {
 	return l.env[name]
 }
 
-func (sr *stepRun) setupShell(ctx context.Context) {
+func (sr *stepRun) interpretShell(ctx context.Context) string {
 	rc := sr.RunContext
-	step := sr.Step
+	shell := sr.Step.RawShell
 
-	if step.Shell == "" {
-		step.Shell = rc.Run.Job().Defaults.Run.Shell
+	if shell == "" {
+		shell = rc.Run.Job().Defaults.Run.Shell
 	}
 
-	step.Shell = rc.NewExpressionEvaluator(ctx).Interpolate(ctx, step.Shell)
+	shell = rc.NewExpressionEvaluator(ctx).Interpolate(ctx, shell)
 
-	if step.Shell == "" {
-		step.Shell = rc.Run.Workflow.Defaults.Run.Shell
+	if shell == "" {
+		shell = rc.Run.Workflow.Defaults.Run.Shell
 	}
 
-	if step.Shell == "" {
+	if shell == "" {
 		if _, ok := rc.JobContainer.(*container.HostEnvironment); ok {
 			shellWithFallback := []string{"bash", "sh"}
 			// Don't use bash on windows by default, if not using a docker container
 			if runtime.GOOS == "windows" {
 				shellWithFallback = []string{"pwsh", "powershell"}
 			}
-			step.Shell = shellWithFallback[0]
+			shell = shellWithFallback[0]
 			lenv := &localEnv{env: map[string]string{}}
 			maps.Copy(lenv.env, sr.env)
 			sr.getRunContext().ApplyExtraPath(ctx, &lenv.env)
 			_, err := lookpath.LookPath2(shellWithFallback[0], lenv)
 			if err != nil {
-				step.Shell = shellWithFallback[1]
+				shell = shellWithFallback[1]
 			}
 		} else {
 			shellFallback := `
@@ -204,11 +225,13 @@ fi
 			stdout, _, err := rc.sh(ctx, shellFallback)
 			if err != nil {
 				common.Logger(ctx).Error("fail to run %q: %v", shellFallback, err)
-				return
+			} else {
+				shell = stdout
 			}
-			step.Shell = stdout
 		}
 	}
+
+	return shell
 }
 
 func (sr *stepRun) setupWorkingDirectory(ctx context.Context) {
