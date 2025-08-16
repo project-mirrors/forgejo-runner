@@ -788,7 +788,7 @@ jobs:
 			},
 			inputs: []container.NewContainerInput{
 				{
-					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855_JOB",
+					Name:           "WORKFLOW-8a5edab282632443219e051e4ade2d1d5bbc671c781051bf1437897cbdfea0f1_JOB",
 					Image:          "some:image",
 					Username:       "containerusername",
 					Password:       "containerpassword",
@@ -808,7 +808,7 @@ jobs:
 					JobOptions:     "",
 				},
 				{
-					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599-fe7f4c0058dbd2161ebe4aafa71cd83bd96ee19d3ca8043d5e4bc477a664a80c",
+					Name:           "WORKFLOW-8a5edab282632443219e051e4ade2d1d5bbc671c781051bf143789-d083efaebdcab24d231fa091b85dbb8768b47136582b340132c197d9cb5e7430",
 					Image:          "service1:image",
 					Username:       "service1username",
 					Password:       "service1password",
@@ -828,7 +828,7 @@ jobs:
 					JobOptions:     "",
 				},
 				{
-					Name:           "WORKFLOW-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599-c233cf913e1d0c90cc1404ee09917e625f9cb82156ca3d7cb10b729d563728ea",
+					Name:           "WORKFLOW-8a5edab282632443219e051e4ade2d1d5bbc671c781051bf143789-4c44cd5731ec445ebe33780a3e39ed5e20e80f8a697a6e34c7acdd3675e631a8",
 					Image:          "service2:image",
 					Username:       "service2username",
 					Password:       "service2password",

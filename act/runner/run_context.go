@@ -98,7 +98,7 @@ func (rc *RunContext) GetEnv() map[string]string {
 }
 
 func (rc *RunContext) jobContainerName() string {
-	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+common.Sha256(rc.Run.Workflow.Name), "JOB-"+rc.Name)
+	return createSimpleContainerName(rc.Config.ContainerNamePrefix, "WORKFLOW-"+common.Sha256(rc.String()), "JOB-"+rc.Name)
 }
 
 func getDockerDaemonSocketMountPath(daemonPath string) string {
