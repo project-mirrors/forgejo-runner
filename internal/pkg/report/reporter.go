@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"code.forgejo.org/forgejo/runner/v9/internal/pkg/client"
+	"code.forgejo.org/forgejo/runner/v9/internal/pkg/common"
 )
 
 var (
@@ -61,7 +62,10 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, c client.Client
 	}
 
 	rv := &Reporter{
-		ctx:            ctx,
+		// ctx & cancel are related: the daemon context allows the reporter
+		// to continue to operate even after the context is canceled, to
+		// conclude the converation
+		ctx:            common.DaemonContext(ctx),
 		cancel:         cancel,
 		client:         c,
 		masker:         masker,
