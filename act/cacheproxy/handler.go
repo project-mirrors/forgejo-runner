@@ -51,15 +51,17 @@ type RunData struct {
 	RunNumber          string
 	Timestamp          string
 	RepositoryMAC      string
+	WriteIsolationKey  string
 }
 
-func (h *Handler) CreateRunData(fullName, runNumber, timestamp string) RunData {
+func (h *Handler) CreateRunData(fullName, runNumber, timestamp, writeIsolationKey string) RunData {
 	mac := computeMac(h.cacheSecret, fullName, runNumber, timestamp)
 	return RunData{
 		RepositoryFullName: fullName,
 		RunNumber:          runNumber,
 		Timestamp:          timestamp,
 		RepositoryMAC:      mac,
+		WriteIsolationKey:  writeIsolationKey,
 	}
 }
 
@@ -152,6 +154,9 @@ func (h *Handler) newReverseProxy(targetHost string) (*httputil.ReverseProxy, er
 			r.Out.Header.Set("Forgejo-Cache-Timestamp", runData.Timestamp)
 			r.Out.Header.Set("Forgejo-Cache-MAC", runData.RepositoryMAC)
 			r.Out.Header.Set("Forgejo-Cache-Host", h.ExternalURL())
+			if runData.WriteIsolationKey != "" {
+				r.Out.Header.Set("Forgejo-Cache-WriteIsolationKey", runData.WriteIsolationKey)
+			}
 		},
 	}
 	return proxy, nil

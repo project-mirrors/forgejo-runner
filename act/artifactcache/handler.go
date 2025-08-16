@@ -181,10 +181,18 @@ func (h *Handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 	}
 	defer db.Close()
 
-	cache, err := findCache(db, repo, keys, version)
+	cache, err := findCache(db, repo, keys, version, rundata.WriteIsolationKey)
 	if err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
+	}
+	// If read was scoped to WriteIsolationKey and didn't find anything, we can fallback to the non-isolated cache read
+	if cache == nil && rundata.WriteIsolationKey != "" {
+		cache, err = findCache(db, repo, keys, version, "")
+		if err != nil {
+			h.responseJSON(w, r, 500, err)
+			return
+		}
 	}
 	if cache == nil {
 		h.responseJSON(w, r, 204)
@@ -236,6 +244,7 @@ func (h *Handler) reserve(w http.ResponseWriter, r *http.Request, params httprou
 	cache.CreatedAt = now
 	cache.UsedAt = now
 	cache.Repo = repo
+	cache.WriteIsolationKey = rundata.WriteIsolationKey
 	if err := insertCache(db, cache); err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
@@ -273,6 +282,10 @@ func (h *Handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 	// Should not happen
 	if cache.Repo != repo {
 		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
+		return
+	}
+	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
+		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
 	}
 
@@ -324,6 +337,10 @@ func (h *Handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 	// Should not happen
 	if cache.Repo != repo {
 		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
+		return
+	}
+	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
+		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
 	}
 
@@ -386,6 +403,11 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
 		return
 	}
+	// reads permitted against caches w/ the same isolation key, or no isolation key
+	if cache.WriteIsolationKey != rundata.WriteIsolationKey && cache.WriteIsolationKey != "" {
+		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
+		return
+	}
 
 	if err := h.useCache(id); err != nil {
 		h.responseJSON(w, r, 500, fmt.Errorf("cache useCache: %w", err))
@@ -417,7 +439,7 @@ func (h *Handler) middleware(handler httprouter.Handle) httprouter.Handle {
 }
 
 // if not found, return (nil, nil) instead of an error.
-func findCache(db *bolthold.Store, repo string, keys []string, version string) (*Cache, error) {
+func findCache(db *bolthold.Store, repo string, keys []string, version, writeIsolationKey string) (*Cache, error) {
 	cache := &Cache{}
 	for _, prefix := range keys {
 		// if a key in the list matches exactly, don't return partial matches
@@ -425,6 +447,7 @@ func findCache(db *bolthold.Store, repo string, keys []string, version string) (
 			bolthold.Where("Repo").Eq(repo).Index("Repo").
 				And("Key").Eq(prefix).
 				And("Version").Eq(version).
+				And("WriteIsolationKey").Eq(writeIsolationKey).
 				And("Complete").Eq(true).
 				SortBy("CreatedAt").Reverse()); err == nil || !errors.Is(err, bolthold.ErrNotFound) {
 			if err != nil {
@@ -441,6 +464,7 @@ func findCache(db *bolthold.Store, repo string, keys []string, version string) (
 			bolthold.Where("Repo").Eq(repo).Index("Repo").
 				And("Key").RegExp(re).
 				And("Version").Eq(version).
+				And("WriteIsolationKey").Eq(writeIsolationKey).
 				And("Complete").Eq(true).
 				SortBy("CreatedAt").Reverse()); err != nil {
 			if errors.Is(err, bolthold.ErrNotFound) {
@@ -644,5 +668,6 @@ func runDataFromHeaders(r *http.Request) cacheproxy.RunData {
 		RunNumber:          r.Header.Get("Forgejo-Cache-RunNumber"),
 		Timestamp:          r.Header.Get("Forgejo-Cache-Timestamp"),
 		RepositoryMAC:      r.Header.Get("Forgejo-Cache-MAC"),
+		WriteIsolationKey:  r.Header.Get("Forgejo-Cache-WriteIsolationKey"),
 	}
 }
