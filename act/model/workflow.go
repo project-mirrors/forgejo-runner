@@ -339,14 +339,21 @@ func (j *Job) Needs() []string {
 
 // RunsOn list for Job
 func (j *Job) RunsOn() []string {
-	switch j.RawRunsOn.Kind {
+	return FlattenRunsOnNode(j.RawRunsOn)
+}
+
+// Given an already expression-evaluated `runs-on` yaml node from a job, compute all the labels that will be run for a
+// job. Can be a single string label, an array of labels, or an object { group: "...", labels: [...] };
+// FlattenRunsOnNode will flatten all the options down to a []string.
+func FlattenRunsOnNode(runsOn yaml.Node) []string {
+	switch runsOn.Kind {
 	case yaml.MappingNode:
 		var val struct {
 			Group  string
 			Labels yaml.Node
 		}
 
-		if !decodeNode(j.RawRunsOn, &val) {
+		if !decodeNode(runsOn, &val) {
 			return nil
 		}
 
@@ -358,7 +365,7 @@ func (j *Job) RunsOn() []string {
 
 		return labels
 	default:
-		return nodeAsStringSlice(j.RawRunsOn)
+		return nodeAsStringSlice(runsOn)
 	}
 }
 
