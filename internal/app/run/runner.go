@@ -170,11 +170,7 @@ func (r *Runner) Run(ctx context.Context, task *runnerv1.Task) error {
 	reporter := report.NewReporter(ctx, cancel, r.client, task, r.cfg.Runner.ReportInterval)
 	var runErr error
 	defer func() {
-		lastWords := ""
-		if runErr != nil {
-			lastWords = runErr.Error()
-		}
-		_ = reporter.Close(lastWords)
+		_ = reporter.Close(runErr)
 	}()
 	reporter.RunDaemon()
 	runErr = r.run(ctx, task, reporter)
