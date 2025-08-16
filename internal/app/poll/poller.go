@@ -42,14 +42,14 @@ type poller struct {
 	done chan any
 }
 
-func New(cfg *config.Config, client client.Client, runner run.RunnerInterface) Poller {
-	return (&poller{}).init(cfg, client, runner)
+func New(ctx context.Context, cfg *config.Config, client client.Client, runner run.RunnerInterface) Poller {
+	return (&poller{}).init(ctx, cfg, client, runner)
 }
 
-func (p *poller) init(cfg *config.Config, client client.Client, runner run.RunnerInterface) Poller {
-	pollingCtx, shutdownPolling := context.WithCancel(context.Background())
+func (p *poller) init(ctx context.Context, cfg *config.Config, client client.Client, runner run.RunnerInterface) Poller {
+	pollingCtx, shutdownPolling := context.WithCancel(ctx)
 
-	jobsCtx, shutdownJobs := context.WithCancel(context.Background())
+	jobsCtx, shutdownJobs := context.WithCancel(ctx)
 
 	done := make(chan any)
 

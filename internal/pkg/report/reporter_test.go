@@ -21,6 +21,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"code.forgejo.org/forgejo/runner/v9/internal/pkg/client/mocks"
+	"code.forgejo.org/forgejo/runner/v9/internal/pkg/common"
 	"code.forgejo.org/forgejo/runner/v9/testutils"
 )
 
@@ -51,11 +52,11 @@ func mockReporter(t *testing.T) (*Reporter, *mocks.Client, func()) {
 	ctx, cancel := context.WithCancel(context.Background())
 	taskCtx, err := structpb.NewStruct(map[string]any{})
 	require.NoError(t, err)
-	reporter := NewReporter(ctx, cancel, client, &runnerv1.Task{
+	reporter := NewReporter(common.WithDaemonContext(ctx, t.Context()), cancel, client, &runnerv1.Task{
 		Context: taskCtx,
 	}, time.Second)
 	close := func() {
-		assert.NoError(t, reporter.Close(""))
+		assert.NoError(t, reporter.Close(nil))
 	}
 	return reporter, client, close
 }
@@ -404,6 +405,95 @@ func TestReporterReportLog(t *testing.T) {
 				assert.Equal(t, len(rows), len(reporter.logRows))
 				assert.Equal(t, 0, reporter.logOffset)
 			}
+		})
+	}
+}
+
+func TestReporterClose(t *testing.T) {
+	mockReporterCloser := func(message *string, result *runnerv1.Result) *Reporter {
+		reporter, client, _ := mockReporter(t)
+		if message != nil {
+			client.On("UpdateLog", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateLogRequest]) (*connect_go.Response[runnerv1.UpdateLogResponse], error) {
+				t.Logf("UpdateLogRequest: %s", req.Msg.String())
+				assert.Equal(t, (*message)+"\n", rowsToString(req.Msg.Rows))
+				resp := &runnerv1.UpdateLogResponse{
+					AckIndex: req.Msg.Index + 1,
+				}
+				t.Logf("UpdateLogResponse: %s", resp.String())
+				return connect_go.NewResponse(resp), nil
+			})
+		}
+
+		if result != nil {
+			client.On("UpdateTask", mock.Anything, mock.Anything).Return(func(_ context.Context, req *connect_go.Request[runnerv1.UpdateTaskRequest]) (*connect_go.Response[runnerv1.UpdateTaskResponse], error) {
+				t.Logf("Received UpdateTask: %s", req.Msg.String())
+				assert.Equal(t, result.String(), req.Msg.State.Result.String())
+				return connect_go.NewResponse(&runnerv1.UpdateTaskResponse{}), nil
+			})
+		}
+		return reporter
+	}
+
+	for _, testCase := range []struct {
+		name            string
+		err             error
+		expectedMessage string
+		result          runnerv1.Result
+		expectedResult  runnerv1.Result
+	}{
+		{
+			name:            "ResultSuccessAndNilErrorIsResultSuccess",
+			err:             nil,
+			expectedMessage: "",
+			result:          runnerv1.Result_RESULT_SUCCESS,
+			expectedResult:  runnerv1.Result_RESULT_SUCCESS,
+		},
+		{
+			name:            "ResultUnspecifiedAndErrorIsResultFailure",
+			err:             errors.New("ERROR_MESSAGE"),
+			expectedMessage: "ERROR_MESSAGE",
+			result:          runnerv1.Result_RESULT_UNSPECIFIED,
+			expectedResult:  runnerv1.Result_RESULT_FAILURE,
+		},
+		{
+			name:            "ResultUnspecifiedAndNilErrorIsResultFailure",
+			err:             nil,
+			expectedMessage: closeCancelledMessage,
+			result:          runnerv1.Result_RESULT_UNSPECIFIED,
+			expectedResult:  runnerv1.Result_RESULT_FAILURE,
+		},
+		{
+			name:            "ResultSuccessAndErrorIsResultFailure",
+			err:             errors.New("ERROR_MESSAGE"),
+			expectedMessage: "ERROR_MESSAGE",
+			result:          runnerv1.Result_RESULT_SUCCESS,
+			expectedResult:  runnerv1.Result_RESULT_FAILURE,
+		},
+		{
+			name:            "Timeout",
+			err:             context.DeadlineExceeded,
+			expectedMessage: closeTimeoutMessage,
+			result:          runnerv1.Result_RESULT_UNSPECIFIED,
+			expectedResult:  runnerv1.Result_RESULT_CANCELLED,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			var message *string
+			if testCase.expectedMessage != "" {
+				message = &testCase.expectedMessage
+			}
+			reporter := mockReporterCloser(message, &testCase.expectedResult)
+
+			// cancel() verifies Close can operate after the context is cancelled
+			// because it uses the daemon context instead
+			reporter.cancel()
+			reporter.state.Result = testCase.result
+			reporter.state.Steps = []*runnerv1.StepState{
+				{
+					Result: runnerv1.Result_RESULT_UNSPECIFIED,
+				},
+			}
+			require.NoError(t, reporter.Close(testCase.err))
 		})
 	}
 }

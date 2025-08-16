@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"code.forgejo.org/forgejo/runner/v9/internal/pkg/client"
+	"code.forgejo.org/forgejo/runner/v9/internal/pkg/common"
 )
 
 var (
@@ -61,7 +62,10 @@ func NewReporter(ctx context.Context, cancel context.CancelFunc, c client.Client
 	}
 
 	rv := &Reporter{
-		ctx:            ctx,
+		// ctx & cancel are related: the daemon context allows the reporter
+		// to continue to operate even after the context is canceled, to
+		// conclude the converation
+		ctx:            common.DaemonContext(ctx),
 		cancel:         cancel,
 		client:         c,
 		masker:         masker,
@@ -232,13 +236,24 @@ func (r *Reporter) SetOutputs(outputs map[string]string) error {
 	return errors.Join(errs...)
 }
 
-func (r *Reporter) Close(lastWords string) error {
+const (
+	closeTimeoutMessage   = "The runner cancelled the job because it exceeds the maximum run time"
+	closeCancelledMessage = "Cancelled"
+)
+
+func (r *Reporter) Close(runErr error) error {
 	r.closed = true
 
 	r.stateMu.Lock()
-	if r.state.Result == runnerv1.Result_RESULT_UNSPECIFIED {
-		if lastWords == "" {
-			lastWords = "Early termination"
+	var lastWords string
+	if errors.Is(runErr, context.DeadlineExceeded) {
+		lastWords = closeTimeoutMessage
+		r.state.Result = runnerv1.Result_RESULT_CANCELLED
+	} else if r.state.Result == runnerv1.Result_RESULT_UNSPECIFIED {
+		if runErr == nil {
+			lastWords = closeCancelledMessage
+		} else {
+			lastWords = runErr.Error()
 		}
 		for _, v := range r.state.Steps {
 			if v.Result == runnerv1.Result_RESULT_UNSPECIFIED {
@@ -246,17 +261,18 @@ func (r *Reporter) Close(lastWords string) error {
 			}
 		}
 		r.state.Result = runnerv1.Result_RESULT_FAILURE
-		r.logRows = append(r.logRows, &runnerv1.LogRow{
-			Time:    timestamppb.Now(),
-			Content: lastWords,
-		})
-		r.state.StoppedAt = timestamppb.Now()
-	} else if lastWords != "" {
+	} else if runErr != nil {
+		lastWords = runErr.Error()
+		r.state.Result = runnerv1.Result_RESULT_FAILURE
+	}
+
+	if lastWords != "" {
 		r.logRows = append(r.logRows, &runnerv1.LogRow{
 			Time:    timestamppb.Now(),
 			Content: lastWords,
 		})
 	}
+	r.state.StoppedAt = timestamppb.Now()
 	r.stateMu.Unlock()
 
 	return retry.Do(func() error {
