@@ -114,7 +114,7 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 			}
 		}
 
-		poller := poll.New(cfg, cli, runner)
+		poller := poll.New(ctx, cfg, cli, runner)
 
 		go poller.Poll()
 

@@ -118,7 +118,7 @@ func setTrace(t *testing.T) {
 }
 
 func TestPoller_New(t *testing.T) {
-	p := New(&config.Config{}, &mockClient{}, &mockRunner{})
+	p := New(t.Context(), &config.Config{}, &mockClient{}, &mockRunner{})
 	assert.NotNil(t, p)
 }
 
@@ -172,6 +172,7 @@ func TestPoller_Runner(t *testing.T) {
 			}
 			p := &mockPoller{}
 			p.init(
+				t.Context(),
 				&config.Config{
 					Runner: configRunner,
 				},
@@ -239,6 +240,7 @@ func TestPoller_Fetch(t *testing.T) {
 			}
 			p := &mockPoller{}
 			p.init(
+				t.Context(),
 				&config.Config{
 					Runner: configRunner,
 				},
