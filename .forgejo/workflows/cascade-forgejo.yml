@@ -47,7 +47,11 @@ jobs:
           ${{ toJSON(forge.event.pull_request.labels.*.name) }}
           EOF
           cat <<'EOF'
-          ${{ toJSON(forge.event) }}
+          contains => ${{ contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') }}
+          contains boolean => ${{ contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') == true }}
+          EOF
+          cat <<'EOF'
+          ${{ toJSON(forge) }}
           EOF
 
   forgejo:
@@ -55,7 +59,7 @@ jobs:
       vars.ROLE == 'forgejo-coding' && (
         forge.ref_name == 'main' ||
         forge.ref_name == 'wip-cascade' ||
-        contains(github.event.pull_request.labels.*.name, 'run-forgejo-tests')
+        contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests')
       )
 
     runs-on: docker
