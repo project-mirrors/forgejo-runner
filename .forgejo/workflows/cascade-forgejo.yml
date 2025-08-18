@@ -103,7 +103,7 @@ jobs:
           destination-branch: forgejo
           destination-token: ${{ secrets.FORGEJO_CASCADING_PR_DESTINATION_TOKEN }}
           prefix: runner
-          close-merge: true
+          close: true
           verbose: ${{ vars.VERBOSE == 'yes' }}
           debug: ${{ vars.DEBUG == 'yes' }}
           update: .forgejo/cascading-forgejo
