@@ -49,7 +49,7 @@ jobs:
           cat <<'EOF'
           push => ${{ forge.event_name == 'push' && ( forge.ref_name == 'main' || forge.ref_name == 'wip-cascade') }}
           pull_request_target synchornized => ${{ ( forge.event.action == 'synchronized' && contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') ) }}
-          pull_request_target label_updated => ${{ ( forge.event.action == 'label_updated' && forge.event.label == 'run-forgejo-tests' ) }}
+          pull_request_target label_updated => ${{ ( forge.event.action == 'label_updated' && forge.event.label.name == 'run-forgejo-tests' ) }}
           contains => ${{ contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') }}
           contains boolean => ${{ contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') == true }}
           EOF
@@ -71,7 +71,7 @@ jobs:
         ) || (
           forge.event_name == 'pull_request_target' && (
             ( forge.event.action == 'synchronized' && contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') ) ||
-            ( forge.event.action == 'label_updated' && forge.event.label == 'run-forgejo-tests' )
+            ( forge.event.action == 'label_updated' && forge.event.label.name == 'run-forgejo-tests' )
           )
         )
       )
