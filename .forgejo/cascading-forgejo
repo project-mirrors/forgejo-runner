@@ -29,6 +29,15 @@ cd $forgejo
 #
 find * -name '*.go' -o -name 'go.mod' | xargs sed -i -E -e "s|code.forgejo.org/forgejo/runner/v[0-9]+|$module|"
 #
+# If it is a pull request, change the module to reference the forked repository so
+# go mod tidy can find the SHA from a known branch or tag
+#
+if test -f "$runner_pr_or_ref"; then
+  repository=$(jq --raw-output .head.repo.full_name <$runner_pr_or_ref)
+  test "$repository"
+  module=$(echo $module | sed -e "s|code.forgejo.org/forgejo/runner|code.forgejo.org/$repository|")
+fi
+#
 # add a "replace code.forgejo.org/forgejo/runner/v?? $sha" line to the forgejo go.mod
 # so that it uses the branch or pull request from which the cascade is run.
 #
