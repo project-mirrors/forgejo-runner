@@ -57,9 +57,8 @@ jobs:
   forgejo:
     if: >
       vars.ROLE == 'forgejo-coding' && (
-        forge.ref_name == 'main' ||
-        forge.ref_name == 'wip-cascade' ||
-        contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests')
+        ( forge.event_name == 'push' && ( forge.ref_name == 'main' || forge.ref_name == 'wip-cascade') ) ||
+        ( forge.event_name == 'pull_request_target' && contains(forge.event.pull_request.labels.*.name, 'run-forgejo-tests') )
       )
 
     runs-on: docker
