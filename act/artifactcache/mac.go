@@ -22,7 +22,7 @@ func (h *Handler) validateMac(rundata cacheproxy.RunData) (string, error) {
 		return "", ErrValidation
 	}
 
-	expectedMAC := computeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp)
+	expectedMAC := computeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp, rundata.WriteIsolationKey)
 	if hmac.Equal([]byte(expectedMAC), []byte(rundata.RepositoryMAC)) {
 		return rundata.RepositoryFullName, nil
 	}
@@ -40,12 +40,14 @@ func validateAge(ts string) bool {
 	return true
 }
 
-func computeMac(secret, repo, run, ts string) string {
+func computeMac(secret, repo, run, ts, writeIsolationKey string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(repo))
 	mac.Write([]byte(">"))
 	mac.Write([]byte(run))
 	mac.Write([]byte(">"))
 	mac.Write([]byte(ts))
+	mac.Write([]byte(">"))
+	mac.Write([]byte(writeIsolationKey))
 	return hex.EncodeToString(mac.Sum(nil))
 }

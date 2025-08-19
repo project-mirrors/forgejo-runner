@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"code.forgejo.org/forgejo/runner/v9/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/timshannon/bolthold"
@@ -23,21 +22,26 @@ const (
 	cacheRepo      = "testuser/repo"
 	cacheRunnum    = "1"
 	cacheTimestamp = "0"
-	cacheMac       = "c13854dd1ac599d1d61680cd93c26b77ba0ee10f374a3408bcaea82f38ca1865"
+	cacheMac       = "bc2e9167f9e310baebcead390937264e4c0b21d2fdd49f5b9470d54406099360"
 )
 
 var handlerExternalURL string
 
 type AuthHeaderTransport struct {
-	T                 http.RoundTripper
-	WriteIsolationKey string
+	T                  http.RoundTripper
+	WriteIsolationKey  string
+	OverrideDefaultMac string
 }
 
 func (t *AuthHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Forgejo-Cache-Repo", cacheRepo)
 	req.Header.Set("Forgejo-Cache-RunNumber", cacheRunnum)
 	req.Header.Set("Forgejo-Cache-Timestamp", cacheTimestamp)
-	req.Header.Set("Forgejo-Cache-MAC", cacheMac)
+	if t.OverrideDefaultMac != "" {
+		req.Header.Set("Forgejo-Cache-MAC", t.OverrideDefaultMac)
+	} else {
+		req.Header.Set("Forgejo-Cache-MAC", cacheMac)
+	}
 	req.Header.Set("Forgejo-Cache-Host", handlerExternalURL)
 	if t.WriteIsolationKey != "" {
 		req.Header.Set("Forgejo-Cache-WriteIsolationKey", t.WriteIsolationKey)
@@ -467,25 +471,28 @@ func TestHandler(t *testing.T) {
 
 		uploadCacheNormally(t, base, key, version, "TestWriteKey", make([]byte, 64))
 
-		httpClientTransport.WriteIsolationKey = "AnotherTestWriteKey"
-		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
-		require.NoError(t, err)
-		require.Equal(t, 204, resp.StatusCode)
+		func() {
+			defer overrideWriteIsolationKey("AnotherTestWriteKey")()
+			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+			require.NoError(t, err)
+			require.Equal(t, 204, resp.StatusCode)
+		}()
 
-		httpClientTransport.WriteIsolationKey = ""
-		resp, err = httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
-		require.NoError(t, err)
-		require.Equal(t, 204, resp.StatusCode)
+		{
+			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+			require.NoError(t, err)
+			require.Equal(t, 204, resp.StatusCode)
+		}
 
-		httpClientTransport.WriteIsolationKey = "TestWriteKey"
-		resp, err = httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
-		require.NoError(t, err)
-		require.Equal(t, 200, resp.StatusCode)
+		func() {
+			defer overrideWriteIsolationKey("TestWriteKey")()
+			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+			require.NoError(t, err)
+			require.Equal(t, 200, resp.StatusCode)
+		}()
 	})
 
 	t.Run("find prefers WriteIsolationKey match", func(t *testing.T) {
-		defer func() { httpClientTransport.WriteIsolationKey = "" }()
-
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d21"
 		key := strings.ToLower(t.Name())
 
@@ -494,47 +501,51 @@ func TestHandler(t *testing.T) {
 		uploadCacheNormally(t, base, key, version, "", make([]byte, 128))
 
 		// We should read the value with the matching WriteIsolationKey from the cache...
-		httpClientTransport.WriteIsolationKey = "TestWriteKey"
-		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
-		require.NoError(t, err)
-		require.Equal(t, 200, resp.StatusCode)
+		func() {
+			defer overrideWriteIsolationKey("TestWriteKey")()
 
-		got := struct {
-			ArchiveLocation string `json:"archiveLocation"`
-		}{}
-		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
-		contentResp, err := httpClient.Get(got.ArchiveLocation)
-		require.NoError(t, err)
-		require.Equal(t, 200, contentResp.StatusCode)
-		content, err := io.ReadAll(contentResp.Body)
-		require.NoError(t, err)
-		// Which we finally check matches the correct WriteIsolationKey's content here.
-		assert.Equal(t, make([]byte, 64), content)
+			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+			require.NoError(t, err)
+			require.Equal(t, 200, resp.StatusCode)
+
+			got := struct {
+				ArchiveLocation string `json:"archiveLocation"`
+			}{}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			contentResp, err := httpClient.Get(got.ArchiveLocation)
+			require.NoError(t, err)
+			require.Equal(t, 200, contentResp.StatusCode)
+			content, err := io.ReadAll(contentResp.Body)
+			require.NoError(t, err)
+			// Which we finally check matches the correct WriteIsolationKey's content here.
+			assert.Equal(t, make([]byte, 64), content)
+		}()
 	})
 
 	t.Run("find falls back if matching WriteIsolationKey not available", func(t *testing.T) {
-		defer func() { httpClientTransport.WriteIsolationKey = "" }()
-
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d21"
 		key := strings.ToLower(t.Name())
 
 		uploadCacheNormally(t, base, key, version, "", make([]byte, 128))
 
-		httpClientTransport.WriteIsolationKey = "TestWriteKey"
-		resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
-		require.NoError(t, err)
-		require.Equal(t, 200, resp.StatusCode)
+		func() {
+			defer overrideWriteIsolationKey("TestWriteKey")()
 
-		got := struct {
-			ArchiveLocation string `json:"archiveLocation"`
-		}{}
-		require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
-		contentResp, err := httpClient.Get(got.ArchiveLocation)
-		require.NoError(t, err)
-		require.Equal(t, 200, contentResp.StatusCode)
-		content, err := io.ReadAll(contentResp.Body)
-		require.NoError(t, err)
-		assert.Equal(t, make([]byte, 128), content)
+			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
+			require.NoError(t, err)
+			require.Equal(t, 200, resp.StatusCode)
+
+			got := struct {
+				ArchiveLocation string `json:"archiveLocation"`
+			}{}
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			contentResp, err := httpClient.Get(got.ArchiveLocation)
+			require.NoError(t, err)
+			require.Equal(t, 200, contentResp.StatusCode)
+			content, err := io.ReadAll(contentResp.Body)
+			require.NoError(t, err)
+			assert.Equal(t, make([]byte, 128), content)
+		}()
 	})
 
 	t.Run("case insensitive", func(t *testing.T) {
@@ -666,7 +677,7 @@ func TestHandler(t *testing.T) {
 	})
 
 	t.Run("upload across WriteIsolationKey", func(t *testing.T) {
-		defer testutils.MockVariable(&httpClientTransport.WriteIsolationKey, "CorrectKey")()
+		defer overrideWriteIsolationKey("CorrectKey")()
 
 		key := strings.ToLower(t.Name())
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d20"
@@ -692,8 +703,8 @@ func TestHandler(t *testing.T) {
 			id = got.CacheID
 		}
 		// upload, but with the incorrect write isolation key relative to the cache obj created
-		{
-			httpClientTransport.WriteIsolationKey = "WrongKey"
+		func() {
+			defer overrideWriteIsolationKey("WrongKey")()
 			req, err := http.NewRequest(http.MethodPatch,
 				fmt.Sprintf("%s/caches/%d", base, id), bytes.NewReader(content))
 			require.NoError(t, err)
@@ -702,11 +713,11 @@ func TestHandler(t *testing.T) {
 			resp, err := httpClient.Do(req)
 			require.NoError(t, err)
 			assert.Equal(t, 403, resp.StatusCode)
-		}
+		}()
 	})
 
 	t.Run("commit across WriteIsolationKey", func(t *testing.T) {
-		defer testutils.MockVariable(&httpClientTransport.WriteIsolationKey, "CorrectKey")()
+		defer overrideWriteIsolationKey("CorrectKey")()
 
 		key := strings.ToLower(t.Name())
 		version := "c19da02a2bd7e77277f1ac29ab45c09b7d46a4ee758284e26bb3045ad11d9d20"
@@ -743,12 +754,12 @@ func TestHandler(t *testing.T) {
 			assert.Equal(t, 200, resp.StatusCode)
 		}
 		// commit, but with the incorrect write isolation key relative to the cache obj created
-		{
-			httpClientTransport.WriteIsolationKey = "WrongKey"
+		func() {
+			defer overrideWriteIsolationKey("WrongKey")()
 			resp, err := httpClient.Post(fmt.Sprintf("%s/caches/%d", base, id), "", nil)
 			require.NoError(t, err)
 			assert.Equal(t, 403, resp.StatusCode)
-		}
+		}()
 	})
 
 	t.Run("get across WriteIsolationKey", func(t *testing.T) {
@@ -762,8 +773,8 @@ func TestHandler(t *testing.T) {
 
 		// Perform the 'get' without the right WriteIsolationKey for the cache entry... should be OK for `key` since it
 		// was written with WriteIsolationKey "" meaning it is available for non-isolated access
-		{
-			httpClientTransport.WriteIsolationKey = "WhoopsWrongKey"
+		func() {
+			defer overrideWriteIsolationKey("WhoopsWrongKey")()
 
 			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, key, version))
 			require.NoError(t, err)
@@ -777,30 +788,52 @@ func TestHandler(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 200, contentResp.StatusCode)
 			httpClientTransport.WriteIsolationKey = "CorrectKey" // reset for next find
-		}
+		}()
 
 		// Perform the 'get' without the right WriteIsolationKey for the cache entry... should be 403 for `keyIsolated`
 		// because it was written with a different WriteIsolationKey.
 		{
-			httpClientTransport.WriteIsolationKey = "CorrectKey" // for test purposes make the `find` successful...
-			resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, keyIsolated, version))
-			require.NoError(t, err)
-			require.Equal(t, 200, resp.StatusCode)
-			got := struct {
+			got := func() struct {
 				ArchiveLocation string `json:"archiveLocation"`
-			}{}
-			require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+			} {
+				defer overrideWriteIsolationKey("CorrectKey")() // for test purposes make the `find` successful...
+				resp, err := httpClient.Get(fmt.Sprintf("%s/cache?keys=%s&version=%s", base, keyIsolated, version))
+				require.NoError(t, err)
+				require.Equal(t, 200, resp.StatusCode)
+				got := struct {
+					ArchiveLocation string `json:"archiveLocation"`
+				}{}
+				require.NoError(t, json.NewDecoder(resp.Body).Decode(&got))
+				return got
+			}()
 
-			httpClientTransport.WriteIsolationKey = "WhoopsWrongKey" // but then access w/ the wrong key for `get`
-			contentResp, err := httpClient.Get(got.ArchiveLocation)
-			require.NoError(t, err)
-			require.Equal(t, 403, contentResp.StatusCode)
+			func() {
+				defer overrideWriteIsolationKey("WhoopsWrongKey")() // but then access w/ the wrong key for `get`
+				contentResp, err := httpClient.Get(got.ArchiveLocation)
+				require.NoError(t, err)
+				require.Equal(t, 403, contentResp.StatusCode)
+			}()
 		}
 	})
 }
 
+func overrideWriteIsolationKey(writeIsolationKey string) func() {
+	originalWriteIsolationKey := httpClientTransport.WriteIsolationKey
+	originalMac := httpClientTransport.OverrideDefaultMac
+
+	httpClientTransport.WriteIsolationKey = writeIsolationKey
+	httpClientTransport.OverrideDefaultMac = computeMac("secret", cacheRepo, cacheRunnum, cacheTimestamp, httpClientTransport.WriteIsolationKey)
+
+	return func() {
+		httpClientTransport.WriteIsolationKey = originalWriteIsolationKey
+		httpClientTransport.OverrideDefaultMac = originalMac
+	}
+}
+
 func uploadCacheNormally(t *testing.T, base, key, version, writeIsolationKey string, content []byte) {
-	defer testutils.MockVariable(&httpClientTransport.WriteIsolationKey, writeIsolationKey)()
+	if writeIsolationKey != "" {
+		defer overrideWriteIsolationKey(writeIsolationKey)()
+	}
 
 	var id uint64
 	{
