@@ -144,6 +144,7 @@ jobs:
           apt-get update -qq
           apt-get -q install -qq -y docker.io
 
+      - run: apt-get -q install -qq -y gcc # required for `-race`
       - name: integration test
         run: |
           go test -race ./act/container
@@ -184,6 +185,8 @@ jobs:
           }
           EOF
           apt --quiet install --yes -qq docker.io make
+
+      - run: apt-get -q install -qq -y gcc # required for `-race`
 
       - run: make integration-test
 
