@@ -192,7 +192,7 @@ func TestRunnerCacheConfiguration(t *testing.T) {
 	}
 
 	t.Run("Cache accessible", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		// Step 1: Populate shared cache with push workflow
@@ -236,7 +236,7 @@ jobs:
 	})
 
 	t.Run("PR cache pollution prevented", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
 		// Step 1: Populate shared cache with push workflow
