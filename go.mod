@@ -35,7 +35,7 @@ require (
 	github.com/spf13/pflag v1.0.7
 	github.com/stretchr/testify v1.10.0
 	github.com/timshannon/bolthold v0.0.0-20240314194003-30aac6950928
-	go.etcd.io/bbolt v1.4.2
+	go.etcd.io/bbolt v1.4.3
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/term v0.34.0
 	golang.org/x/time v0.12.0
