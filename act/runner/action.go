@@ -277,7 +277,6 @@ func removeGitIgnore(ctx context.Context, directory string) error {
 	return nil
 }
 
-// TODO: break out parts of function to reduce complexicity
 func execAsDocker(ctx context.Context, step actionStep, actionName, basedir string, localAction bool) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()
@@ -291,10 +290,11 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, basedir stri
 		// Apply forcePull only for prebuild docker images
 		forcePull = rc.Config.ForcePull
 	} else {
-		// "-dockeraction" enshures that "./", "./test " won't get converted to "act-:latest", "act-test-:latest" which are invalid docker image names
-		image = fmt.Sprintf("%s-dockeraction:%s", regexp.MustCompile("[^a-zA-Z0-9]").ReplaceAllString(actionName, "-"), "latest")
-		image = fmt.Sprintf("act-%s", strings.TrimLeft(image, "-"))
-		image = strings.ToLower(image)
+		if localAction {
+			image = fmt.Sprintf("runner-local-docker-action-%s:latest", common.MustRandName(16))
+		} else {
+			image = fmt.Sprintf("runner-remote-docker-action-%s:latest", common.Sha256(step.getStepModel().Uses))
+		}
 		contextDir, fileName := filepath.Split(filepath.Join(basedir, action.Runs.Image))
 
 		anyArchExists, err := container.ImageExistsLocally(ctx, image, "any")
