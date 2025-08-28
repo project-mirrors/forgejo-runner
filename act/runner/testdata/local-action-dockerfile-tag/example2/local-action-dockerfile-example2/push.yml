@@ -1,0 +1,11 @@
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./actions/docker-local
+      id: dockerlocal
+      with:
+        who-to-greet: 'SOMEONE'
+    - run: '[[ "${{ steps.dockerlocal.outputs.whoami }}" == "example2 SOMEONE" ]]'
