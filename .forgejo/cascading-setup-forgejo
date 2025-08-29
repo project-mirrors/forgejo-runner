@@ -8,9 +8,9 @@ runner=$3
 runner_pr_or_ref=$4
 
 if test -f "$runner_pr_or_ref"; then
-  url=$(jq --raw-output .head.repo.html_url <$runner_pr)
+  url=$(jq --raw-output .head.repo.html_url <$runner_pr_or_ref)
   test "$url" != null
-  branch=$(jq --raw-output .head.ref <$runner_pr)
+  branch=$(jq --raw-output .head.ref <$runner_pr_or_ref)
 else
   url=https://code.forgejo.org/forgejo/runner
   branch=${runner_pr_or_ref#refs/heads/}
