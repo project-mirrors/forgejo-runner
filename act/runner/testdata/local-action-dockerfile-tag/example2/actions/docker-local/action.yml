@@ -1,0 +1,12 @@
+inputs:
+  who-to-greet:
+outputs:
+  whoami:
+    description: 'The time we greeted you'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    WHOAMI: ${{ inputs.who-to-greet }}
+  args:
+    - ${{ inputs.who-to-greet }}

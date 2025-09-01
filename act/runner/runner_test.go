@@ -245,6 +245,8 @@ func TestRunner_RunEvent(t *testing.T) {
 		{workdir, "local-action-fails-schema-validation", "push", "Job 'test' failed", platforms, secrets},
 		{workdir, "local-action-docker-url", "push", "", platforms, secrets},
 		{workdir, "local-action-dockerfile", "push", "", platforms, secrets},
+		{workdir + "/local-action-dockerfile-tag/example1", "local-action-dockerfile-example1", "push", "", platforms, secrets},
+		{workdir + "/local-action-dockerfile-tag/example2", "local-action-dockerfile-example2", "push", "", platforms, secrets},
 		{workdir, "local-action-via-composite-dockerfile", "push", "", platforms, secrets},
 		{workdir, "local-action-js", "push", "", platforms, secrets},
 
