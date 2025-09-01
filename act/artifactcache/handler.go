@@ -177,7 +177,8 @@ func (h *handler) isClosed() bool {
 }
 
 func (h *handler) openDB() (*bolthold.Store, error) {
-	return bolthold.Open(filepath.Join(h.dir, "bolt.db"), 0o644, &bolthold.Options{
+	file := filepath.Join(h.dir, "bolt.db")
+	db, err := bolthold.Open(file, 0o644, &bolthold.Options{
 		Encoder: json.Marshal,
 		Decoder: json.Unmarshal,
 		Options: &bbolt.Options{
@@ -186,6 +187,10 @@ func (h *handler) openDB() (*bolthold.Store, error) {
 			FreelistType: bbolt.DefaultOptions.FreelistType,
 		},
 	})
+	if err != nil {
+		return nil, fmt.Errorf("Open(%s): %v", file, err)
+	}
+	return db, nil
 }
 
 // GET /_apis/artifactcache/cache
@@ -206,21 +211,21 @@ func (h *handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 
 	db, err := h.openDB()
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	defer db.Close()
 
 	cache, err := findCache(db, repo, keys, version, rundata.WriteIsolationKey)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	// If read was scoped to WriteIsolationKey and didn't find anything, we can fallback to the non-isolated cache read
 	if cache == nil && rundata.WriteIsolationKey != "" {
 		cache, err = findCache(db, repo, keys, version, "")
 		if err != nil {
-			h.responseJSON(w, r, 500, err)
+			h.responseFatalJSON(w, r, err)
 			return
 		}
 	}
@@ -265,7 +270,7 @@ func (h *handler) reserve(w http.ResponseWriter, r *http.Request, params httprou
 	cache := api.ToCache()
 	db, err := h.openDB()
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	defer db.Close()
@@ -305,13 +310,13 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		h.responseFatalJSON(w, r, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
-	// Should not happen
 	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
+		// can only happen if the cache is corrupted
+		h.responseFatalJSON(w, r, fmt.Errorf("cache repo is not valid"))
 		return
 	}
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
@@ -360,13 +365,13 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		h.responseFatalJSON(w, r, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
-	// Should not happen
 	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
+		// can only happen if the cache is corrupted
+		h.responseFatalJSON(w, r, fmt.Errorf("cache repo is not valid"))
 		return
 	}
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
@@ -381,7 +386,7 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 
 	size, err := h.storage.Commit(cache.ID, cache.Size)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("commit(%v): %w", cache.ID, err))
 		return
 	}
 	// write real size back to cache, it may be different from the current value when the request doesn't specify it.
@@ -389,7 +394,7 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 
 	db, err := h.openDB()
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	defer db.Close()
@@ -424,13 +429,13 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		h.responseFatalJSON(w, r, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
-	// Should not happen
 	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
+		// can only happen if the cache is corrupted
+		h.responseFatalJSON(w, r, fmt.Errorf("cache repo is not valid"))
 		return
 	}
 	// reads permitted against caches w/ the same isolation key, or no isolation key
@@ -481,7 +486,7 @@ func findCache(db *bolthold.Store, repo string, keys []string, version, writeIso
 				And("Complete").Eq(true).
 				SortBy("CreatedAt").Reverse()); err == nil || !errors.Is(err, bolthold.ErrNotFound) {
 			if err != nil {
-				return nil, fmt.Errorf("find cache: %w", err)
+				return nil, fmt.Errorf("find cache entry equal to %s: %w", prefix, err)
 			}
 			return cache, nil
 		}
@@ -500,7 +505,7 @@ func findCache(db *bolthold.Store, repo string, keys []string, version, writeIso
 			if errors.Is(err, bolthold.ErrNotFound) {
 				continue
 			}
-			return nil, fmt.Errorf("find cache: %w", err)
+			return nil, fmt.Errorf("find cache entry starting with %s: %w", prefix, err)
 		}
 		return cache, nil
 	}
@@ -526,7 +531,7 @@ func (h *handler) readCache(id uint64) (*Cache, error) {
 	defer db.Close()
 	cache := &Cache{}
 	if err := db.Get(id, cache); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("readCache: Get(%v): %w", id, err)
 	}
 	return cache, nil
 }
@@ -539,10 +544,13 @@ func (h *handler) useCache(id uint64) error {
 	defer db.Close()
 	cache := &Cache{}
 	if err := db.Get(id, cache); err != nil {
-		return err
+		return fmt.Errorf("useCache: Get(%v): %w", id, err)
 	}
 	cache.UsedAt = time.Now().Unix()
-	return db.Update(cache.ID, cache)
+	if err := db.Update(cache.ID, cache); err != nil {
+		return fmt.Errorf("useCache: Update(%v): %v", cache.ID, err)
+	}
+	return nil
 }
 
 const (
@@ -574,6 +582,7 @@ func (h *handler) gcCache() {
 
 	db, err := h.openDB()
 	if err != nil {
+		fatal(h.logger, err)
 		return
 	}
 	defer db.Close()
@@ -584,12 +593,12 @@ func (h *handler) gcCache() {
 		Where("UsedAt").Lt(time.Now().Add(-keepTemp).Unix()).
 		And("Complete").Eq(false),
 	); err != nil {
-		h.logger.Warnf("find caches: %v", err)
+		fatal(h.logger, fmt.Errorf("gc caches not completed: %v", err))
 	} else {
 		for _, cache := range caches {
 			h.storage.Remove(cache.ID)
 			if err := db.Delete(cache.ID, cache); err != nil {
-				h.logger.Warnf("delete cache: %v", err)
+				h.logger.Errorf("delete cache: %v", err)
 				continue
 			}
 			h.logger.Infof("deleted cache: %+v", cache)
@@ -601,7 +610,7 @@ func (h *handler) gcCache() {
 	if err := db.Find(&caches, bolthold.
 		Where("UsedAt").Lt(time.Now().Add(-keepUnused).Unix()),
 	); err != nil {
-		h.logger.Warnf("find caches: %v", err)
+		fatal(h.logger, fmt.Errorf("gc caches old not used: %v", err))
 	} else {
 		for _, cache := range caches {
 			h.storage.Remove(cache.ID)
@@ -618,7 +627,7 @@ func (h *handler) gcCache() {
 	if err := db.Find(&caches, bolthold.
 		Where("CreatedAt").Lt(time.Now().Add(-keepUsed).Unix()),
 	); err != nil {
-		h.logger.Warnf("find caches: %v", err)
+		fatal(h.logger, fmt.Errorf("gc caches too old: %v", err))
 	} else {
 		for _, cache := range caches {
 			h.storage.Remove(cache.ID)
@@ -637,7 +646,7 @@ func (h *handler) gcCache() {
 		bolthold.Where("Complete").Eq(true),
 		"Key", "Version",
 	); err != nil {
-		h.logger.Warnf("find aggregate caches: %v", err)
+		fatal(h.logger, fmt.Errorf("gc aggregate caches: %v", err))
 	} else {
 		for _, result := range results {
 			if result.Count() <= 1 {
@@ -661,6 +670,11 @@ func (h *handler) gcCache() {
 			}
 		}
 	}
+}
+
+func (h *handler) responseFatalJSON(w http.ResponseWriter, r *http.Request, err error) {
+	h.responseJSON(w, r, 500, err)
+	fatal(h.logger, err)
 }
 
 func (h *handler) responseJSON(w http.ResponseWriter, r *http.Request, code int, v ...any) {

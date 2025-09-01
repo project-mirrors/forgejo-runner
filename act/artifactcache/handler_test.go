@@ -16,10 +16,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"code.forgejo.org/forgejo/runner/v9/testutils"
+	"github.com/sirupsen/logrus"
 	"github.com/timshannon/bolthold"
 	"go.etcd.io/bbolt"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -59,6 +62,10 @@ var (
 )
 
 func TestHandler(t *testing.T) {
+	defer testutils.MockVariable(&fatal, func(_ logrus.FieldLogger, err error) {
+		t.Fatalf("unexpected call to fatal(%v)", err)
+	})()
+
 	dir := filepath.Join(t.TempDir(), "artifactcache")
 	handler, err := StartHandler(dir, "", 0, "secret", nil)
 	require.NoError(t, err)
