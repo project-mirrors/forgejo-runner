@@ -171,11 +171,7 @@ func TestRunnerCacheConfiguration(t *testing.T) {
 	// Must set up cache for our test
 	require.NotNil(t, runner.cacheProxy)
 
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-
-	// Run a given workflow w/ event...
-	runWorkflow := func(yamlContent, eventName, ref, description string) {
+	runWorkflow := func(ctx context.Context, cancel context.CancelFunc, yamlContent, eventName, ref, description string) {
 		task := &runnerv1.Task{
 			WorkflowPayload: []byte(yamlContent),
 			Context: &structpb.Struct{
@@ -195,8 +191,12 @@ func TestRunnerCacheConfiguration(t *testing.T) {
 		require.NoError(t, err, description)
 	}
 
-	// Step 1: Populate shared cache with push workflow
-	populateYaml := `
+	t.Run("Cache accessible", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// Step 1: Populate shared cache with push workflow
+		populateYaml := `
 name: Cache Testing Action
 on:
   push:
@@ -212,11 +212,11 @@ jobs:
           mkdir -p cache_path_1
           echo "Hello from push workflow!" > cache_path_1/cache_content_1
 `
-	runWorkflow(populateYaml, "push", "refs/heads/main", "step 1: push cache populate expected to succeed")
+		runWorkflow(ctx, cancel, populateYaml, "push", "refs/heads/main", "step 1: push cache populate expected to succeed")
 
-	// Step 2: Validate that cache is accessible; mostly a sanity check that the test environment and mock context
-	// provides everything needed for the cache setup.
-	checkYaml := `
+		// Step 2: Validate that cache is accessible; mostly a sanity check that the test environment and mock context
+		// provides everything needed for the cache setup.
+		checkYaml := `
 name: Cache Testing Action
 on:
   push:
@@ -232,5 +232,108 @@ jobs:
           [[ -f cache_path_1/cache_content_1 ]] && echo "Step 2: cache file found." || echo "Step 2: cache file missing!"
           [[ -f cache_path_1/cache_content_1 ]] || exit 1
 `
-	runWorkflow(checkYaml, "push", "refs/heads/main", "step 2: push cache check expected to succeed")
+		runWorkflow(ctx, cancel, checkYaml, "push", "refs/heads/main", "step 2: push cache check expected to succeed")
+	})
+
+	t.Run("PR cache pollution prevented", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		// Step 1: Populate shared cache with push workflow
+		populateYaml := `
+name: Cache Testing Action
+on:
+  push:
+jobs:
+  job-cache-check-1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: cache_path_1
+          key: cache-key-1
+      - run: |
+          mkdir -p cache_path_1
+          echo "Hello from push workflow!" > cache_path_1/cache_content_1
+`
+		runWorkflow(ctx, cancel, populateYaml, "push", "refs/heads/main", "step 1: push cache populate expected to succeed")
+
+		// Step 2: Check if pull_request can read push cache, should be available as it's a trusted cache.
+		checkPRYaml := `
+name: Cache Testing Action
+on:
+  pull_request:
+jobs:
+  job-cache-check-2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: cache_path_1
+          key: cache-key-1
+      - run: |
+          [[ -f cache_path_1/cache_content_1 ]] && echo "Step 2: cache file found." || echo "Step 2: cache file missing!"
+          [[ -f cache_path_1/cache_content_1 ]] || exit 1
+`
+		runWorkflow(ctx, cancel, checkPRYaml, "pull_request", "refs/pull/1234/head", "step 2: PR should read push cache")
+
+		// Step 3: Pull request writes to cache; here we need to use a new cache key because we'll get a cache-hit like we
+		// did in step #2 if we keep the same key, and then the cache contents won't be updated.
+		populatePRYaml := `
+name: Cache Testing Action
+on:
+  pull_request:
+jobs:
+  job-cache-check-3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: cache_path_1
+          key: cache-key-2
+      - run: |
+          mkdir -p cache_path_1
+          echo "Hello from PR workflow!" > cache_path_1/cache_content_2
+`
+		runWorkflow(ctx, cancel, populatePRYaml, "pull_request", "refs/pull/1234/head", "step 3: PR cache populate expected to succeed")
+
+		// Step 4: Check if pull_request can read its own cache written by step #3.
+		checkPRKey2Yaml := `
+name: Cache Testing Action
+on:
+  pull_request:
+jobs:
+  job-cache-check-4:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: cache_path_1
+          key: cache-key-2
+      - run: |
+          [[ -f cache_path_1/cache_content_2 ]] && echo "Step 4 cache file found." || echo "Step 4 cache file missing!"
+          [[ -f cache_path_1/cache_content_2 ]] || exit 1
+`
+		runWorkflow(ctx, cancel, checkPRKey2Yaml, "pull_request", "refs/pull/1234/head", "step 4: PR should read its own cache")
+
+		// Step 5: Check that the push workflow cannot access the isolated cache that was written by the pull_request in
+		// step #3, ensuring that it's not possible to pollute the cache by predicting cache keys.
+		checkKey2Yaml := `
+name: Cache Testing Action
+on:
+  push:
+jobs:
+  job-cache-check-6:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache@v4
+        with:
+          path: cache_path_1
+          key: cache-key-2
+      - run: |
+          [[ -f cache_path_1/cache_content_2 ]] && echo "Step 5 cache file found, oh no!" || echo "Step 5: cache file missing as expected."
+          [[ -f cache_path_1/cache_content_2 ]] && exit 1 || exit 0
+`
+		runWorkflow(ctx, cancel, checkKey2Yaml, "push", "refs/heads/main", "step 5: push cache should not be polluted by PR")
+	})
 }

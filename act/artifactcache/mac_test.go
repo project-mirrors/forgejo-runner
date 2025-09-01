@@ -19,7 +19,7 @@ func TestMac(t *testing.T) {
 		run := "1"
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
 
-		mac := computeMac(handler.secret, name, run, ts)
+		mac := computeMac(handler.secret, name, run, ts, "")
 		rundata := cacheproxy.RunData{
 			RepositoryFullName: name,
 			RunNumber:          run,
@@ -37,7 +37,7 @@ func TestMac(t *testing.T) {
 		run := "1"
 		ts := "9223372036854775807" // This should last us for a while...
 
-		mac := computeMac(handler.secret, name, run, ts)
+		mac := computeMac(handler.secret, name, run, ts, "")
 		rundata := cacheproxy.RunData{
 			RepositoryFullName: name,
 			RunNumber:          run,
@@ -72,9 +72,12 @@ func TestMac(t *testing.T) {
 		run := "42"
 		ts := "1337"
 
-		mac := computeMac(secret, name, run, ts)
-		expectedMac := "f666f06f917acb7186e152195b2a8c8d36d068ce683454be0878806e08e04f2b" // * Precomputed, anytime the computeMac function changes this needs to be recalculated
+		mac := computeMac(secret, name, run, ts, "")
+		expectedMac := "4754474b21329e8beadd2b4054aa4be803965d66e710fa1fee091334ed804f29" // * Precomputed, anytime the computeMac function changes this needs to be recalculated
+		require.Equal(t, expectedMac, mac)
 
-		require.Equal(t, mac, expectedMac)
+		mac = computeMac(secret, name, run, ts, "refs/pull/12/head")
+		expectedMac = "9ca8f4cb5e1b083ee8cd215215bc00f379b28511d3ef7930bf054767de34766d" // * Precomputed, anytime the computeMac function changes this needs to be recalculated
+		require.Equal(t, expectedMac, mac)
 	})
 }

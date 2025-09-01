@@ -265,8 +265,23 @@ func (r *Runner) run(ctx context.Context, task *runnerv1.Task, reporter *report.
 
 	// Register the run with the cacheproxy and modify the CACHE_URL
 	if r.cacheProxy != nil {
+		writeIsolationKey := ""
+
+		// When performing an action on an event from a PR, provide a "write isolation key" to the cache. The generated
+		// ACTIONS_CACHE_URL will be able to read the cache, and write to a cache, but its writes will be isolated to
+		// future runs of the PR's workflows and won't be shared with other pull requests or actions. This is a security
+		// measure to prevent a malicious pull request from poisoning the cache with secret-stealing code which would
+		// later be executed on another action.
+		if taskContext["event_name"].GetStringValue() == "pull_request" || taskContext["event_name"].GetStringValue() == "pull_request_target" {
+			// Ensure that `Ref` has the expected format so that we don't end up with a useless write isolation key
+			if !strings.HasPrefix(preset.Ref, "refs/pull/") {
+				return fmt.Errorf("write isolation key: expected preset.Ref to be refs/pull/..., but was %q", preset.Ref)
+			}
+			writeIsolationKey = preset.Ref
+		}
+
 		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
-		cacheRunData := r.cacheProxy.CreateRunData(preset.Repository, preset.RunID, timestamp)
+		cacheRunData := r.cacheProxy.CreateRunData(preset.Repository, preset.RunID, timestamp, writeIsolationKey)
 		cacheRunID, err := r.cacheProxy.AddRun(cacheRunData)
 		if err == nil {
 			defer func() { _ = r.cacheProxy.RemoveRun(cacheRunID) }()
