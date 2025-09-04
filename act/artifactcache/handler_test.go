@@ -63,7 +63,7 @@ func TestHandler(t *testing.T) {
 	base := fmt.Sprintf("%s%s", handler.ExternalURL(), urlBase)
 
 	defer func() {
-		t.Run("inpect db", func(t *testing.T) {
+		t.Run("inspect db", func(t *testing.T) {
 			db, err := handler.openDB()
 			require.NoError(t, err)
 			defer db.Close()
