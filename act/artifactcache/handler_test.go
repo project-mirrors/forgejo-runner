@@ -4,11 +4,15 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -1031,4 +1035,43 @@ func TestHandler_ExternalURL(t *testing.T) {
 		require.NoError(t, handler.Close())
 		assert.True(t, handler.isClosed())
 	})
+}
+
+var (
+	settleTime       = 100 * time.Millisecond
+	fatalWaitingTime = 30 * time.Second
+)
+
+func waitSig(t *testing.T, c <-chan os.Signal, sig os.Signal) {
+	t.Helper()
+
+	// Sleep multiple times to give the kernel more tries to
+	// deliver the signal.
+	start := time.Now()
+	timer := time.NewTimer(settleTime / 10)
+	defer timer.Stop()
+	for time.Since(start) < fatalWaitingTime {
+		select {
+		case s := <-c:
+			if s == sig {
+				return
+			}
+			t.Fatalf("signal was %v, want %v", s, sig)
+		case <-timer.C:
+			timer.Reset(settleTime / 10)
+		}
+	}
+	t.Fatalf("timeout after %v waiting for %v", fatalWaitingTime, sig)
+}
+
+func TestHandler_fatal(t *testing.T) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGTERM)
+	defer signal.Stop(c)
+
+	discard := logrus.New()
+	discard.Out = io.Discard
+	fatal(discard, errors.New("fatal error"))
+
+	waitSig(t, c, syscall.SIGTERM)
 }

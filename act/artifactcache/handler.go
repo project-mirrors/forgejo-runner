@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -26,6 +27,13 @@ import (
 const (
 	urlBase = "/_apis/artifactcache"
 )
+
+var fatal = func(logger logrus.FieldLogger, err error) {
+	logger.Errorf("unrecoverable error in the cache: %v", err)
+	if err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM); err != nil {
+		logger.Errorf("unrecoverable error in the cache: failed to send the TERM signal to shutdown the daemon %v", err)
+	}
+}
 
 type Handler interface {
 	ExternalURL() string
