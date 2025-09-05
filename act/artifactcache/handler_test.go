@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,8 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"code.forgejo.org/forgejo/runner/v9/testutils"
+	"code.forgejo.org/forgejo/runner/v11/testutils"
+	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/timshannon/bolthold"
 	"go.etcd.io/bbolt"
 
@@ -900,6 +903,155 @@ func uploadCacheNormally(t *testing.T, base, key, version, writeIsolationKey str
 		got, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 		assert.Equal(t, content, got)
+	}
+}
+
+func TestHandlerAPIFatalErrors(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		prepare func(message string) func()
+		caches  func(t *testing.T, message string) caches
+		call    func(t *testing.T, handler Handler, w http.ResponseWriter)
+	}{
+		{
+			name: "find",
+			prepare: func(message string) func() {
+				return testutils.MockVariable(&findCacheWithIsolationKeyFallback, func(db *bolthold.Store, repo string, keys []string, version, writeIsolationKey string) (*Cache, error) {
+					return nil, errors.New(message)
+				})
+			},
+			caches: func(t *testing.T, message string) caches {
+				caches, err := newCaches(t.TempDir(), "secret", logrus.New())
+				require.NoError(t, err)
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				keyOne := "ONE"
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com/cache?keys=%s", keyOne), nil)
+				require.NoError(t, err)
+				req.Header.Set("Forgejo-Cache-Repo", cacheRepo)
+				req.Header.Set("Forgejo-Cache-RunNumber", cacheRunnum)
+				req.Header.Set("Forgejo-Cache-Timestamp", cacheTimestamp)
+				req.Header.Set("Forgejo-Cache-MAC", cacheMac)
+				req.Header.Set("Forgejo-Cache-Host", "http://example.com")
+				handler.find(w, req, nil)
+			},
+		},
+		{
+			name: "find open",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("openDB", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				req, err := http.NewRequest("GET", "example.com/cache", nil)
+				require.NoError(t, err)
+				handler.find(w, req, nil)
+			},
+		},
+		{
+			name: "reserve",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("openDB", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				body, err := json.Marshal(&Request{})
+				require.NoError(t, err)
+				req, err := http.NewRequest("POST", "example.com/caches", bytes.NewReader(body))
+				require.NoError(t, err)
+				handler.reserve(w, req, nil)
+			},
+		},
+		{
+			name: "upload",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("readCache", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				id := 1234
+				req, err := http.NewRequest("PATCH", fmt.Sprintf("http://example.com/caches/%d", id), nil)
+				require.NoError(t, err)
+				handler.upload(w, req, httprouter.Params{
+					httprouter.Param{Key: "id", Value: fmt.Sprintf("%d", id)},
+				})
+			},
+		},
+		{
+			name: "commit",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("readCache", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				id := 1234
+				req, err := http.NewRequest("POST", fmt.Sprintf("http://example.com/caches/%d", id), nil)
+				require.NoError(t, err)
+				handler.commit(w, req, httprouter.Params{
+					httprouter.Param{Key: "id", Value: fmt.Sprintf("%d", id)},
+				})
+			},
+		},
+		{
+			name: "get",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("readCache", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				id := 1234
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com/artifacts/%d", id), nil)
+				require.NoError(t, err)
+				handler.get(w, req, httprouter.Params{
+					httprouter.Param{Key: "id", Value: fmt.Sprintf("%d", id)},
+				})
+			},
+		},
+		// it currently is a noop
+		//{
+		//name: "clean",
+		//}
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			message := "ERROR MESSAGE"
+			if testCase.prepare != nil {
+				defer testCase.prepare(message)()
+			}
+
+			fatalMessage := "<unset>"
+			defer testutils.MockVariable(&fatal, func(_ logrus.FieldLogger, err error) {
+				fatalMessage = err.Error()
+			})()
+
+			assertFatalMessage := func(t *testing.T, expected string) {
+				t.Helper()
+				assert.Contains(t, fatalMessage, expected)
+			}
+
+			dir := filepath.Join(t.TempDir(), "artifactcache")
+			handler, err := StartHandler(dir, "", 0, "secret", nil)
+			require.NoError(t, err)
+
+			fatalMessage = "<unset>"
+
+			handler.setCaches(testCase.caches(t, message))
+
+			w := httptest.NewRecorder()
+			testCase.call(t, handler, w)
+			require.Equal(t, 500, w.Code)
+			assertFatalMessage(t, message)
+		})
 	}
 }
 
