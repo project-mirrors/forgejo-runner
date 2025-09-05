@@ -9,7 +9,7 @@ import (
 )
 
 func TestMac(t *testing.T) {
-	handler := &handler{
+	cache := &cachesImpl{
 		secret: "secret for testing",
 	}
 
@@ -18,7 +18,7 @@ func TestMac(t *testing.T) {
 		run := "1"
 		ts := strconv.FormatInt(time.Now().Unix(), 10)
 
-		mac := ComputeMac(handler.secret, name, run, ts, "")
+		mac := ComputeMac(cache.secret, name, run, ts, "")
 		rundata := RunData{
 			RepositoryFullName: name,
 			RunNumber:          run,
@@ -26,7 +26,7 @@ func TestMac(t *testing.T) {
 			RepositoryMAC:      mac,
 		}
 
-		repoName, err := handler.validateMac(rundata)
+		repoName, err := cache.validateMac(rundata)
 		require.NoError(t, err)
 		require.Equal(t, name, repoName)
 	})
@@ -36,7 +36,7 @@ func TestMac(t *testing.T) {
 		run := "1"
 		ts := "9223372036854775807" // This should last us for a while...
 
-		mac := ComputeMac(handler.secret, name, run, ts, "")
+		mac := ComputeMac(cache.secret, name, run, ts, "")
 		rundata := RunData{
 			RepositoryFullName: name,
 			RunNumber:          run,
@@ -44,7 +44,7 @@ func TestMac(t *testing.T) {
 			RepositoryMAC:      mac,
 		}
 
-		_, err := handler.validateMac(rundata)
+		_, err := cache.validateMac(rundata)
 		require.Error(t, err)
 	})
 
@@ -60,7 +60,7 @@ func TestMac(t *testing.T) {
 			RepositoryMAC:      "this is not the right mac :D",
 		}
 
-		repoName, err := handler.validateMac(rundata)
+		repoName, err := cache.validateMac(rundata)
 		require.Error(t, err)
 		require.Equal(t, "", repoName)
 	})

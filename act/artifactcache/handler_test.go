@@ -75,7 +75,7 @@ func TestHandler(t *testing.T) {
 
 	defer func() {
 		t.Run("inspect db", func(t *testing.T) {
-			db, err := handler.openDB()
+			db, err := handler.getCaches().openDB()
 			require.NoError(t, err)
 			defer db.Close()
 			require.NoError(t, db.Bolt().View(func(tx *bbolt.Tx) error {
@@ -986,17 +986,17 @@ func TestHandler_gcCache(t *testing.T) {
 		},
 	}
 
-	db, err := handler.openDB()
+	db, err := handler.getCaches().openDB()
 	require.NoError(t, err)
 	for _, c := range cases {
 		require.NoError(t, insertCache(db, c.Cache))
 	}
 	require.NoError(t, db.Close())
 
-	handler.setgcAt(time.Time{}) // ensure gcCache will not skip
-	handler.gcCache()
+	handler.getCaches().setgcAt(time.Time{}) // ensure gcCache will not skip
+	handler.getCaches().gcCache()
 
-	db, err = handler.openDB()
+	db, err = handler.getCaches().openDB()
 	require.NoError(t, err)
 	for i, v := range cases {
 		t.Run(fmt.Sprintf("%d_%s", i, v.Cache.Key), func(t *testing.T) {
