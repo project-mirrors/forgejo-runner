@@ -10,19 +10,17 @@ import (
 	"errors"
 	"strconv"
 	"time"
-
-	"code.forgejo.org/forgejo/runner/v9/act/cacheproxy"
 )
 
 var ErrValidation = errors.New("validation error")
 
-func (h *handler) validateMac(rundata cacheproxy.RunData) (string, error) {
+func (h *handler) validateMac(rundata RunData) (string, error) {
 	// TODO: allow configurable max age
 	if !validateAge(rundata.Timestamp) {
 		return "", ErrValidation
 	}
 
-	expectedMAC := computeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp, rundata.WriteIsolationKey)
+	expectedMAC := ComputeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp, rundata.WriteIsolationKey)
 	if hmac.Equal([]byte(expectedMAC), []byte(rundata.RepositoryMAC)) {
 		return rundata.RepositoryFullName, nil
 	}
@@ -40,7 +38,7 @@ func validateAge(ts string) bool {
 	return true
 }
 
-func computeMac(secret, repo, run, ts, writeIsolationKey string) string {
+func ComputeMac(secret, repo, run, ts, writeIsolationKey string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(repo))
 	mac.Write([]byte(">"))
