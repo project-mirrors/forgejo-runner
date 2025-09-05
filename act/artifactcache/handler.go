@@ -265,7 +265,7 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache, err := h.caches.readCache(id)
+	cache, err := h.caches.readCache(id, repo)
 	if err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
@@ -275,11 +275,6 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	if cache.Repo != repo {
-		// can only happen if the cache is corrupted
-		h.responseFatalJSON(w, r, fmt.Errorf("cache repo is not valid"))
-		return
-	}
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
 		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
@@ -320,7 +315,7 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache, err := h.caches.readCache(id)
+	cache, err := h.caches.readCache(id, repo)
 	if err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
@@ -330,11 +325,6 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	if cache.Repo != repo {
-		// can only happen if the cache is corrupted
-		h.responseFatalJSON(w, r, fmt.Errorf("cache repo is not valid"))
-		return
-	}
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
 		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
@@ -384,7 +374,7 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 		return
 	}
 
-	cache, err := h.caches.readCache(id)
+	cache, err := h.caches.readCache(id, repo)
 	if err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
@@ -394,11 +384,6 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 		return
 	}
 
-	if cache.Repo != repo {
-		// can only happen if the cache is corrupted
-		h.responseFatalJSON(w, r, fmt.Errorf("cache repo is not valid"))
-		return
-	}
 	// reads permitted against caches w/ the same isolation key, or no isolation key
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey && cache.WriteIsolationKey != "" {
 		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))

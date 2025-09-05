@@ -20,7 +20,7 @@ import (
 type caches interface {
 	openDB() (*bolthold.Store, error)
 	validateMac(rundata RunData) (string, error)
-	readCache(id uint64) (*Cache, error)
+	readCache(id uint64, repo string) (*Cache, error)
 	useCache(id uint64) error
 	setgcAt(at time.Time)
 	gcCache()
@@ -139,7 +139,7 @@ func insertCache(db *bolthold.Store, cache *Cache) error {
 	return nil
 }
 
-func (c *cachesImpl) readCache(id uint64) (*Cache, error) {
+func (c *cachesImpl) readCache(id uint64, repo string) (*Cache, error) {
 	db, err := c.openDB()
 	if err != nil {
 		return nil, err
@@ -149,6 +149,10 @@ func (c *cachesImpl) readCache(id uint64) (*Cache, error) {
 	if err := db.Get(id, cache); err != nil {
 		return nil, fmt.Errorf("readCache: Get(%v): %w", id, err)
 	}
+	if cache.Repo != repo {
+		return nil, fmt.Errorf("readCache: Get(%v): cache.Repo %s != repo %s", id, cache.Repo, repo)
+	}
+
 	return cache, nil
 }
 
