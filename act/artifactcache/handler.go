@@ -177,18 +177,10 @@ func (h *handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 	}
 	defer db.Close()
 
-	cache, err := findCache(db, repo, keys, version, rundata.WriteIsolationKey)
+	cache, err := findCacheWithIsolationKeyFallback(db, repo, keys, version, rundata.WriteIsolationKey)
 	if err != nil {
 		h.responseFatalJSON(w, r, err)
 		return
-	}
-	// If read was scoped to WriteIsolationKey and didn't find anything, we can fallback to the non-isolated cache read
-	if cache == nil && rundata.WriteIsolationKey != "" {
-		cache, err = findCache(db, repo, keys, version, "")
-		if err != nil {
-			h.responseFatalJSON(w, r, err)
-			return
-		}
 	}
 	if cache == nil {
 		h.responseJSON(w, r, 204)

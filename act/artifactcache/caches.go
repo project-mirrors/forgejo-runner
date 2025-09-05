@@ -90,6 +90,21 @@ func (c *cachesImpl) openDB() (*bolthold.Store, error) {
 	return db, nil
 }
 
+var findCacheWithIsolationKeyFallback = func(db *bolthold.Store, repo string, keys []string, version, writeIsolationKey string) (*Cache, error) {
+	cache, err := findCache(db, repo, keys, version, writeIsolationKey)
+	if err != nil {
+		return nil, err
+	}
+	// If read was scoped to WriteIsolationKey and didn't find anything, we can fallback to the non-isolated cache read
+	if cache == nil && writeIsolationKey != "" {
+		cache, err = findCache(db, repo, keys, version, "")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cache, nil
+}
+
 // if not found, return (nil, nil) instead of an error.
 func findCache(db *bolthold.Store, repo string, keys []string, version, writeIsolationKey string) (*Cache, error) {
 	cache := &Cache{}
