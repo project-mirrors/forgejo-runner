@@ -14,13 +14,13 @@ import (
 
 var ErrValidation = errors.New("validation error")
 
-func (h *handler) validateMac(rundata RunData) (string, error) {
+func (c *cachesImpl) validateMac(rundata RunData) (string, error) {
 	// TODO: allow configurable max age
 	if !validateAge(rundata.Timestamp) {
 		return "", ErrValidation
 	}
 
-	expectedMAC := ComputeMac(h.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp, rundata.WriteIsolationKey)
+	expectedMAC := ComputeMac(c.secret, rundata.RepositoryFullName, rundata.RunNumber, rundata.Timestamp, rundata.WriteIsolationKey)
 	if hmac.Equal([]byte(expectedMAC), []byte(rundata.RepositoryMAC)) {
 		return rundata.RepositoryFullName, nil
 	}

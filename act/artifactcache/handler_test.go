@@ -4,18 +4,28 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"code.forgejo.org/forgejo/runner/v11/testutils"
+	"github.com/julienschmidt/httprouter"
+	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/mock"
 	"github.com/timshannon/bolthold"
 	"go.etcd.io/bbolt"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -55,6 +65,10 @@ var (
 )
 
 func TestHandler(t *testing.T) {
+	defer testutils.MockVariable(&fatal, func(_ logrus.FieldLogger, err error) {
+		t.Fatalf("unexpected call to fatal(%v)", err)
+	})()
+
 	dir := filepath.Join(t.TempDir(), "artifactcache")
 	handler, err := StartHandler(dir, "", 0, "secret", nil)
 	require.NoError(t, err)
@@ -63,8 +77,8 @@ func TestHandler(t *testing.T) {
 	base := fmt.Sprintf("%s%s", handler.ExternalURL(), urlBase)
 
 	defer func() {
-		t.Run("inpect db", func(t *testing.T) {
-			db, err := handler.openDB()
+		t.Run("inspect db", func(t *testing.T) {
+			db, err := handler.getCaches().openDB()
 			require.NoError(t, err)
 			defer db.Close()
 			require.NoError(t, db.Bolt().View(func(tx *bbolt.Tx) error {
@@ -892,6 +906,155 @@ func uploadCacheNormally(t *testing.T, base, key, version, writeIsolationKey str
 	}
 }
 
+func TestHandlerAPIFatalErrors(t *testing.T) {
+	for _, testCase := range []struct {
+		name    string
+		prepare func(message string) func()
+		caches  func(t *testing.T, message string) caches
+		call    func(t *testing.T, handler Handler, w http.ResponseWriter)
+	}{
+		{
+			name: "find",
+			prepare: func(message string) func() {
+				return testutils.MockVariable(&findCacheWithIsolationKeyFallback, func(db *bolthold.Store, repo string, keys []string, version, writeIsolationKey string) (*Cache, error) {
+					return nil, errors.New(message)
+				})
+			},
+			caches: func(t *testing.T, message string) caches {
+				caches, err := newCaches(t.TempDir(), "secret", logrus.New())
+				require.NoError(t, err)
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				keyOne := "ONE"
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com/cache?keys=%s", keyOne), nil)
+				require.NoError(t, err)
+				req.Header.Set("Forgejo-Cache-Repo", cacheRepo)
+				req.Header.Set("Forgejo-Cache-RunNumber", cacheRunnum)
+				req.Header.Set("Forgejo-Cache-Timestamp", cacheTimestamp)
+				req.Header.Set("Forgejo-Cache-MAC", cacheMac)
+				req.Header.Set("Forgejo-Cache-Host", "http://example.com")
+				handler.find(w, req, nil)
+			},
+		},
+		{
+			name: "find open",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("openDB", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				req, err := http.NewRequest("GET", "example.com/cache", nil)
+				require.NoError(t, err)
+				handler.find(w, req, nil)
+			},
+		},
+		{
+			name: "reserve",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("openDB", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				body, err := json.Marshal(&Request{})
+				require.NoError(t, err)
+				req, err := http.NewRequest("POST", "example.com/caches", bytes.NewReader(body))
+				require.NoError(t, err)
+				handler.reserve(w, req, nil)
+			},
+		},
+		{
+			name: "upload",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("readCache", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				id := 1234
+				req, err := http.NewRequest("PATCH", fmt.Sprintf("http://example.com/caches/%d", id), nil)
+				require.NoError(t, err)
+				handler.upload(w, req, httprouter.Params{
+					httprouter.Param{Key: "id", Value: fmt.Sprintf("%d", id)},
+				})
+			},
+		},
+		{
+			name: "commit",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("readCache", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				id := 1234
+				req, err := http.NewRequest("POST", fmt.Sprintf("http://example.com/caches/%d", id), nil)
+				require.NoError(t, err)
+				handler.commit(w, req, httprouter.Params{
+					httprouter.Param{Key: "id", Value: fmt.Sprintf("%d", id)},
+				})
+			},
+		},
+		{
+			name: "get",
+			caches: func(t *testing.T, message string) caches {
+				caches := newMockCaches(t)
+				caches.On("validateMac", RunData{}).Return(cacheRepo, nil)
+				caches.On("readCache", mock.Anything, mock.Anything).Return(nil, errors.New(message))
+				return caches
+			},
+			call: func(t *testing.T, handler Handler, w http.ResponseWriter) {
+				id := 1234
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com/artifacts/%d", id), nil)
+				require.NoError(t, err)
+				handler.get(w, req, httprouter.Params{
+					httprouter.Param{Key: "id", Value: fmt.Sprintf("%d", id)},
+				})
+			},
+		},
+		// it currently is a noop
+		//{
+		//name: "clean",
+		//}
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			message := "ERROR MESSAGE"
+			if testCase.prepare != nil {
+				defer testCase.prepare(message)()
+			}
+
+			fatalMessage := "<unset>"
+			defer testutils.MockVariable(&fatal, func(_ logrus.FieldLogger, err error) {
+				fatalMessage = err.Error()
+			})()
+
+			assertFatalMessage := func(t *testing.T, expected string) {
+				t.Helper()
+				assert.Contains(t, fatalMessage, expected)
+			}
+
+			dir := filepath.Join(t.TempDir(), "artifactcache")
+			handler, err := StartHandler(dir, "", 0, "secret", nil)
+			require.NoError(t, err)
+
+			fatalMessage = "<unset>"
+
+			handler.setCaches(testCase.caches(t, message))
+
+			w := httptest.NewRecorder()
+			testCase.call(t, handler, w)
+			require.Equal(t, 500, w.Code)
+			assertFatalMessage(t, message)
+		})
+	}
+}
+
 func TestHandler_gcCache(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "artifactcache")
 	handler, err := StartHandler(dir, "", 0, "", nil)
@@ -975,17 +1138,17 @@ func TestHandler_gcCache(t *testing.T) {
 		},
 	}
 
-	db, err := handler.openDB()
+	db, err := handler.getCaches().openDB()
 	require.NoError(t, err)
 	for _, c := range cases {
 		require.NoError(t, insertCache(db, c.Cache))
 	}
 	require.NoError(t, db.Close())
 
-	handler.setgcAt(time.Time{}) // ensure gcCache will not skip
-	handler.gcCache()
+	handler.getCaches().setgcAt(time.Time{}) // ensure gcCache will not skip
+	handler.getCaches().gcCache()
 
-	db, err = handler.openDB()
+	db, err = handler.getCaches().openDB()
 	require.NoError(t, err)
 	for i, v := range cases {
 		t.Run(fmt.Sprintf("%d_%s", i, v.Cache.Key), func(t *testing.T) {
@@ -1031,4 +1194,43 @@ func TestHandler_ExternalURL(t *testing.T) {
 		require.NoError(t, handler.Close())
 		assert.True(t, handler.isClosed())
 	})
+}
+
+var (
+	settleTime       = 100 * time.Millisecond
+	fatalWaitingTime = 30 * time.Second
+)
+
+func waitSig(t *testing.T, c <-chan os.Signal, sig os.Signal) {
+	t.Helper()
+
+	// Sleep multiple times to give the kernel more tries to
+	// deliver the signal.
+	start := time.Now()
+	timer := time.NewTimer(settleTime / 10)
+	defer timer.Stop()
+	for time.Since(start) < fatalWaitingTime {
+		select {
+		case s := <-c:
+			if s == sig {
+				return
+			}
+			t.Fatalf("signal was %v, want %v", s, sig)
+		case <-timer.C:
+			timer.Reset(settleTime / 10)
+		}
+	}
+	t.Fatalf("timeout after %v waiting for %v", fatalWaitingTime, sig)
+}
+
+func TestHandler_fatal(t *testing.T) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGTERM)
+	defer signal.Stop(c)
+
+	discard := logrus.New()
+	discard.Out = io.Discard
+	fatal(discard, errors.New("fatal error"))
+
+	waitSig(t, c, syscall.SIGTERM)
 }

@@ -7,18 +7,14 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/sirupsen/logrus"
 	"github.com/timshannon/bolthold"
-	"go.etcd.io/bbolt"
 
 	"code.forgejo.org/forgejo/runner/v11/act/common"
 )
@@ -27,11 +23,19 @@ const (
 	urlBase = "/_apis/artifactcache"
 )
 
+var fatal = func(logger logrus.FieldLogger, err error) {
+	logger.Errorf("unrecoverable error in the cache: %v", err)
+	if err := syscall.Kill(syscall.Getpid(), syscall.SIGTERM); err != nil {
+		logger.Errorf("unrecoverable error in the cache: failed to send the TERM signal to shutdown the daemon %v", err)
+	}
+}
+
 type Handler interface {
 	ExternalURL() string
 	Close() error
 	isClosed() bool
-	openDB() (*bolthold.Store, error)
+	getCaches() caches
+	setCaches(caches caches)
 	find(w http.ResponseWriter, r *http.Request, params httprouter.Params)
 	reserve(w http.ResponseWriter, r *http.Request, params httprouter.Params)
 	upload(w http.ResponseWriter, r *http.Request, params httprouter.Params)
@@ -39,32 +43,21 @@ type Handler interface {
 	get(w http.ResponseWriter, r *http.Request, params httprouter.Params)
 	clean(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 	middleware(handler httprouter.Handle) httprouter.Handle
-	readCache(id uint64) (*Cache, error)
-	useCache(id uint64) error
-	setgcAt(at time.Time)
-	gcCache()
 	responseJSON(w http.ResponseWriter, r *http.Request, code int, v ...any)
 }
 
 type handler struct {
-	dir      string
-	storage  *Storage
+	caches   caches
 	router   *httprouter.Router
 	listener net.Listener
 	server   *http.Server
 	logger   logrus.FieldLogger
-	secret   string
-
-	gcing atomic.Bool
-	gcAt  time.Time
 
 	outboundIP string
 }
 
 func StartHandler(dir, outboundIP string, port uint16, secret string, logger logrus.FieldLogger) (Handler, error) {
-	h := &handler{
-		secret: secret,
-	}
+	h := &handler{}
 
 	if logger == nil {
 		discard := logrus.New()
@@ -74,24 +67,11 @@ func StartHandler(dir, outboundIP string, port uint16, secret string, logger log
 	logger = logger.WithField("module", "artifactcache")
 	h.logger = logger
 
-	if dir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, err
-		}
-		dir = filepath.Join(home, ".cache", "actcache")
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, err
-	}
-
-	h.dir = dir
-
-	storage, err := NewStorage(filepath.Join(dir, "cache"))
+	caches, err := newCaches(dir, secret, logger)
 	if err != nil {
 		return nil, err
 	}
-	h.storage = storage
+	h.caches = caches
 
 	if outboundIP != "" {
 		h.outboundIP = outboundIP
@@ -110,8 +90,6 @@ func StartHandler(dir, outboundIP string, port uint16, secret string, logger log
 	router.POST(urlBase+"/clean", h.middleware(h.clean))
 
 	h.router = router
-
-	h.gcCache()
 
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port)) // listen on all interfaces
 	if err != nil {
@@ -168,22 +146,18 @@ func (h *handler) isClosed() bool {
 	return h.listener == nil && h.server == nil
 }
 
-func (h *handler) openDB() (*bolthold.Store, error) {
-	return bolthold.Open(filepath.Join(h.dir, "bolt.db"), 0o644, &bolthold.Options{
-		Encoder: json.Marshal,
-		Decoder: json.Unmarshal,
-		Options: &bbolt.Options{
-			Timeout:      5 * time.Second,
-			NoGrowSync:   bbolt.DefaultOptions.NoGrowSync,
-			FreelistType: bbolt.DefaultOptions.FreelistType,
-		},
-	})
+func (h *handler) getCaches() caches {
+	return h.caches
+}
+
+func (h *handler) setCaches(caches caches) {
+	h.caches = caches
 }
 
 // GET /_apis/artifactcache/cache
 func (h *handler) find(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	rundata := runDataFromHeaders(r)
-	repo, err := h.validateMac(rundata)
+	repo, err := h.caches.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 403, err)
 		return
@@ -196,32 +170,24 @@ func (h *handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 	}
 	version := r.URL.Query().Get("version")
 
-	db, err := h.openDB()
+	db, err := h.caches.openDB()
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	defer db.Close()
 
-	cache, err := findCache(db, repo, keys, version, rundata.WriteIsolationKey)
+	cache, err := findCacheWithIsolationKeyFallback(db, repo, keys, version, rundata.WriteIsolationKey)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
-	}
-	// If read was scoped to WriteIsolationKey and didn't find anything, we can fallback to the non-isolated cache read
-	if cache == nil && rundata.WriteIsolationKey != "" {
-		cache, err = findCache(db, repo, keys, version, "")
-		if err != nil {
-			h.responseJSON(w, r, 500, err)
-			return
-		}
 	}
 	if cache == nil {
 		h.responseJSON(w, r, 204)
 		return
 	}
 
-	if ok, err := h.storage.Exist(cache.ID); err != nil {
+	if ok, err := h.caches.exist(cache.ID); err != nil {
 		h.responseJSON(w, r, 500, err)
 		return
 	} else if !ok {
@@ -240,7 +206,7 @@ func (h *handler) find(w http.ResponseWriter, r *http.Request, params httprouter
 // POST /_apis/artifactcache/caches
 func (h *handler) reserve(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	rundata := runDataFromHeaders(r)
-	repo, err := h.validateMac(rundata)
+	repo, err := h.caches.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 403, err)
 		return
@@ -255,9 +221,9 @@ func (h *handler) reserve(w http.ResponseWriter, r *http.Request, params httprou
 	api.Key = strings.ToLower(api.Key)
 
 	cache := api.ToCache()
-	db, err := h.openDB()
+	db, err := h.caches.openDB()
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	defer db.Close()
@@ -279,7 +245,7 @@ func (h *handler) reserve(w http.ResponseWriter, r *http.Request, params httprou
 // PATCH /_apis/artifactcache/caches/:id
 func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	rundata := runDataFromHeaders(r)
-	repo, err := h.validateMac(rundata)
+	repo, err := h.caches.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 403, err)
 		return
@@ -291,21 +257,16 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache, err := h.readCache(id)
+	cache, err := h.caches.readCache(id, repo)
 	if err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		h.responseFatalJSON(w, r, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
-	// Should not happen
-	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
-		return
-	}
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
 		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
@@ -320,11 +281,11 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 		h.responseJSON(w, r, 400, fmt.Errorf("cache parseContentRange(%s): %w", r.Header.Get("Content-Range"), err))
 		return
 	}
-	if err := h.storage.Write(cache.ID, start, r.Body); err != nil {
+	if err := h.caches.write(cache.ID, start, r.Body); err != nil {
 		h.responseJSON(w, r, 500, fmt.Errorf("cache storage.Write: %w", err))
 		return
 	}
-	if err := h.useCache(id); err != nil {
+	if err := h.caches.useCache(id); err != nil {
 		h.responseJSON(w, r, 500, fmt.Errorf("cache useCache: %w", err))
 		return
 	}
@@ -334,7 +295,7 @@ func (h *handler) upload(w http.ResponseWriter, r *http.Request, params httprout
 // POST /_apis/artifactcache/caches/:id
 func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	rundata := runDataFromHeaders(r)
-	repo, err := h.validateMac(rundata)
+	repo, err := h.caches.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 403, err)
 		return
@@ -346,21 +307,16 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	cache, err := h.readCache(id)
+	cache, err := h.caches.readCache(id, repo)
 	if err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		h.responseFatalJSON(w, r, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
-	// Should not happen
-	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
-		return
-	}
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey {
 		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
@@ -371,17 +327,17 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 		return
 	}
 
-	size, err := h.storage.Commit(cache.ID, cache.Size)
+	size, err := h.caches.commit(cache.ID, cache.Size)
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseJSON(w, r, 500, fmt.Errorf("commit(%v): %w", cache.ID, err))
 		return
 	}
 	// write real size back to cache, it may be different from the current value when the request doesn't specify it.
 	cache.Size = size
 
-	db, err := h.openDB()
+	db, err := h.caches.openDB()
 	if err != nil {
-		h.responseJSON(w, r, 500, err)
+		h.responseFatalJSON(w, r, err)
 		return
 	}
 	defer db.Close()
@@ -398,7 +354,7 @@ func (h *handler) commit(w http.ResponseWriter, r *http.Request, params httprout
 // GET /_apis/artifactcache/artifacts/:id
 func (h *handler) get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	rundata := runDataFromHeaders(r)
-	repo, err := h.validateMac(rundata)
+	repo, err := h.caches.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 403, err)
 		return
@@ -410,38 +366,33 @@ func (h *handler) get(w http.ResponseWriter, r *http.Request, params httprouter.
 		return
 	}
 
-	cache, err := h.readCache(id)
+	cache, err := h.caches.readCache(id, repo)
 	if err != nil {
 		if errors.Is(err, bolthold.ErrNotFound) {
 			h.responseJSON(w, r, 404, fmt.Errorf("cache %d: not reserved", id))
 			return
 		}
-		h.responseJSON(w, r, 500, fmt.Errorf("cache Get: %w", err))
+		h.responseFatalJSON(w, r, fmt.Errorf("cache Get: %w", err))
 		return
 	}
 
-	// Should not happen
-	if cache.Repo != repo {
-		h.responseJSON(w, r, 500, fmt.Errorf("cache repo is not valid"))
-		return
-	}
 	// reads permitted against caches w/ the same isolation key, or no isolation key
 	if cache.WriteIsolationKey != rundata.WriteIsolationKey && cache.WriteIsolationKey != "" {
 		h.responseJSON(w, r, 403, fmt.Errorf("cache authorized for write isolation %q, but attempting to operate on %q", rundata.WriteIsolationKey, cache.WriteIsolationKey))
 		return
 	}
 
-	if err := h.useCache(id); err != nil {
+	if err := h.caches.useCache(id); err != nil {
 		h.responseJSON(w, r, 500, fmt.Errorf("cache useCache: %w", err))
 		return
 	}
-	h.storage.Serve(w, r, id)
+	h.caches.serve(w, r, id)
 }
 
 // POST /_apis/artifactcache/clean
 func (h *handler) clean(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	rundata := runDataFromHeaders(r)
-	_, err := h.validateMac(rundata)
+	_, err := h.caches.validateMac(rundata)
 	if err != nil {
 		h.responseJSON(w, r, 403, err)
 		return
@@ -456,203 +407,13 @@ func (h *handler) middleware(handler httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		h.logger.Debugf("%s %s", r.Method, r.RequestURI)
 		handler(w, r, params)
-		go h.gcCache()
+		go h.caches.gcCache()
 	}
 }
 
-// if not found, return (nil, nil) instead of an error.
-func findCache(db *bolthold.Store, repo string, keys []string, version, writeIsolationKey string) (*Cache, error) {
-	cache := &Cache{}
-	for _, prefix := range keys {
-		// if a key in the list matches exactly, don't return partial matches
-		if err := db.FindOne(cache,
-			bolthold.Where("Repo").Eq(repo).Index("Repo").
-				And("Key").Eq(prefix).
-				And("Version").Eq(version).
-				And("WriteIsolationKey").Eq(writeIsolationKey).
-				And("Complete").Eq(true).
-				SortBy("CreatedAt").Reverse()); err == nil || !errors.Is(err, bolthold.ErrNotFound) {
-			if err != nil {
-				return nil, fmt.Errorf("find cache: %w", err)
-			}
-			return cache, nil
-		}
-		prefixPattern := fmt.Sprintf("^%s", regexp.QuoteMeta(prefix))
-		re, err := regexp.Compile(prefixPattern)
-		if err != nil {
-			continue
-		}
-		if err := db.FindOne(cache,
-			bolthold.Where("Repo").Eq(repo).Index("Repo").
-				And("Key").RegExp(re).
-				And("Version").Eq(version).
-				And("WriteIsolationKey").Eq(writeIsolationKey).
-				And("Complete").Eq(true).
-				SortBy("CreatedAt").Reverse()); err != nil {
-			if errors.Is(err, bolthold.ErrNotFound) {
-				continue
-			}
-			return nil, fmt.Errorf("find cache: %w", err)
-		}
-		return cache, nil
-	}
-	return nil, nil
-}
-
-func insertCache(db *bolthold.Store, cache *Cache) error {
-	if err := db.Insert(bolthold.NextSequence(), cache); err != nil {
-		return fmt.Errorf("insert cache: %w", err)
-	}
-	// write back id to db
-	if err := db.Update(cache.ID, cache); err != nil {
-		return fmt.Errorf("write back id to db: %w", err)
-	}
-	return nil
-}
-
-func (h *handler) readCache(id uint64) (*Cache, error) {
-	db, err := h.openDB()
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-	cache := &Cache{}
-	if err := db.Get(id, cache); err != nil {
-		return nil, err
-	}
-	return cache, nil
-}
-
-func (h *handler) useCache(id uint64) error {
-	db, err := h.openDB()
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-	cache := &Cache{}
-	if err := db.Get(id, cache); err != nil {
-		return err
-	}
-	cache.UsedAt = time.Now().Unix()
-	return db.Update(cache.ID, cache)
-}
-
-const (
-	keepUsed   = 30 * 24 * time.Hour
-	keepUnused = 7 * 24 * time.Hour
-	keepTemp   = 5 * time.Minute
-	keepOld    = 5 * time.Minute
-)
-
-func (h *handler) setgcAt(at time.Time) {
-	h.gcAt = at
-}
-
-func (h *handler) gcCache() {
-	if h.gcing.Load() {
-		return
-	}
-	if !h.gcing.CompareAndSwap(false, true) {
-		return
-	}
-	defer h.gcing.Store(false)
-
-	if time.Since(h.gcAt) < time.Hour {
-		h.logger.Debugf("skip gc: %v", h.gcAt.String())
-		return
-	}
-	h.gcAt = time.Now()
-	h.logger.Debugf("gc: %v", h.gcAt.String())
-
-	db, err := h.openDB()
-	if err != nil {
-		return
-	}
-	defer db.Close()
-
-	// Remove the caches which are not completed for a while, they are most likely to be broken.
-	var caches []*Cache
-	if err := db.Find(&caches, bolthold.
-		Where("UsedAt").Lt(time.Now().Add(-keepTemp).Unix()).
-		And("Complete").Eq(false),
-	); err != nil {
-		h.logger.Warnf("find caches: %v", err)
-	} else {
-		for _, cache := range caches {
-			h.storage.Remove(cache.ID)
-			if err := db.Delete(cache.ID, cache); err != nil {
-				h.logger.Warnf("delete cache: %v", err)
-				continue
-			}
-			h.logger.Infof("deleted cache: %+v", cache)
-		}
-	}
-
-	// Remove the old caches which have not been used recently.
-	caches = caches[:0]
-	if err := db.Find(&caches, bolthold.
-		Where("UsedAt").Lt(time.Now().Add(-keepUnused).Unix()),
-	); err != nil {
-		h.logger.Warnf("find caches: %v", err)
-	} else {
-		for _, cache := range caches {
-			h.storage.Remove(cache.ID)
-			if err := db.Delete(cache.ID, cache); err != nil {
-				h.logger.Warnf("delete cache: %v", err)
-				continue
-			}
-			h.logger.Infof("deleted cache: %+v", cache)
-		}
-	}
-
-	// Remove the old caches which are too old.
-	caches = caches[:0]
-	if err := db.Find(&caches, bolthold.
-		Where("CreatedAt").Lt(time.Now().Add(-keepUsed).Unix()),
-	); err != nil {
-		h.logger.Warnf("find caches: %v", err)
-	} else {
-		for _, cache := range caches {
-			h.storage.Remove(cache.ID)
-			if err := db.Delete(cache.ID, cache); err != nil {
-				h.logger.Warnf("delete cache: %v", err)
-				continue
-			}
-			h.logger.Infof("deleted cache: %+v", cache)
-		}
-	}
-
-	// Remove the old caches with the same key and version, keep the latest one.
-	// Also keep the olds which have been used recently for a while in case of the cache is still in use.
-	if results, err := db.FindAggregate(
-		&Cache{},
-		bolthold.Where("Complete").Eq(true),
-		"Key", "Version",
-	); err != nil {
-		h.logger.Warnf("find aggregate caches: %v", err)
-	} else {
-		for _, result := range results {
-			if result.Count() <= 1 {
-				continue
-			}
-			result.Sort("CreatedAt")
-			caches = caches[:0]
-			result.Reduction(&caches)
-			for _, cache := range caches[:len(caches)-1] {
-				if time.Since(time.Unix(cache.UsedAt, 0)) < keepOld {
-					// Keep it since it has been used recently, even if it's old.
-					// Or it could break downloading in process.
-					continue
-				}
-				h.storage.Remove(cache.ID)
-				if err := db.Delete(cache.ID, cache); err != nil {
-					h.logger.Warnf("delete cache: %v", err)
-					continue
-				}
-				h.logger.Infof("deleted cache: %+v", cache)
-			}
-		}
-	}
+func (h *handler) responseFatalJSON(w http.ResponseWriter, r *http.Request, err error) {
+	h.responseJSON(w, r, 500, err)
+	fatal(h.logger, err)
 }
 
 func (h *handler) responseJSON(w http.ResponseWriter, r *http.Request, code int, v ...any) {

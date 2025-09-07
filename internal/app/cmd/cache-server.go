@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/config"
 
@@ -73,7 +74,7 @@ func runCacheServer(ctx context.Context, configFile *string, cacheArgs *cacheSer
 		log.Infof("cache server is listening on %v", cacheHandler.ExternalURL())
 
 		c := make(chan os.Signal, 1)
-		signal.Notify(c, os.Interrupt)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 		<-c
 
 		return nil

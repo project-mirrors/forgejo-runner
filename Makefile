@@ -62,7 +62,7 @@ else
 	endif
 endif
 
-GO_PACKAGES_TO_VET ?= $(filter-out code.forgejo.org/forgejo/runner/v11/internal/pkg/client/mocks,$(shell $(GO) list ./...))
+GO_PACKAGES_TO_VET ?= $(filter-out code.forgejo.org/forgejo/runner/v11/internal/pkg/client/mocks code.forgejo.org/forgejo/runner/v11/act/artifactcache/mock_caches.go,$(shell $(GO) list ./...))
 
 TAGS ?=
 LDFLAGS ?= -X "code.forgejo.org/forgejo/runner/v11/internal/pkg/ver.version=v$(RELEASE_VERSION)"
@@ -120,7 +120,7 @@ vet:
 
 .PHONY: generate
 generate:
-	$(GO) generate ./internal/...
+	$(GO) generate ./...
 
 install: $(GOFILES)
 	$(GO) install -v -tags '$(TAGS)' -ldflags '$(EXTLDFLAGS)-s -w $(LDFLAGS)'
