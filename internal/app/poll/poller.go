@@ -22,6 +22,7 @@ import (
 
 const PollerID = "PollerID"
 
+//go:generate mockery --name Poller
 type Poller interface {
 	Poll()
 	Shutdown(ctx context.Context) error

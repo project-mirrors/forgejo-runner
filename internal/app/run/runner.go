@@ -48,6 +48,7 @@ type Runner struct {
 	runningTasks sync.Map
 }
 
+//go:generate mockery --name RunnerInterface
 type RunnerInterface interface {
 	Run(ctx context.Context, task *runnerv1.Task) error
 }
