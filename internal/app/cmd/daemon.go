@@ -21,14 +21,22 @@ import (
 	"code.forgejo.org/forgejo/runner/v11/internal/app/poll"
 	"code.forgejo.org/forgejo/runner/v11/internal/app/run"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/client"
+	"code.forgejo.org/forgejo/runner/v11/internal/pkg/common"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/config"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/envcheck"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/labels"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/ver"
 )
 
-func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command, args []string) error {
+func runDaemon(signalContext context.Context, configFile *string) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		// signalContext will be 'done' when we receive a graceful shutdown signal; daemonContext is not a derived
+		// context because we want it to 'outlive' the signalContext in order to perform graceful cleanup.
+		daemonContext, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		ctx := common.WithDaemonContext(daemonContext, daemonContext)
+
 		cfg, err := config.LoadDefault(*configFile)
 		if err != nil {
 			return fmt.Errorf("invalid configuration: %w", err)
@@ -118,13 +126,13 @@ func runDaemon(ctx context.Context, configFile *string) func(cmd *cobra.Command,
 
 		go poller.Poll()
 
-		<-ctx.Done()
+		<-signalContext.Done()
 		log.Infof("runner: %s shutdown initiated, waiting [runner].shutdown_timeout=%s for running jobs to complete before shutting down", resp.Msg.GetRunner().GetName(), cfg.Runner.ShutdownTimeout)
 
-		ctx, cancel := context.WithTimeout(context.Background(), cfg.Runner.ShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(daemonContext, cfg.Runner.ShutdownTimeout)
 		defer cancel()
 
-		err = poller.Shutdown(ctx)
+		err = poller.Shutdown(shutdownCtx)
 		if err != nil {
 			log.Warnf("runner: %s cancelled in progress jobs during shutdown", resp.Msg.GetRunner().GetName())
 		}

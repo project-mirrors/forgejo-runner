@@ -10,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"code.forgejo.org/forgejo/runner/v11/internal/pkg/common"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/config"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/ver"
 )
@@ -46,7 +45,7 @@ func Execute(ctx context.Context) {
 		Use:   "daemon",
 		Short: "Run as a runner daemon",
 		Args:  cobra.MaximumNArgs(1),
-		RunE:  runDaemon(common.WithDaemonContext(ctx, ctx), &configFile),
+		RunE:  runDaemon(ctx, &configFile),
 	}
 	rootCmd.AddCommand(daemonCmd)
 
