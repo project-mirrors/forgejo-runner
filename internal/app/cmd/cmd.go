@@ -45,7 +45,7 @@ func Execute(ctx context.Context) {
 		Use:   "daemon",
 		Short: "Run as a runner daemon",
 		Args:  cobra.MaximumNArgs(1),
-		RunE:  runDaemon(ctx, &configFile),
+		RunE:  getRunDaemonCommandProcessor(ctx, &configFile),
 	}
 	rootCmd.AddCommand(daemonCmd)
 
