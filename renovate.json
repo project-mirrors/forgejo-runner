@@ -4,7 +4,7 @@
   "prConcurrentLimit": 1,
   "packageRules": [
     {
-      "description": "Separate minor and patch for some packages",
+      "description": "separate minor and patch for some packages",
       "matchDepNames": ["github.com/rhysd/actionlint"],
       "separateMinorPatch": true
     },
@@ -13,6 +13,11 @@
       "matchDepNames": ["code.forgejo.org/forgejo/forgejo"],
       "separateMultipleMajor": true,
       "separateMultipleMinor": true
+    },
+    {
+      "description": "group runner updates",
+      "matchDepNames": ["code.forgejo.org/forgejo/runner", "forgejo/runner"],
+      "groupName": "forgejo-runner"
     }
   ],
   "labels": ["Kind/DependencyUpdate", "run-end-to-end-tests"],
