@@ -8,6 +8,7 @@ import (
 	"code.forgejo.org/forgejo/runner/v11/act/common"
 	"code.forgejo.org/forgejo/runner/v11/act/container"
 	"code.forgejo.org/forgejo/runner/v11/act/model"
+	"github.com/sirupsen/logrus"
 )
 
 type jobInfo interface {
@@ -104,37 +105,40 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 		}
 	}
 
-	postExecutor = postExecutor.Finally(func(ctx context.Context) error {
+	setJobResults := func(ctx context.Context) error {
 		jobError := common.JobError(ctx)
 
 		// Fresh context to ensure job result output works even if prev. context was a cancelled job
 		ctx, cancel := context.WithTimeout(common.WithLogger(context.Background(), common.Logger(ctx)), time.Minute)
 		defer cancel()
 		setJobResult(ctx, info, rc, jobError == nil)
-		setJobOutputs(ctx, rc)
 
+		return nil
+	}
+
+	cleanupJob := func(_ context.Context) error {
 		var err error
-		{
-			// Separate timeout for cleanup tasks; logger is cleared so that cleanup logs go to runner, not job
-			ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
-			defer cancel()
 
-			logger := common.Logger(ctx)
-			logger.Debugf("Cleaning up container for job %s", rc.jobContainerName())
-			if err = info.stopContainer()(ctx); err != nil {
-				logger.Errorf("Error while stop job container %s: %v", rc.jobContainerName(), err)
-			}
+		// Separate timeout for cleanup tasks; logger is cleared so that cleanup logs go to runner, not job
+		ctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+		defer cancel()
 
-			if !rc.IsHostEnv(ctx) && rc.getNetworkCreated(ctx) {
-				networkName := rc.getNetworkName(ctx)
-				logger.Debugf("Cleaning up network %s for job %s", networkName, rc.jobContainerName())
-				if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
-					logger.Errorf("Error while cleaning network %s: %v", networkName, err)
-				}
+		logger := common.Logger(ctx)
+		logger.Debugf("Cleaning up container for job %s", rc.jobContainerName())
+		if err = info.stopContainer()(ctx); err != nil {
+			logger.Errorf("Error while stop job container %s: %v", rc.jobContainerName(), err)
+		}
+
+		if !rc.IsHostEnv(ctx) && rc.getNetworkCreated(ctx) {
+			networkName := rc.getNetworkName(ctx)
+			logger.Debugf("Cleaning up network %s for job %s", networkName, rc.jobContainerName())
+			if err := container.NewDockerNetworkRemoveExecutor(networkName)(ctx); err != nil {
+				logger.Errorf("Error while cleaning network %s: %v", networkName, err)
 			}
 		}
+
 		return err
-	})
+	}
 
 	pipeline := make([]common.Executor, 0)
 	pipeline = append(pipeline, preSteps...)
@@ -152,6 +156,8 @@ func newJobExecutor(info jobInfo, sf stepFactory, rc *RunContext) common.Executo
 			return postExecutor(ctx)
 		}).
 		Finally(info.interpolateOutputs()).
+		Finally(setJobResults).
+		Finally(cleanupJob).
 		Finally(info.closeContainer()))
 }
 
@@ -185,22 +191,27 @@ func setJobResult(ctx context.Context, info jobInfo, rc *RunContext, success boo
 		jobResultMessage = "failed"
 	}
 
-	logger.WithField("jobResult", jobResult).Infof("\U0001F3C1  Job %s", jobResultMessage)
-}
-
-func setJobOutputs(ctx context.Context, rc *RunContext) {
+	jobOutputs := rc.Run.Job().Outputs
 	if rc.caller != nil {
-		// map outputs for reusable workflows
-		callerOutputs := make(map[string]string)
-
+		// Rewrite the job's outputs into the workflow_call outputs...
+		jobOutputs = make(map[string]string)
 		ee := rc.NewExpressionEvaluator(ctx)
-
 		for k, v := range rc.Run.Workflow.WorkflowCallConfig().Outputs {
-			callerOutputs[k] = ee.Interpolate(ctx, ee.Interpolate(ctx, v.Value))
+			jobOutputs[k] = ee.Interpolate(ctx, ee.Interpolate(ctx, v.Value))
 		}
-
-		rc.caller.runContext.Run.Job().Outputs = callerOutputs
+		// When running as a daemon and receiving jobs from Forgejo, the next job (and any of it's `needs` outputs) will
+		// be provided by Forgejo based upon the data sent to the logger below.  However, when running `forgejo-runner
+		// exec` with a reusable workflow, the next job will only be able to read outputs if those outputs are stored on
+		// the workflow -- that's what is accomplished here:
+		rc.caller.runContext.Run.Job().Outputs = jobOutputs
 	}
+
+	logger.
+		WithFields(logrus.Fields{
+			"jobResult":  jobResult,
+			"jobOutputs": jobOutputs,
+		}).
+		Infof("\U0001F3C1  Job %s", jobResultMessage)
 }
 
 func useStepLogger(rc *RunContext, stepModel *model.Step, stage stepStage, executor common.Executor) common.Executor {
