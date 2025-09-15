@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-git/go-billy/v5/helper/polyfill"
@@ -191,12 +192,12 @@ func (e *HostEnvironment) Start(_ bool) common.Executor {
 
 type ptyWriter struct {
 	Out       io.Writer
-	AutoStop  bool
+	AutoStop  atomic.Bool
 	dirtyLine bool
 }
 
 func (w *ptyWriter) Write(buf []byte) (int, error) {
-	if w.AutoStop && len(buf) > 0 && buf[len(buf)-1] == 4 {
+	if w.AutoStop.Load() && len(buf) > 0 && buf[len(buf)-1] == 4 {
 		n, err := w.Out.Write(buf[:len(buf)-1])
 		if err != nil {
 			return n, err
@@ -365,7 +366,7 @@ func (e *HostEnvironment) exec(ctx context.Context, commandparam []string, cmdli
 		return fmt.Errorf("RUN %w", err)
 	}
 	if tty != nil {
-		writer.AutoStop = true
+		writer.AutoStop.Store(true)
 		if _, err := tty.Write([]byte("\x04")); err != nil {
 			common.Logger(ctx).Debug("Failed to write EOT")
 		}
