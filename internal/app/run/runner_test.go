@@ -13,6 +13,7 @@ import (
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/labels"
 	"code.forgejo.org/forgejo/runner/v11/internal/pkg/report"
 	"connectrpc.com/connect"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stretchr/testify/assert"
@@ -339,5 +340,69 @@ jobs:
           [[ -f cache_path_1/cache_content_2 ]] && exit 1 || exit 0
 `
 		runWorkflow(ctx, cancel, checkKey2Yaml, "push", "refs/heads/main", "step 5: push cache should not be polluted by PR")
+	})
+}
+
+func TestRunnerLXC(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration test")
+	}
+
+	forgejoClient := &forgejoClientMock{}
+
+	forgejoClient.On("Address").Return("https://127.0.0.1:8080") // not expected to be used in this test
+	forgejoClient.On("UpdateLog", mock.Anything, mock.Anything).Return(nil, nil)
+	forgejoClient.On("UpdateTask", mock.Anything, mock.Anything).
+		Return(connect.NewResponse(&runnerv1.UpdateTaskResponse{}), nil)
+
+	runner := NewRunner(
+		&config.Config{
+			Log: config.Log{
+				JobLevel: "trace",
+			},
+			Host: config.Host{
+				WorkdirParent: t.TempDir(),
+			},
+		},
+		&config.Registration{
+			Labels: []string{"lxc:lxc://debian:bookworm"},
+		},
+		forgejoClient)
+	require.NotNil(t, runner)
+
+	runWorkflow := func(ctx context.Context, cancel context.CancelFunc, yamlContent, eventName, ref, description string) {
+		task := &runnerv1.Task{
+			WorkflowPayload: []byte(yamlContent),
+			Context: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"token":                       structpb.NewStringValue("some token here"),
+					"forgejo_default_actions_url": structpb.NewStringValue("https://data.forgejo.org"),
+					"repository":                  structpb.NewStringValue("runner"),
+					"event_name":                  structpb.NewStringValue(eventName),
+					"ref":                         structpb.NewStringValue(ref),
+				},
+			},
+		}
+
+		reporter := report.NewReporter(ctx, cancel, forgejoClient, task, time.Second)
+		err := runner.run(ctx, task, reporter)
+		reporter.Close(nil)
+		require.NoError(t, err, description)
+	}
+
+	t.Run("OK", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		workflow := `
+on:
+  push:
+jobs:
+  job:
+    runs-on: lxc
+    steps:
+      - run: echo OK
+`
+		runWorkflow(ctx, cancel, workflow, "push", "refs/heads/main", "OK")
 	})
 }

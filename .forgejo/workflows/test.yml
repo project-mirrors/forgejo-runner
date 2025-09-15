@@ -185,6 +185,11 @@ jobs:
           EOF
           apt --quiet install --yes -qq docker.io make
 
+      - name: install LXC
+        run: |
+          act/runner/lxc-helpers.sh lxc_prepare_environment
+          act/runner/lxc-helpers.sh lxc_install_lxc_inside 10.39.28 fdb1
+
       - run: apt-get -q install -qq -y gcc # required for `-race`
 
       - run: make integration-test
