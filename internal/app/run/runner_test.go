@@ -20,6 +20,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func init() {
+	log.SetLevel(log.TraceLevel)
+}
+
 func TestExplainFailedGenerateWorkflow(t *testing.T) {
 	logged := ""
 	log := func(message string, args ...any) {
