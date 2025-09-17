@@ -50,12 +50,13 @@ func validate(dir, path string, isWorkflow, isAction bool) error {
 		kind = "action"
 	}
 	if err != nil {
-		fmt.Printf("%s %s schema validation failed:\n%s\n", shortPath, kind, err.Error())
+		err = fmt.Errorf("%s %s schema validation failed:\n%s", shortPath, kind, err.Error())
+		fmt.Printf("%s\n", err.Error())
 	} else {
 		fmt.Printf("%s %s schema validation OK\n", shortPath, kind)
 	}
 
-	return nil
+	return err
 }
 
 func validatePath(validateArgs *validateArgs) error {
@@ -115,6 +116,8 @@ func validateRepository(validateArgs *validateArgs) error {
 		}
 	}
 
+	var validationErrors error
+
 	if err := filepath.Walk(clonedir, func(path string, fi fs.FileInfo, err error) error {
 		if validatePathMatch(path, ".forgejo/workflows/action") {
 			return nil
@@ -123,7 +126,7 @@ func validateRepository(validateArgs *validateArgs) error {
 		isAction := true
 		if validatePathMatch(path, "action") {
 			if err := validate(clonedir, path, isWorkflow, isAction); err != nil {
-				return err
+				validationErrors = errors.Join(validationErrors, err)
 			}
 		}
 		return nil
@@ -141,9 +144,9 @@ func validateRepository(validateArgs *validateArgs) error {
 		if err := filepath.Walk(workflowdir, func(path string, fi fs.FileInfo, err error) error {
 			isWorkflow := true
 			isAction := false
-			if validateHasYamlSuffix(path, "") {
+			if validateHasYamlSuffix(path) {
 				if err := validate(clonedir, path, isWorkflow, isAction); err != nil {
-					return err
+					validationErrors = errors.Join(validationErrors, err)
 				}
 			}
 			return nil
@@ -152,7 +155,7 @@ func validateRepository(validateArgs *validateArgs) error {
 		}
 	}
 
-	return nil
+	return validationErrors
 }
 
 func processDirectory(validateArgs *validateArgs) {
