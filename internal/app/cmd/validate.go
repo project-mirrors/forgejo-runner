@@ -65,8 +65,17 @@ func validatePath(validateArgs *validateArgs) error {
 	return validate("", validateArgs.path, validateArgs.workflow, validateArgs.action)
 }
 
-func validateHasYamlSuffix(s, suffix string) bool {
-	return strings.HasSuffix(s, suffix+".yml") || strings.HasSuffix(s, suffix+".yaml")
+func validatePathMatch(existing, search string) bool {
+	if !validateHasYamlSuffix(existing) {
+		return false
+	}
+	existing = strings.TrimSuffix(existing, ".yml")
+	existing = strings.TrimSuffix(existing, ".yaml")
+	return existing == search || strings.HasSuffix(existing, "/"+search)
+}
+
+func validateHasYamlSuffix(s string) bool {
+	return strings.HasSuffix(s, ".yml") || strings.HasSuffix(s, ".yaml")
 }
 
 func validateRepository(validateArgs *validateArgs) error {
@@ -107,12 +116,12 @@ func validateRepository(validateArgs *validateArgs) error {
 	}
 
 	if err := filepath.Walk(clonedir, func(path string, fi fs.FileInfo, err error) error {
-		if validateHasYamlSuffix(path, "/.forgejo/workflows/action") {
+		if validatePathMatch(path, ".forgejo/workflows/action") {
 			return nil
 		}
 		isWorkflow := false
 		isAction := true
-		if validateHasYamlSuffix(path, "/action") {
+		if validatePathMatch(path, "action") {
 			if err := validate(clonedir, path, isWorkflow, isAction); err != nil {
 				return err
 			}

@@ -10,6 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_validatePathMatch(t *testing.T) {
+	assert.False(t, validatePathMatch("nosuffix", "nosuffix"))
+	assert.True(t, validatePathMatch("something.yml", "something"))
+	assert.True(t, validatePathMatch("something.yaml", "something"))
+	assert.False(t, validatePathMatch("entire_something.yaml", "something"))
+	assert.True(t, validatePathMatch("nested/in/directory/something.yaml", "something"))
+	assert.False(t, validatePathMatch("nested/in/directory/entire_something.yaml", "something"))
+}
+
 func Test_validateCmd(t *testing.T) {
 	ctx := context.Background()
 	for _, testCase := range []struct {
