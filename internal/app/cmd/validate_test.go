@@ -10,6 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func Test_validatePathMatch(t *testing.T) {
+	assert.False(t, validatePathMatch("nosuffix", "nosuffix"))
+	assert.True(t, validatePathMatch("something.yml", "something"))
+	assert.True(t, validatePathMatch("something.yaml", "something"))
+	assert.False(t, validatePathMatch("entire_something.yaml", "something"))
+	assert.True(t, validatePathMatch("nested/in/directory/something.yaml", "something"))
+	assert.False(t, validatePathMatch("nested/in/directory/entire_something.yaml", "something"))
+}
+
 func Test_validateCmd(t *testing.T) {
 	ctx := context.Background()
 	for _, testCase := range []struct {
@@ -47,9 +56,10 @@ func Test_validateCmd(t *testing.T) {
 			stdOut: "schema validation OK",
 		},
 		{
-			name:   "PathActionNOK",
-			args:   []string{"--action", "--path", "testdata/validate/bad-action.yml"},
-			stdOut: "Expected a mapping got scalar",
+			name:    "PathActionNOK",
+			args:    []string{"--action", "--path", "testdata/validate/bad-action.yml"},
+			stdOut:  "Expected a mapping got scalar",
+			message: "testdata/validate/bad-action.yml action schema validation failed",
 		},
 		{
 			name:   "PathWorkflowOK",
@@ -57,9 +67,10 @@ func Test_validateCmd(t *testing.T) {
 			stdOut: "schema validation OK",
 		},
 		{
-			name:   "PathWorkflowNOK",
-			args:   []string{"--workflow", "--path", "testdata/validate/bad-workflow.yml"},
-			stdOut: "Unknown Property ruins-on",
+			name:    "PathWorkflowNOK",
+			args:    []string{"--workflow", "--path", "testdata/validate/bad-workflow.yml"},
+			stdOut:  "Unknown Property ruins-on",
+			message: "testdata/validate/bad-workflow.yml workflow schema validation failed",
 		},
 		{
 			name:   "DirectoryOK",
@@ -67,14 +78,16 @@ func Test_validateCmd(t *testing.T) {
 			stdOut: "action.yml action schema validation OK\nsubaction/action.yaml action schema validation OK\n.forgejo/workflows/action.yml workflow schema validation OK\n.forgejo/workflows/workflow1.yml workflow schema validation OK\n.forgejo/workflows/workflow2.yaml workflow schema validation OK",
 		},
 		{
-			name:   "DirectoryActionNOK",
-			args:   []string{"--directory", "testdata/validate/bad-directory"},
-			stdOut: "action.yml action schema validation failed",
+			name:    "DirectoryActionNOK",
+			args:    []string{"--directory", "testdata/validate/bad-directory"},
+			stdOut:  "action.yml action schema validation failed",
+			message: "action.yml action schema validation failed",
 		},
 		{
-			name:   "DirectoryWorkflowNOK",
-			args:   []string{"--directory", "testdata/validate/bad-directory"},
-			stdOut: ".forgejo/workflows/workflow1.yml workflow schema validation failed",
+			name:    "DirectoryWorkflowNOK",
+			args:    []string{"--directory", "testdata/validate/bad-directory"},
+			stdOut:  ".forgejo/workflows/workflow1.yml workflow schema validation failed",
+			message: ".forgejo/workflows/workflow1.yml workflow schema validation failed",
 		},
 		{
 			name:   "RepositoryOK",
@@ -82,14 +95,16 @@ func Test_validateCmd(t *testing.T) {
 			stdOut: "action.yml action schema validation OK\nsubaction/action.yaml action schema validation OK\n.forgejo/workflows/action.yml workflow schema validation OK\n.forgejo/workflows/workflow1.yml workflow schema validation OK\n.forgejo/workflows/workflow2.yaml workflow schema validation OK",
 		},
 		{
-			name:   "RepositoryActionNOK",
-			args:   []string{"--repository", "testdata/validate/bad-repository"},
-			stdOut: "action.yml action schema validation failed",
+			name:    "RepositoryActionNOK",
+			args:    []string{"--repository", "testdata/validate/bad-repository"},
+			stdOut:  "action.yml action schema validation failed",
+			message: "action.yml action schema validation failed",
 		},
 		{
-			name:   "RepositoryWorkflowNOK",
-			args:   []string{"--repository", "testdata/validate/bad-repository"},
-			stdOut: ".forgejo/workflows/workflow1.yml workflow schema validation failed",
+			name:    "RepositoryWorkflowNOK",
+			args:    []string{"--repository", "testdata/validate/bad-repository"},
+			stdOut:  ".forgejo/workflows/workflow1.yml workflow schema validation failed",
+			message: ".forgejo/workflows/workflow1.yml workflow schema validation failed",
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
