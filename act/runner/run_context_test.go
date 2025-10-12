@@ -280,6 +280,39 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 	})
 }
 
+func TestRunContext_GetGithubContextURL(t *testing.T) {
+	table := []struct {
+		instance  string
+		serverURL string
+		APIURL    string
+	}{
+		{instance: "", serverURL: "", APIURL: "/api/v1"},
+		{instance: "example.com", serverURL: "https://example.com", APIURL: "https://example.com/api/v1"},
+		{instance: "http://example.com", serverURL: "http://example.com", APIURL: "http://example.com/api/v1"},
+		{instance: "https://example.com", serverURL: "https://example.com", APIURL: "https://example.com/api/v1"},
+	}
+	for _, data := range table {
+		t.Run(data.instance, func(t *testing.T) {
+			rc := &RunContext{
+				EventJSON: "{}",
+				Config: &Config{
+					GitHubInstance: data.instance,
+				},
+				Run: &model.Run{
+					Workflow: &model.Workflow{
+						Name: "GitHubContextTest",
+					},
+				},
+			}
+
+			ghc := rc.getGithubContext(t.Context())
+
+			assert.Equal(t, data.serverURL, ghc.ServerURL)
+			assert.Equal(t, data.APIURL, ghc.APIURL)
+		})
+	}
+}
+
 func TestRunContext_GetGithubContextRef(t *testing.T) {
 	table := []struct {
 		event string
