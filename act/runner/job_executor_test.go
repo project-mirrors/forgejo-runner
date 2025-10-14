@@ -444,3 +444,76 @@ func TestSetJobResultConcurrency(t *testing.T) {
 
 	assert.Equal(t, "failure", lastResult)
 }
+
+func TestSetJobResult_SkipsBannerInChildReusableWorkflow(t *testing.T) {
+	// Test that child reusable workflow does not print final banner
+	// to prevent premature token revocation
+
+	mockLogger := mocks.NewFieldLogger(t)
+	// Allow all variants of Debugf (git operations can call with 1-3 args)
+	mockLogger.On("Debugf", mock.Anything).Return(0).Maybe()
+	mockLogger.On("Debugf", mock.Anything, mock.Anything).Return(0).Maybe()
+	mockLogger.On("Debugf", mock.Anything, mock.Anything, mock.Anything).Return(0).Maybe()
+	// CRITICAL: In CI, git ref detection may fail and call Warningf
+	mockLogger.On("Warningf", mock.Anything, mock.Anything).Return(0).Maybe()
+	mockLogger.On("WithField", mock.Anything, mock.Anything).Return(&logrus.Entry{Logger: &logrus.Logger{}}).Maybe()
+	mockLogger.On("WithFields", mock.Anything).Return(&logrus.Entry{Logger: &logrus.Logger{}}).Maybe()
+
+	ctx := common.WithLogger(common.WithJobErrorContainer(t.Context()), mockLogger)
+
+	// Setup parent job
+	parentJob := &model.Job{
+		Result: "success",
+	}
+	parentRC := &RunContext{
+		Config: &Config{Env: map[string]string{}}, // Must have Config
+		Run: &model.Run{
+			JobID: "parent",
+			Workflow: &model.Workflow{
+				Jobs: map[string]*model.Job{
+					"parent": parentJob,
+				},
+			},
+		},
+	}
+
+	// Setup child job with caller reference
+	childJob := &model.Job{
+		Result: "success",
+	}
+	childRC := &RunContext{
+		Config: &Config{Env: map[string]string{}}, // Must have Config
+		Run: &model.Run{
+			JobID: "child",
+			Workflow: &model.Workflow{
+				Jobs: map[string]*model.Job{
+					"child": childJob,
+				},
+			},
+		},
+		caller: &caller{
+			runContext: parentRC,
+		},
+	}
+
+	jim := &jobInfoMock{}
+	jim.On("matrix").Return(map[string]any{}) // REQUIRED: setJobResult always calls matrix()
+	jim.On("result", "success")
+
+	// Call setJobResult for child workflow
+	setJobResult(ctx, jim, childRC, true)
+
+	// Verify:
+	// 1. Child result is set
+	jim.AssertCalled(t, "result", "success")
+
+	// 2. Parent result is propagated
+	assert.Equal(t, "success", parentJob.Result)
+
+	// 3. Final banner was NOT printed by child (critical for token security)
+	mockLogger.AssertNotCalled(t, "WithFields", mock.MatchedBy(func(fields logrus.Fields) bool {
+		_, okJobResult := fields["jobResult"]
+		_, okJobOutput := fields["jobOutputs"]
+		return okJobOutput && okJobResult
+	}))
+}
