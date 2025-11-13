@@ -26,9 +26,9 @@ DEFAULT_RUNNER_VERSION=11.3.1 # renovate: datasource=forgejo-releases depName=fo
 : ${INPUTS_RUNNER_VERSION:=$DEFAULT_RUNNER_VERSION}
 
 : ${KILL_AFTER:=21600} # 6h == 21600
-NODEJS_VERSION=20
-DEBIAN_RELEASE=trixie
-YQ_VERSION=v4.45.1
+NODEJS_VERSION=20 # renovate: datasource=node-version depName=forgejo-runner-service-node
+DEBIAN_RELEASE=trixie # renovate: datasource=docker depName=forgejo-runner-service-debian packageName=code.forgejo.org/oci/debian versioning=debian
+YQ_VERSION=v4.45.1 # renovate: datasource=github-releases depName=forgejo-runner-service-yq packageName=mikefarah/yq
 SELF=${BASH_SOURCE[0]}
 SELF_FILENAME=$(basename "$SELF")
 SELF_INSTALLED=/usr/local/bin/$SELF_FILENAME
