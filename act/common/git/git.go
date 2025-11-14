@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -348,37 +347,6 @@ func NewGitCloneExecutor(input NewGitCloneExecutorInput) common.Executor {
 				err:    ErrShortRef,
 				commit: hash.String(),
 			}
-		}
-
-		var head *plumbing.Reference
-		if head, err = r.Head(); err != nil {
-			logger.Errorf("Unable to get repository head")
-			return err
-		}
-
-		if head.Hash() == *hash {
-			// HEAD is already at the target hash, so we don't have to do anything
-			return err
-		}
-
-		// At this point we need to know if it's a tag or a branch
-		// And the easiest way to do it is duck typing
-		//
-		// If err is nil, it's a tag so let's proceed with that hash like we would if
-		// it was a sha
-		rev = plumbing.Revision(path.Join("refs", "tags", input.Ref))
-		if _, err := r.Tag(input.Ref); errors.Is(err, git.ErrTagNotFound) {
-			rName := plumbing.ReferenceName(path.Join("refs", "remotes", "origin", input.Ref))
-			if _, err := r.Reference(rName, false); errors.Is(err, plumbing.ErrReferenceNotFound) {
-				rev = plumbing.Revision(input.Ref)
-			} else {
-				rev = plumbing.Revision(rName)
-			}
-		}
-
-		if hash, err = r.ResolveRevision(rev); err != nil {
-			logger.Errorf("Unable to resolve %s: %v", input.Ref, err)
-			return err
 		}
 
 		var w *git.Worktree
