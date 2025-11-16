@@ -9,6 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContainerPath(t *testing.T) {
@@ -35,13 +36,23 @@ func TestContainerPath(t *testing.T) {
 			{fmt.Sprintf("/mnt/%v/act", rootDriveLetter), "act", fmt.Sprintf("%s\\", rootDrive)},
 		} {
 			if v.workDir != "" {
-				t.Chdir(v.workDir)
+				//nolint:usetesting
+				// 2025-11-14: t.Chdir does not work because it relies on os.Open(".").Chdir() which fails on Windows
+				if err := os.Chdir(v.workDir); err != nil {
+					log.Error(err)
+					require.NoError(t, err)
+				}
 			}
 
 			assert.Equal(t, v.destinationPath, linuxcontainerext.ToContainerPath(v.sourcePath))
 		}
 
-		t.Chdir(cwd)
+		//nolint:usetesting
+		// 2025-11-14: t.Chdir does not work because it relies on os.Open(".").Chdir() which fails on Windows
+		if err := os.Chdir(cwd); err != nil {
+			log.Error(err)
+			require.NoError(t, err)
+		}
 	} else {
 		cwd, err := os.Getwd()
 		if err != nil {

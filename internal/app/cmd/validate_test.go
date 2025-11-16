@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,8 +16,8 @@ func Test_validatePathMatch(t *testing.T) {
 	assert.True(t, validatePathMatch("something.yml", "something"))
 	assert.True(t, validatePathMatch("something.yaml", "something"))
 	assert.False(t, validatePathMatch("entire_something.yaml", "something"))
-	assert.True(t, validatePathMatch("nested/in/directory/something.yaml", "something"))
-	assert.False(t, validatePathMatch("nested/in/directory/entire_something.yaml", "something"))
+	assert.True(t, validatePathMatch(filepath.FromSlash("nested/in/directory/something.yaml"), "something"))
+	assert.False(t, validatePathMatch(filepath.FromSlash("nested/in/directory/entire_something.yaml"), "something"))
 }
 
 func Test_validateCmd(t *testing.T) {
@@ -111,12 +112,12 @@ func Test_validateCmd(t *testing.T) {
 			cmd := loadValidateCmd(ctx)
 			cmdOut, stdOut, stdErr, err := executeCommand(ctx, t, cmd, testCase.args...)
 			if testCase.message != "" {
-				assert.ErrorContains(t, err, testCase.message)
+				assert.ErrorContains(t, err, filepath.FromSlash(testCase.message))
 			} else {
 				assert.NoError(t, err)
 			}
 			if testCase.stdOut != "" {
-				assert.Contains(t, stdOut, testCase.stdOut)
+				assert.Contains(t, stdOut, filepath.FromSlash(testCase.stdOut))
 			} else {
 				assert.Empty(t, stdOut)
 			}

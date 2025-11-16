@@ -2,10 +2,13 @@ package exprparser
 
 import (
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"code.forgejo.org/forgejo/runner/v11/act/model"
 	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/skip"
 )
 
 func TestFunctionContains(t *testing.T) {
@@ -210,19 +213,28 @@ func TestFunctionHashFiles(t *testing.T) {
 		expected any
 		name     string
 	}{
-		{"hashFiles('**/non-extant-files') }}", "", "hash-non-existing-file"},
-		{"hashFiles('**/non-extant-files', '**/more-non-extant-files') }}", "", "hash-multiple-non-existing-files"},
-		{"hashFiles('./for-hashing-1.txt') }}", "66a045b452102c59d840ec097d59d9467e13a3f34f6494e539ffd32c1bb35f18", "hash-single-file"},
-		{"hashFiles('./for-hashing-*.txt') }}", "8e5935e7e13368cd9688fe8f48a0955293676a021562582c7e848dafe13fb046", "hash-multiple-files"},
-		{"hashFiles('./for-hashing-*.txt', '!./for-hashing-2.txt') }}", "66a045b452102c59d840ec097d59d9467e13a3f34f6494e539ffd32c1bb35f18", "hash-negative-pattern"},
-		{"hashFiles('./for-hashing-**') }}", "c418ba693753c84115ced0da77f876cddc662b9054f4b129b90f822597ee2f94", "hash-multiple-files-and-directories"},
-		{"hashFiles('./for-hashing-3/**') }}", "6f5696b546a7a9d6d42a449dc9a56bef244aaa826601ef27466168846139d2c2", "hash-nested-directories"},
-		{"hashFiles('./for-hashing-3/**/nested-data.txt') }}", "8ecadfb49f7f978d0a9f3a957e9c8da6cc9ab871f5203b5d9f9d1dc87d8af18c", "hash-nested-directories-2"},
+		{"hashFiles('**/non-extant-files') }}", "", "unix-hash-non-existing-file"},
+		{"hashFiles('**/non-extant-files', '**/more-non-extant-files') }}", "", "unix-hash-multiple-non-existing-files"},
+		{"hashFiles('./for-hashing-1.txt') }}", "66a045b452102c59d840ec097d59d9467e13a3f34f6494e539ffd32c1bb35f18", "unix-hash-single-file"},
+		{"hashFiles('./for-hashing-*.txt') }}", "8e5935e7e13368cd9688fe8f48a0955293676a021562582c7e848dafe13fb046", "unix-hash-multiple-files"},
+		{"hashFiles('./for-hashing-*.txt', '!./for-hashing-2.txt') }}", "66a045b452102c59d840ec097d59d9467e13a3f34f6494e539ffd32c1bb35f18", "unix-hash-negative-pattern"},
+		{"hashFiles('./for-hashing-**') }}", "c418ba693753c84115ced0da77f876cddc662b9054f4b129b90f822597ee2f94", "unix-hash-multiple-files-and-directories"},
+		{"hashFiles('./for-hashing-3/**') }}", "6f5696b546a7a9d6d42a449dc9a56bef244aaa826601ef27466168846139d2c2", "unix-hash-nested-directories"},
+		{"hashFiles('./for-hashing-3/**/nested-data.txt') }}", "8ecadfb49f7f978d0a9f3a957e9c8da6cc9ab871f5203b5d9f9d1dc87d8af18c", "unix-hash-nested-directories-2"},
+		{"hashFiles('**\\non-extant-files') }}", "", "dos-hash-non-existing-file"},
+		{"hashFiles('**\\non-extant-files', '**\\more-non-extant-files') }}", "", "dos-hash-multiple-non-existing-files"},
+		{"hashFiles('.\\for-hashing-1.txt') }}", "66a045b452102c59d840ec097d59d9467e13a3f34f6494e539ffd32c1bb35f18", "dos-hash-single-file"},
+		{"hashFiles('.\\for-hashing-*.txt') }}", "8e5935e7e13368cd9688fe8f48a0955293676a021562582c7e848dafe13fb046", "dos-hash-multiple-files"},
+		{"hashFiles('.\\for-hashing-*.txt', '!.\\for-hashing-2.txt') }}", "66a045b452102c59d840ec097d59d9467e13a3f34f6494e539ffd32c1bb35f18", "dos-hash-negative-pattern"},
+		{"hashFiles('.\\for-hashing-**') }}", "c418ba693753c84115ced0da77f876cddc662b9054f4b129b90f822597ee2f94", "dos-hash-multiple-files-and-directories"},
+		{"hashFiles('.\\for-hashing-3\\**') }}", "6f5696b546a7a9d6d42a449dc9a56bef244aaa826601ef27466168846139d2c2", "dos-hash-nested-directories"},
+		{"hashFiles('.\\for-hashing-3\\**\\nested-data.txt') }}", "8ecadfb49f7f978d0a9f3a957e9c8da6cc9ab871f5203b5d9f9d1dc87d8af18c", "dos-hash-nested-directories-2"},
 	}
 
 	env := &EvaluationEnvironment{}
 
 	for _, tt := range table {
+		skip.If(t, runtime.GOOS != "windows" && strings.HasPrefix(tt.name, "dos")) // Windows and macOS cannot run linux docker container natively
 		t.Run(tt.name, func(t *testing.T) {
 			workdir, err := filepath.Abs("testdata")
 			assert.Nil(t, err)

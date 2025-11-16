@@ -2,12 +2,14 @@ package container
 
 import (
 	"io"
+	"runtime"
 	"testing"
 
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"gotest.tools/v3/skip"
 )
 
 func init() {
@@ -15,12 +17,13 @@ func init() {
 }
 
 func TestImageExistsLocally(t *testing.T) {
+	skip.If(t, runtime.GOOS != "linux") // Windows and macOS cannot natively run Linux containers
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
 	ctx := t.Context()
 	// to help make this test reliable and not flaky, we need to have
-	// an image that will exist, and onew that won't exist
+	// an image that will exist, and one that won't exist
 
 	// Test if image exists with specific tag
 	invalidImageTag, err := ImageExistsLocally(ctx, "code.forgejo.org/oci/alpine:this-random-tag-will-never-exist", "linux/amd64")

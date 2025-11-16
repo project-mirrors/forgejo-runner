@@ -15,6 +15,7 @@ import (
 	"code.forgejo.org/forgejo/runner/v11/act/exprparser"
 	"code.forgejo.org/forgejo/runner/v11/act/model"
 	"code.forgejo.org/forgejo/runner/v11/testutils"
+	"gotest.tools/v3/skip"
 
 	"github.com/docker/go-connections/nat"
 	log "github.com/sirupsen/logrus"
@@ -232,19 +233,32 @@ func TestRunContext_GetBindsAndMounts(t *testing.T) {
 	}
 
 	t.Run("ContainerVolumeMountTest", func(t *testing.T) {
+		type PlatformRestriction int
+
+		const (
+			WindowsOnly    PlatformRestriction = iota // Shall run only on Windows
+			NonWindowsOnly                            // Shall run only on non-Windows
+			Always                                    // Shall always run, regardless of OS
+		)
+
 		tests := []struct {
+			platform  PlatformRestriction
 			name      string
 			volumes   []string
 			wantbind  string
 			wantmount map[string]string
 		}{
-			{"BindAnonymousVolume", []string{"/volume"}, "/volume", map[string]string{}},
-			{"BindHostFile", []string{"/path/to/file/on/host:/volume"}, "/path/to/file/on/host:/volume", map[string]string{}},
-			{"MountExistingVolume", []string{"volume-id:/volume"}, "", map[string]string{"volume-id": "/volume"}},
+			{Always, "BindAnonymousVolume", []string{"/volume"}, "/volume", map[string]string{}},
+			{NonWindowsOnly, "BindHostFile", []string{"/path/to/file/on/host:/volume"}, "/path/to/file/on/host:/volume", map[string]string{}},
+			{WindowsOnly, "BindWindowsHostFile", []string{"C:\\path\\to\\file\\on\\host:/volume"}, "C:\\path\\to\\file\\on\\host:/volume", map[string]string{}},
+			{Always, "MountExistingVolume", []string{"volume-id:/volume"}, "", map[string]string{"volume-id": "/volume"}},
 		}
 
 		for _, testcase := range tests {
 			t.Run(testcase.name, func(t *testing.T) {
+				skip.If(t, isWindows && testcase.platform == NonWindowsOnly)
+				skip.If(t, !isWindows && testcase.platform == WindowsOnly)
+
 				job := &model.Job{}
 				err := job.RawContainer.Encode(map[string][]string{
 					"volumes": testcase.volumes,
@@ -710,6 +724,7 @@ func TestRunContext_SanitizeNetworkAlias(t *testing.T) {
 }
 
 func TestRunContext_PrepareJobContainer(t *testing.T) {
+	skip.If(t, runtime.GOOS != "linux") // Windows and macOS cannot natively run Linux containers
 	yaml := `
 on:
   push:
