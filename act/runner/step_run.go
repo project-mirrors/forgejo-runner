@@ -224,7 +224,7 @@ fi
 `
 			stdout, _, err := rc.sh(ctx, shellFallback)
 			if err != nil {
-				common.Logger(ctx).Error("fail to run %q: %v", shellFallback, err)
+				common.Logger(ctx).Errorf("fail to run %q: %v", shellFallback, err)
 			} else {
 				shell = stdout
 			}
