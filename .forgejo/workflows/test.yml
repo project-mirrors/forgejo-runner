@@ -253,7 +253,7 @@ jobs:
         run: |
           pre-commit try-repo --all-files --verbose . forgejo-runner-validate
 
-      - name: check that a bad workflow file doesn’t validate (should fail)
+      - name: check that a bad workflow file doesn't validate (should fail)
         continue-on-error: true
         run: |
           mkdir -p test-repo
