@@ -563,13 +563,21 @@ func (cr *containerReference) create(capAdd, capDrop []string) common.Executor {
 		}
 
 		var platSpecs *specs.Platform
-		if supportsContainerImagePlatform(ctx, cr.cli) && cr.input.Platform != "" {
-			desiredPlatform := strings.SplitN(cr.input.Platform, `/`, 2)
-
-			if len(desiredPlatform) != 2 {
-				return fmt.Errorf("incorrect container platform option '%s'", cr.input.Platform)
+		if supportsContainerImagePlatform(ctx, cr.cli) {
+			platform := cr.input.Platform
+			if platform == "" {
+				defaultPlatform, err := currentSystemPlatform(ctx)
+				logger.Debugf("platform not specified, defaulting to detected %s", defaultPlatform)
+				if err != nil {
+					return err
+				}
+				platform = defaultPlatform
 			}
 
+			desiredPlatform := strings.SplitN(platform, `/`, 2)
+			if len(desiredPlatform) != 2 {
+				return fmt.Errorf("incorrect container platform option '%s'", platform)
+			}
 			platSpecs = &specs.Platform{
 				Architecture: desiredPlatform[1],
 				OS:           desiredPlatform[0],
@@ -707,7 +715,26 @@ func (cr *containerReference) exec(cmd []string, env map[string]string, user, wo
 			AttachStdout: true,
 		})
 		if err != nil {
-			return fmt.Errorf("failed to create exec: %w", err)
+			// If exec fails, it's possible that the entrypoint of the container failed in some way; for example
+			// "/usr/bin/tail: exec format error" has been observed if the container's platform doesn't match the
+			// current platform.  In order to help diagnose these problems, run a `docker logs ...` on the container and
+			// include it in the error output.
+			logContext := ""
+			reader, err2 := cr.cli.ContainerLogs(ctx, cr.id, container.LogsOptions{
+				ShowStdout: true,
+				ShowStderr: true,
+			})
+			if err2 == nil {
+				output, err2 := io.ReadAll(reader)
+				if err2 == nil {
+					logContext = string(output)
+				} else {
+					logger.Warnf("unable to read container logs: %v", err2)
+				}
+			} else {
+				logger.Warnf("unable to fetch container logs: %v", err2)
+			}
+			return fmt.Errorf("failed to create exec: %w; container logs: %q", err, logContext)
 		}
 
 		resp, err := cr.cli.ContainerExecAttach(ctx, idResp.ID, container.ExecAttachOptions{
