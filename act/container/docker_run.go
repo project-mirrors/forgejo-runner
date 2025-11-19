@@ -563,13 +563,21 @@ func (cr *containerReference) create(capAdd, capDrop []string) common.Executor {
 		}
 
 		var platSpecs *specs.Platform
-		if supportsContainerImagePlatform(ctx, cr.cli) && cr.input.Platform != "" {
-			desiredPlatform := strings.SplitN(cr.input.Platform, `/`, 2)
-
-			if len(desiredPlatform) != 2 {
-				return fmt.Errorf("incorrect container platform option '%s'", cr.input.Platform)
+		if supportsContainerImagePlatform(ctx, cr.cli) {
+			platform := cr.input.Platform
+			if platform == "" {
+				defaultPlatform, err := currentSystemPlatform(ctx)
+				logger.Debugf("platform not specified, defaulting to detected %s", defaultPlatform)
+				if err != nil {
+					return err
+				}
+				platform = defaultPlatform
 			}
 
+			desiredPlatform := strings.SplitN(platform, `/`, 2)
+			if len(desiredPlatform) != 2 {
+				return fmt.Errorf("incorrect container platform option '%s'", platform)
+			}
 			platSpecs = &specs.Platform{
 				Architecture: desiredPlatform[1],
 				OS:           desiredPlatform[0],

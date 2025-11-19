@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/image"
@@ -15,6 +16,41 @@ import (
 
 	"code.forgejo.org/forgejo/runner/v11/act/common"
 )
+
+// atomic isn't "really" needed, but its used to avoid the data race detector causing errors.
+var cachedSystemPlatform atomic.Pointer[string]
+
+func currentSystemPlatform(ctx context.Context) (string, error) {
+	lastCache := cachedSystemPlatform.Load()
+	if lastCache != nil {
+		return *lastCache, nil
+	}
+
+	cli, err := GetDockerClient(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer cli.Close()
+
+	info, err := cli.Info(ctx)
+	if err != nil {
+		return "", fmt.Errorf("unable to get docker info to determine current system architecture: %w", err)
+	}
+
+	os := info.OSType
+	arch := info.Architecture
+	// Bizarrely `docker info` doesn't provide architecture with the same commonly used values for image tagging...
+	switch arch {
+	case "x86_64":
+		arch = "amd64"
+	case "aarch64":
+		arch = "arm64"
+	}
+
+	systemPlatform := fmt.Sprintf("%s/%s", os, arch)
+	cachedSystemPlatform.Store(&systemPlatform)
+	return systemPlatform, nil
+}
 
 // NewDockerPullExecutor function to create a run executor for the container
 func NewDockerPullExecutor(input NewDockerPullExecutorInput) common.Executor {
@@ -24,6 +60,14 @@ func NewDockerPullExecutor(input NewDockerPullExecutorInput) common.Executor {
 
 		if common.Dryrun(ctx) {
 			return nil
+		}
+
+		if input.Platform == "" {
+			platform, err := currentSystemPlatform(ctx)
+			if err != nil {
+				return err
+			}
+			input.Platform = platform
 		}
 
 		pull := input.ForcePull
