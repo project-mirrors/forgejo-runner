@@ -8,6 +8,7 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"code.forgejo.org/forgejo/runner/v12/act/exprparser"
 	"code.forgejo.org/forgejo/runner/v12/act/model"
 )
 
@@ -33,9 +34,10 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			Result:  pc.jobResults[id],
 			Outputs: nil, // not supported yet
 		}
-
+	}
+	for id, job := range origin.Jobs {
 		if job.Strategy != nil {
-			matrixEvaluator := NewExpressionEvaluator(NewInterpreter(id, job, nil, pc.gitContext, results, pc.vars, pc.inputs))
+			matrixEvaluator := NewExpressionEvaluator(NewInterpreter(id, job, nil, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput))
 			if err := matrixEvaluator.EvaluateYamlNode(&job.Strategy.RawMatrix); err != nil {
 				return nil, fmt.Errorf("failure to evaluate strategy.matrix on job %s: %w", job.Name, err)
 			}
@@ -55,7 +57,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		}
 		for _, matrix := range matricxes {
 			job := job.Clone()
-			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs))
+			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0))
 			if job.Name == "" {
 				job.Name = nameWithMatrix(id, matrix)
 			} else {

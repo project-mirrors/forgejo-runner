@@ -2,6 +2,7 @@ package exprparser
 
 import (
 	"encoding"
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -25,6 +26,7 @@ type EvaluationEnvironment struct {
 	Needs     map[string]Needs
 	Inputs    map[string]any
 	HashFiles func([]reflect.Value) (any, error)
+	ErrorMode ErrorMode
 }
 
 type Needs struct {
@@ -46,6 +48,13 @@ const (
 	DefaultStatusCheckAlways
 	DefaultStatusCheckCanceled
 	DefaultStatusCheckFailure
+)
+
+type ErrorMode int
+
+const (
+	InvalidJobOutput ErrorMode = 1 << iota
+	// Future: add flags enums for other error modes
 )
 
 func (dsc DefaultStatusCheck) String() string {
@@ -229,6 +238,12 @@ func (impl *interperterImpl) evaluateIndexAccess(indexAccessNode *actionlint.Ind
 	}
 }
 
+type NeedsWrapper struct {
+	Outputs map[string]string
+}
+
+var ErrInvalidJobOutputReferenced = errors.New("invalid job output")
+
 func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.ObjectDerefNode) (any, error) {
 	left, err := impl.evaluateNode(objectDerefNode.Receiver)
 	if err != nil {
@@ -239,6 +254,36 @@ func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.Obj
 	if receiverIsDeref {
 		return impl.getPropertyValueDereferenced(reflect.ValueOf(left), objectDerefNode.Property)
 	}
+
+	// When the environment is configured with the `InvalidJobOutput` error mode, exprparser detects specifically the
+	// access to `needs.some-job.outputs.some-output` and returns a typed error if `some-output` isn't presently a valid
+	// output.
+	if impl.env.ErrorMode&InvalidJobOutput == InvalidJobOutput {
+		if jobMap, ok := left.(map[string]Needs); ok {
+			// We've accessed `needs.some-job...`.  In this error mode, if `some-job` doesn't exist then we want to
+			// trigger an error rather than treating it as an empty variable.
+			jobNeeds, ok := jobMap[objectDerefNode.Property]
+			if !ok {
+				return nil, fmt.Errorf("job %q is not available: %w", objectDerefNode.Property, ErrInvalidJobOutputReferenced)
+			}
+			return jobNeeds, nil
+		}
+		if needs, ok := left.(Needs); ok && objectDerefNode.Property == "outputs" {
+			// We've accessed `needs.some-job.outputs`.  In order to easily detect the next access, wrap the result in
+			// an expected type that we can inspect as we evaluate the next node.
+			return &NeedsWrapper{Outputs: needs.Outputs}, nil
+		}
+		if needsWrapper, ok := left.(*NeedsWrapper); ok {
+			// We've accessed `needs.some-job.outputs.some-output` and `some-output` is in objectDerefNode.Property.
+			// Because we're in `InvalidJobOutput` error mode, we'll treat this as an error if the output doesn't exist.
+			output, ok := needsWrapper.Outputs[objectDerefNode.Property]
+			if !ok {
+				return nil, fmt.Errorf("output %q is not available: %w", objectDerefNode.Property, ErrInvalidJobOutputReferenced)
+			}
+			return output, nil
+		}
+	}
+
 	return impl.getPropertyValue(reflect.ValueOf(left), objectDerefNode.Property)
 }
 
