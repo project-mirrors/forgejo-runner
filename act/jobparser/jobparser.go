@@ -32,7 +32,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		results[id] = &JobResult{
 			Needs:   job.Needs(),
 			Result:  pc.jobResults[id],
-			Outputs: nil, // not supported yet
+			Outputs: pc.jobOutputs[id],
 		}
 	}
 	for id, job := range origin.Jobs {
@@ -92,6 +92,12 @@ func WithJobResults(results map[string]string) ParseOption {
 	}
 }
 
+func WithJobOutputs(outputs map[string]map[string]string) ParseOption {
+	return func(c *parseContext) {
+		c.jobOutputs = outputs
+	}
+}
+
 func WithGitContext(context *model.GithubContext) ParseOption {
 	return func(c *parseContext) {
 		c.gitContext = context
@@ -112,6 +118,7 @@ func WithVars(vars map[string]string) ParseOption {
 
 type parseContext struct {
 	jobResults map[string]string
+	jobOutputs map[string]map[string]string // map job ID -> output key -> output value
 	gitContext *model.GithubContext
 	inputs     map[string]any
 	vars       map[string]string

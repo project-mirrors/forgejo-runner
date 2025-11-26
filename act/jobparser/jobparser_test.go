@@ -78,6 +78,11 @@ func TestParse(t *testing.T) {
 			options: []ParseOption{WithVars(map[string]string{"RUNNER": "Windows"})},
 			wantErr: false,
 		},
+		{
+			name:    "evaluated_matrix_needs_provided",
+			options: []ParseOption{WithJobOutputs(map[string]map[string]string{"define-matrix": {"colors": "[\"red\",\"green\",\"blue\"]"}})},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

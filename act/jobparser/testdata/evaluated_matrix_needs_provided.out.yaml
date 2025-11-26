@@ -1,0 +1,162 @@
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  define-matrix:
+    name: define-matrix
+    runs-on: docker
+    steps:
+      - id: colors
+        name: Define Colors
+        run: |
+          echo 'colors=["red", "green", "blue"]' >> "$GITHUB_OUTPUT"
+    outputs:
+      colors: ${{ steps.colors.outputs.colors }}
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts (blue)
+    needs: define-matrix
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color:
+          - blue
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts (green)
+    needs: define-matrix
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color:
+          - green
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts (red)
+    needs: define-matrix
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color:
+          - red
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  consume-artifacts:
+    name: consume-artifacts (blue)
+    needs:
+      - define-matrix
+      - produce-artifacts
+    runs-on: docker
+    steps:
+      - name: Retrieve Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ matrix.color }}
+      - name: Report Color
+        run: |
+          cat color
+    strategy:
+      matrix:
+        color:
+          - blue
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  consume-artifacts:
+    name: consume-artifacts (green)
+    needs:
+      - define-matrix
+      - produce-artifacts
+    runs-on: docker
+    steps:
+      - name: Retrieve Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ matrix.color }}
+      - name: Report Color
+        run: |
+          cat color
+    strategy:
+      matrix:
+        color:
+          - green
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  consume-artifacts:
+    name: consume-artifacts (red)
+    needs:
+      - define-matrix
+      - produce-artifacts
+    runs-on: docker
+    steps:
+      - name: Retrieve Artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ matrix.color }}
+      - name: Report Color
+        run: |
+          cat color
+    strategy:
+      matrix:
+        color:
+          - red
