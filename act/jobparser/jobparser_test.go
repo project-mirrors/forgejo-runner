@@ -79,6 +79,11 @@ func TestParse(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "evaluated_matrix_needs",
+			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
+			wantErr: false,
+		},
+		{
 			name:    "evaluated_matrix_needs_provided",
 			options: []ParseOption{WithJobOutputs(map[string]map[string]string{"define-matrix": {"colors": "[\"red\",\"green\",\"blue\"]"}})},
 			wantErr: false,
