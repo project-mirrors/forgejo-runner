@@ -4,7 +4,7 @@ name: shared matrix
   workflow_dispatch:
 jobs:
   produce-artifacts:
-    name: produce-artifacts
+    name: produce-artifacts (blue)
     runs-on: docker
     steps:
       - name: Define Color
@@ -28,7 +28,7 @@ name: shared matrix
   workflow_dispatch:
 jobs:
   produce-artifacts:
-    name: produce-artifacts
+    name: produce-artifacts (green)
     runs-on: docker
     steps:
       - name: Define Color
@@ -52,7 +52,7 @@ name: shared matrix
   workflow_dispatch:
 jobs:
   produce-artifacts:
-    name: produce-artifacts
+    name: produce-artifacts (red)
     runs-on: docker
     steps:
       - name: Define Color

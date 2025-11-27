@@ -20,7 +20,7 @@ name: shared matrix
   workflow_dispatch:
 jobs:
   produce-artifacts:
-    name: produce-artifacts
+    name: produce-artifacts (incomplete matrix)
     needs: define-matrix
     runs-on: docker
     steps:
@@ -45,7 +45,7 @@ name: shared matrix
   workflow_dispatch:
 jobs:
   consume-artifacts:
-    name: consume-artifacts
+    name: consume-artifacts (incomplete matrix)
     needs:
       - define-matrix
       - produce-artifacts

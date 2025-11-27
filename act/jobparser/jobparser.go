@@ -94,11 +94,6 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		for _, matrix := range matricxes {
 			job := job.Clone()
 			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
-			if job.Name == "" {
-				job.Name = nameWithMatrix(id, matrix)
-			} else {
-				job.Name = evaluator.Interpolate(job.Name)
-			}
 
 			if incompleteMatrix[id] {
 				// Preserve the original incomplete `matrix` value so that when the `IncompleteMatrix` state is
@@ -106,6 +101,24 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 				job.Strategy.RawMatrix = origin.GetJob(id).Strategy.RawMatrix
 			} else {
 				job.Strategy.RawMatrix = encodeMatrix(matrix)
+			}
+
+			// If we're IncompleteMatrix, don't compute the job name -- this will allow it to remain blank and be
+			// computed when the matrix is expanded in a future reparse.
+			if !incompleteMatrix[id] {
+				if job.Name == "" {
+					job.Name = nameWithMatrix(id, matrix)
+				} else if strings.HasSuffix(job.Name, " (incomplete matrix)") {
+					job.Name = nameWithMatrix(strings.TrimSuffix(job.Name, " (incomplete matrix)"), matrix)
+				} else {
+					job.Name = evaluator.Interpolate(job.Name)
+				}
+			} else {
+				if job.Name == "" {
+					job.Name = nameWithMatrix(id, matrix) + " (incomplete matrix)"
+				} else {
+					job.Name = evaluator.Interpolate(job.Name) + " (incomplete matrix)"
+				}
 			}
 
 			runsOn := origin.GetJob(id).RunsOn()

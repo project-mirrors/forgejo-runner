@@ -4,7 +4,7 @@ name: shared matrix
   workflow_dispatch:
 jobs:
   produce-artifacts:
-    name: produce-artifacts
+    name: produce-artifacts (incomplete matrix)
     # `needs` is removed because Forgejo would do this -- it truncates `needs` so that when individual jobs are sent to
     # a runner they don't look for the other jobs.
     #
