@@ -1,0 +1,27 @@
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts
+    # `needs` is removed because Forgejo would do this -- it truncates `needs` so that when individual jobs are sent to
+    # a runner they don't look for the other jobs.
+    #
+    # needs: define-matrix
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color: ${{ fromJSON(needs.define-matrix.outputs.colors) }}
+incomplete_matrix: true

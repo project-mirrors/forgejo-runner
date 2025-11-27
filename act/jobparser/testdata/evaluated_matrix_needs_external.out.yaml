@@ -1,0 +1,71 @@
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color:
+          - blue
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color:
+          - green
+---
+name: shared matrix
+"on":
+  push:
+  workflow_dispatch:
+jobs:
+  produce-artifacts:
+    name: produce-artifacts
+    runs-on: docker
+    steps:
+      - name: Define Color
+        run: |
+          echo "$color" > color
+        env:
+          color: ${{ matrix.color }}
+      - name: Produce Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.color }}
+          path: color
+    strategy:
+      matrix:
+        color:
+          - red

@@ -15,7 +15,7 @@ func NewInterpreter(
 	vars map[string]string,
 	inputs map[string]any,
 	errorMode exprparser.ErrorMode,
-
+	needs []string,
 ) exprparser.Interpreter {
 	strategy := make(map[string]any)
 	if job.Strategy != nil {
@@ -39,13 +39,11 @@ func NewInterpreter(
 		}
 	}
 
-	jobs := run.Workflow.Jobs
-	jobNeeds := run.Job().Needs()
-
 	using := map[string]exprparser.Needs{}
-	for _, need := range jobNeeds {
-		if v, ok := jobs[need]; ok {
-			using[need] = exprparser.Needs{
+	for _, jobID := range needs {
+		v, ok := results[jobID]
+		if ok {
+			using[jobID] = exprparser.Needs{
 				Outputs: v.Outputs,
 				Result:  v.Result,
 			}
