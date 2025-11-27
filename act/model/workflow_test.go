@@ -5,7 +5,10 @@ import (
 	"strings"
 	"testing"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.yaml.in/yaml/v3"
 )
 
 func TestReadWorkflow_ScheduleEvent(t *testing.T) {
@@ -544,6 +547,44 @@ func TestReadWorkflow_Strategy(t *testing.T) {
 	)
 	assert.Equal(t, job.Strategy.MaxParallel, 2)
 	assert.Equal(t, job.Strategy.FailFast, false)
+}
+
+// Various levels of "incomplete" matrix -- where it the unevaluated YAML isn't a map[string][]string -- should parse
+// without triggering OnDecodeNodeError.
+func TestReadWorkflow_StrategyIncomplete(t *testing.T) {
+	// upgrade OnDecodeNodeError to a panic for this test:
+	orig := OnDecodeNodeError
+	OnDecodeNodeError = func(node yaml.Node, out any, err error) {
+		log.Panicf("Failed to decode node %v into %T: %v", node, out, err)
+	}
+	defer func() { OnDecodeNodeError = orig }()
+
+	yaml := `
+name: job outputs definition
+
+jobs:
+  test1:
+    strategy:
+      matrix:
+        color: ${{ fromJSON(needs.define-matrix.outputs.colors) }}
+  test2:
+    strategy:
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.mega-matrix) }}
+`
+
+	workflow, err := ReadWorkflow(strings.NewReader(yaml), false)
+	require.NoError(t, err, "read workflow should succeed")
+	assert.Len(t, workflow.Jobs, 2)
+
+	job := workflow.Jobs["test1"]
+	matrixes, err := job.GetMatrixes()
+	require.NoError(t, err)
+	assert.Equal(t, []map[string]any{{}}, matrixes)
+
+	job = workflow.Jobs["test2"]
+	matrixes, err = job.GetMatrixes()
+	require.NoError(t, err)
+	assert.Equal(t, []map[string]any{{}}, matrixes)
 }
 
 func TestReadWorkflow_WorkflowDispatchConfig(t *testing.T) {
