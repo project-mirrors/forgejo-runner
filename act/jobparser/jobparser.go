@@ -72,7 +72,13 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 				job.Name = evaluator.Interpolate(job.Name)
 			}
 
-			job.Strategy.RawMatrix = encodeMatrix(matrix)
+			if incompleteMatrix[id] {
+				// Preserve the original incomplete `matrix` value so that when the `IncompleteMatrix` state is
+				// discovered later, it can be expanded.
+				job.Strategy.RawMatrix = origin.GetJob(id).Strategy.RawMatrix
+			} else {
+				job.Strategy.RawMatrix = encodeMatrix(matrix)
+			}
 
 			runsOn := origin.GetJob(id).RunsOn()
 			for i, v := range runsOn {

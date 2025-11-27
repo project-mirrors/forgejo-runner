@@ -34,6 +34,9 @@ jobs:
         with:
           name: ${{ matrix.color }}
           path: color
+    strategy:
+      matrix:
+        color: ${{ fromJSON(needs.define-matrix.outputs.colors) }}
 incomplete_matrix: true
 ---
 name: shared matrix
@@ -55,4 +58,7 @@ jobs:
       - name: Report Color
         run: |
           cat color
+    strategy:
+      matrix:
+        color: ${{ fromJSON(needs.define-matrix.outputs.colors) }}
 incomplete_matrix: true
