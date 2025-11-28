@@ -14,12 +14,14 @@ import (
 //go:embed testdata
 var testdata embed.FS
 
-func ReadTestdata(t *testing.T, name string) []byte {
+func ReadTestdata(t *testing.T, name string, skipValidation bool) []byte {
 	t.Helper()
 	filename := path.Join("testdata", name)
 	content, err := testdata.ReadFile(filename)
 	require.NoError(t, err, filename)
-	_, err = model.ReadWorkflow(bytes.NewReader(content), true)
-	require.NoError(t, err, filename)
+	if !skipValidation {
+		_, err = model.ReadWorkflow(bytes.NewReader(content), true)
+		require.NoError(t, err, filename)
+	}
 	return content
 }

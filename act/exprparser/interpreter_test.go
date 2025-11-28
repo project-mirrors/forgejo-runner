@@ -633,3 +633,82 @@ func TestContexts(t *testing.T) {
 		})
 	}
 }
+
+func TestErrorModes(t *testing.T) {
+	table := []struct {
+		input       string
+		expected    any
+		name        string
+		errorMode   ErrorMode
+		expectedErr error
+	}{
+		{
+			name:     "needs-output-defaulterrmode",
+			input:    "needs.job-id.outputs.output-name",
+			expected: "value",
+		},
+		{
+			name:     "needs-result-defaulterrmode",
+			input:    "needs.job-id.result",
+			expected: "success",
+		},
+		{
+			name:      "needs-output-invalidjoboutputerrmode",
+			input:     "needs.job-id.outputs.output-name",
+			expected:  "value",
+			errorMode: InvalidJobOutput,
+		},
+		{
+			name:      "needs-result-invalidjoboutputerrmode",
+			input:     "needs.job-id.result",
+			expected:  "success",
+			errorMode: InvalidJobOutput,
+		},
+		{
+			name:        "needs-output-invalidjoboutputerrmode-err",
+			input:       "needs.job-id.outputs.non-existent-output",
+			errorMode:   InvalidJobOutput,
+			expectedErr: ErrInvalidJobOutputReferenced,
+		},
+		{
+			name:        "needs-output-badjob-invalidjoboutputerrmode-err",
+			input:       "needs.non-existent-job.outputs.non-existent-output",
+			errorMode:   InvalidJobOutput,
+			expectedErr: ErrInvalidJobOutputReferenced,
+		},
+	}
+
+	env := &EvaluationEnvironment{
+		Needs: map[string]Needs{
+			"job-id": {
+				Outputs: map[string]string{
+					"output-name": "value",
+				},
+				Result: "success",
+			},
+			"another-job-id": {
+				Outputs: map[string]string{
+					"output-name": "value",
+				},
+				Result: "success",
+			},
+		},
+		Inputs: map[string]any{
+			"name": "value",
+		},
+	}
+
+	for _, tt := range table {
+		t.Run(tt.name, func(t *testing.T) {
+			env.ErrorMode = tt.errorMode
+
+			output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
+			if tt.expectedErr != nil {
+				assert.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				assert.Nil(t, err)
+				assert.Equal(t, tt.expected, output)
+			}
+		})
+	}
+}

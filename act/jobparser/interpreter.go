@@ -14,6 +14,8 @@ func NewInterpreter(
 	results map[string]*JobResult,
 	vars map[string]string,
 	inputs map[string]any,
+	errorMode exprparser.ErrorMode,
+	needs []string,
 ) exprparser.Interpreter {
 	strategy := make(map[string]any)
 	if job.Strategy != nil {
@@ -37,13 +39,11 @@ func NewInterpreter(
 		}
 	}
 
-	jobs := run.Workflow.Jobs
-	jobNeeds := run.Job().Needs()
-
 	using := map[string]exprparser.Needs{}
-	for _, need := range jobNeeds {
-		if v, ok := jobs[need]; ok {
-			using[need] = exprparser.Needs{
+	for _, jobID := range needs {
+		v, ok := results[jobID]
+		if ok {
+			using[jobID] = exprparser.Needs{
 				Outputs: v.Outputs,
 				Result:  v.Result,
 			}
@@ -51,17 +51,18 @@ func NewInterpreter(
 	}
 
 	ee := &exprparser.EvaluationEnvironment{
-		Github:   gitCtx,
-		Env:      nil, // no need
-		Job:      nil, // no need
-		Steps:    nil, // no need
-		Runner:   nil, // no need
-		Secrets:  nil, // no need
-		Strategy: strategy,
-		Matrix:   matrix,
-		Needs:    using,
-		Inputs:   inputs,
-		Vars:     vars,
+		Github:    gitCtx,
+		Env:       nil, // no need
+		Job:       nil, // no need
+		Steps:     nil, // no need
+		Runner:    nil, // no need
+		Secrets:   nil, // no need
+		Strategy:  strategy,
+		Matrix:    matrix,
+		Needs:     using,
+		Inputs:    inputs,
+		Vars:      vars,
+		ErrorMode: errorMode,
 	}
 
 	config := exprparser.Config{

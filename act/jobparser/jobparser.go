@@ -2,24 +2,39 @@ package jobparser
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
 
+	"code.forgejo.org/forgejo/runner/v12/act/exprparser"
 	"code.forgejo.org/forgejo/runner/v12/act/model"
 )
 
 func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWorkflow, error) {
-	origin, err := model.ReadWorkflow(bytes.NewReader(content), validate)
-	if err != nil {
-		return nil, fmt.Errorf("model.ReadWorkflow: %w", err)
-	}
-
 	workflow := &SingleWorkflow{}
 	if err := yaml.Unmarshal(content, workflow); err != nil {
 		return nil, fmt.Errorf("yaml.Unmarshal: %w", err)
+	}
+	if workflow.IncompleteMatrix {
+		// The IncompleteMatrix tag can't be unmarshaled into `model.Workflow`; it's only applicable for
+		// `SingleWorkflow`.  If it's being passed back to `Parse` in the `content` field, then we're currently trying
+		// to expand the incomplete matrix from a `SingleWorkflow` that we previously generated.
+		//
+		// To allow the creation of `origin`, remove this field...
+		workflow.IncompleteMatrix = false
+		rewrittenContent, err := workflow.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		content = rewrittenContent
+	}
+
+	origin, err := model.ReadWorkflow(bytes.NewReader(content), validate)
+	if err != nil {
+		return nil, fmt.Errorf("model.ReadWorkflow: %w", err)
 	}
 
 	pc := &parseContext{}
@@ -31,13 +46,32 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		results[id] = &JobResult{
 			Needs:   job.Needs(),
 			Result:  pc.jobResults[id],
-			Outputs: nil, // not supported yet
+			Outputs: pc.jobOutputs[id],
 		}
-
+	}
+	// See documentation on `WithWorkflowNeeds` for why we do this:
+	for _, id := range pc.workflowNeeds {
+		results[id] = &JobResult{
+			Result:  pc.jobResults[id],
+			Outputs: pc.jobOutputs[id],
+		}
+	}
+	incompleteMatrix := make(map[string]bool) // map job id -> incomplete matrix true
+	for id, job := range origin.Jobs {
 		if job.Strategy != nil {
-			matrixEvaluator := NewExpressionEvaluator(NewInterpreter(id, job, nil, pc.gitContext, results, pc.vars, pc.inputs))
+			jobNeeds := pc.workflowNeeds
+			if jobNeeds == nil {
+				jobNeeds = job.Needs()
+			}
+			matrixEvaluator := NewExpressionEvaluator(NewInterpreter(id, job, nil, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput, jobNeeds))
 			if err := matrixEvaluator.EvaluateYamlNode(&job.Strategy.RawMatrix); err != nil {
-				return nil, fmt.Errorf("failure to evaluate strategy.matrix on job %s: %w", job.Name, err)
+				// IncompleteMatrix tagging is only supported when `WithJobOutputs()` is used as an option, in order to
+				// maintain jobparser's backwards compatibility.
+				if pc.jobOutputs != nil && errors.Is(err, exprparser.ErrInvalidJobOutputReferenced) {
+					incompleteMatrix[id] = true
+				} else {
+					return nil, fmt.Errorf("failure to evaluate strategy.matrix on job %s: %w", job.Name, err)
+				}
 			}
 		}
 	}
@@ -49,20 +83,48 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 	}
 	for i, id := range ids {
 		job := jobs[i]
+		jobNeeds := pc.workflowNeeds
+		if jobNeeds == nil {
+			jobNeeds = job.Needs()
+		}
 		matricxes, err := getMatrixes(origin.GetJob(id))
 		if err != nil {
 			return nil, fmt.Errorf("getMatrixes: %w", err)
 		}
+		if incompleteMatrix[id] {
+			// If this job is IncompleteMatrix, then ensure that the matrices for the job are undefined.  Otherwise if
+			// there's an array like `[value1, ${{ needs... }}]` then multiple IncompleteMatrix jobs will be emitted.
+			matricxes = []map[string]any{{}}
+		}
 		for _, matrix := range matricxes {
 			job := job.Clone()
-			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs))
-			if job.Name == "" {
-				job.Name = nameWithMatrix(id, matrix)
+			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
+
+			if incompleteMatrix[id] {
+				// Preserve the original incomplete `matrix` value so that when the `IncompleteMatrix` state is
+				// discovered later, it can be expanded.
+				job.Strategy.RawMatrix = origin.GetJob(id).Strategy.RawMatrix
 			} else {
-				job.Name = evaluator.Interpolate(job.Name)
+				job.Strategy.RawMatrix = encodeMatrix(matrix)
 			}
 
-			job.Strategy.RawMatrix = encodeMatrix(matrix)
+			// If we're IncompleteMatrix, don't compute the job name -- this will allow it to remain blank and be
+			// computed when the matrix is expanded in a future reparse.
+			if !incompleteMatrix[id] {
+				if job.Name == "" {
+					job.Name = nameWithMatrix(id, matrix)
+				} else if strings.HasSuffix(job.Name, " (incomplete matrix)") {
+					job.Name = nameWithMatrix(strings.TrimSuffix(job.Name, " (incomplete matrix)"), matrix)
+				} else {
+					job.Name = evaluator.Interpolate(job.Name)
+				}
+			} else {
+				if job.Name == "" {
+					job.Name = nameWithMatrix(id, matrix) + " (incomplete matrix)"
+				} else {
+					job.Name = evaluator.Interpolate(job.Name) + " (incomplete matrix)"
+				}
+			}
 
 			runsOn := origin.GetJob(id).RunsOn()
 			for i, v := range runsOn {
@@ -70,10 +132,11 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			}
 			job.RawRunsOn = encodeRunsOn(runsOn)
 			swf := &SingleWorkflow{
-				Name:     workflow.Name,
-				RawOn:    workflow.RawOn,
-				Env:      workflow.Env,
-				Defaults: workflow.Defaults,
+				Name:             workflow.Name,
+				RawOn:            workflow.RawOn,
+				Env:              workflow.Env,
+				Defaults:         workflow.Defaults,
+				IncompleteMatrix: incompleteMatrix[id],
 			}
 			if err := swf.SetJob(id, job); err != nil {
 				return nil, fmt.Errorf("SetJob: %w", err)
@@ -87,6 +150,12 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 func WithJobResults(results map[string]string) ParseOption {
 	return func(c *parseContext) {
 		c.jobResults = results
+	}
+}
+
+func WithJobOutputs(outputs map[string]map[string]string) ParseOption {
+	return func(c *parseContext) {
+		c.jobOutputs = outputs
 	}
 }
 
@@ -108,11 +177,27 @@ func WithVars(vars map[string]string) ParseOption {
 	}
 }
 
+// `WithWorkflowNeeds` allows overridding the `needs` field for a job being parsed.
+//
+// In the case that a `SingleWorkflow`, returned from `Parse`, is passed back into `Parse` later in order to expand its
+// IncompleteMatrix, then the jobs that it needs will not be present in the workflow (because `SingleWorkflow` only has
+// one job in it).  The `needs` field on the job itself may also be absent (Forgejo truncates the `needs` so that it can
+// coordinate dispatching the jobs one-by-one without the runner panicing over missing jobs). However, the `needs` field
+// is needed in order to populate the `needs` variable context. `WithWorkflowNeeds` can be used to indicate the needs
+// exist and are fulfilled.
+func WithWorkflowNeeds(needs []string) ParseOption {
+	return func(c *parseContext) {
+		c.workflowNeeds = needs
+	}
+}
+
 type parseContext struct {
-	jobResults map[string]string
-	gitContext *model.GithubContext
-	inputs     map[string]any
-	vars       map[string]string
+	jobResults    map[string]string
+	jobOutputs    map[string]map[string]string // map job ID -> output key -> output value
+	gitContext    *model.GithubContext
+	inputs        map[string]any
+	vars          map[string]string
+	workflowNeeds []string
 }
 
 type ParseOption func(c *parseContext)

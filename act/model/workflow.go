@@ -412,7 +412,10 @@ func (j *Job) Environment() map[string]string {
 func (j *Job) Matrix() map[string][]any {
 	if j.Strategy.RawMatrix.Kind == yaml.MappingNode {
 		var val map[string][]any
-		if !decodeNode(j.Strategy.RawMatrix, &val) {
+		// decodeNode isn't used here so that we can do specific error handling
+		if err := j.Strategy.RawMatrix.Decode(&val); err != nil {
+			// It's OK to have an error here -- this case happens when matrix couldn't be evaluated due to missing
+			// inputs and was left in a state where part of it contains unevaluated expressions.
 			return nil
 		}
 		return val
@@ -506,9 +509,6 @@ func (j *Job) GetMatrixes() ([]map[string]any, error) {
 			for _, include := range extraIncludes {
 				log.Debugf("Adding include '%v'", include)
 				matrixes = append(matrixes, include)
-			}
-			if len(matrixes) == 0 {
-				matrixes = append(matrixes, make(map[string]any))
 			}
 		} else {
 			matrixes = append(matrixes, make(map[string]any))

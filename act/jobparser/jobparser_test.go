@@ -14,9 +14,10 @@ import (
 
 func TestParse(t *testing.T) {
 	tests := []struct {
-		name    string
-		options []ParseOption
-		wantErr bool
+		name                    string
+		options                 []ParseOption
+		wantErr                 bool
+		reparsingSingleWorkflow bool
 	}{
 		{
 			name:    "multiple_named_matrix",
@@ -78,11 +79,35 @@ func TestParse(t *testing.T) {
 			options: []ParseOption{WithVars(map[string]string{"RUNNER": "Windows"})},
 			wantErr: false,
 		},
+		{
+			name:    "evaluated_matrix_needs",
+			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
+			wantErr: false,
+		},
+		{
+			name:    "evaluated_matrix_needs_provided",
+			options: []ParseOption{WithJobOutputs(map[string]map[string]string{"define-matrix": {"colors": "[\"red\",\"green\",\"blue\"]"}})},
+			wantErr: false,
+		},
+		{
+			name:                    "evaluated_matrix_needs_external",
+			reparsingSingleWorkflow: true,
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{"define-matrix": {"colors": "[\"red\",\"green\",\"blue\"]"}}),
+				WithWorkflowNeeds([]string{"define-matrix"}),
+			},
+			wantErr: false,
+		},
+		{
+			name:    "evaluated_matrix_needs_scalar_array",
+			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			content := ReadTestdata(t, tt.name+".in.yaml")
-			want := ReadTestdata(t, tt.name+".out.yaml")
+			content := ReadTestdata(t, tt.name+".in.yaml", tt.reparsingSingleWorkflow)
+			want := ReadTestdata(t, tt.name+".out.yaml", false)
 			got, err := Parse(content, false, tt.options...)
 			if tt.wantErr {
 				require.Error(t, err)

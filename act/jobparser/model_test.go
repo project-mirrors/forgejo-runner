@@ -296,8 +296,8 @@ on:
 
 func TestSingleWorkflow_SetJob(t *testing.T) {
 	t.Run("erase needs", func(t *testing.T) {
-		content := ReadTestdata(t, "erase_needs.in.yaml")
-		want := ReadTestdata(t, "erase_needs.out.yaml")
+		content := ReadTestdata(t, "erase_needs.in.yaml", false)
+		want := ReadTestdata(t, "erase_needs.out.yaml", false)
 		swf, err := Parse(content, false)
 		require.NoError(t, err)
 		builder := &strings.Builder{}
