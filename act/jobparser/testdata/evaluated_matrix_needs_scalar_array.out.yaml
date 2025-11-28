@@ -1,0 +1,32 @@
+"on": [push]
+jobs:
+  define-matrix:
+    name: define-matrix
+    runs-on: docker
+    steps:
+      - id: define
+        run: |
+          echo 'scalar=scalar value' >> "$FORGEJO_OUTPUT"
+          echo 'array=["value 1", "value 2"]' >> "$FORGEJO_OUTPUT"
+          echo 'matrix={"dimension-1": ["d1 v1", "d1 v2"], "dimension-2": ["d2 v1", "d2 v2"]}' >> "$GITHUB_OUTPUT"
+    outputs:
+      array-value: ${{ steps.define.outputs.array }}
+      matrix-value: ${{ steps.define.outputs.matrix }}
+      scalar-value: ${{ steps.define.outputs.scalar }}
+---
+"on": [push]
+jobs:
+  scalar-job:
+    name: scalar-job (incomplete matrix)
+    needs: define-matrix
+    runs-on: docker
+    steps:
+      - run: |
+          set -x
+          [ "${{ matrix.scalar }}" = "scalar value" ] || [ "${{ matrix.scalar }}" = "hard-coded value" ] || exit 1
+    strategy:
+      matrix:
+        scalar:
+          - "${{ needs.define-matrix.outputs.scalar-value }}"
+          - hard-coded value
+incomplete_matrix: true

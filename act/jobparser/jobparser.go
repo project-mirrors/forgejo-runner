@@ -91,6 +91,11 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		if err != nil {
 			return nil, fmt.Errorf("getMatrixes: %w", err)
 		}
+		if incompleteMatrix[id] {
+			// If this job is IncompleteMatrix, then ensure that the matrices for the job are undefined.  Otherwise if
+			// there's an array like `[value1, ${{ needs... }}]` then multiple IncompleteMatrix jobs will be emitted.
+			matricxes = []map[string]any{{}}
+		}
 		for _, matrix := range matricxes {
 			job := job.Clone()
 			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))

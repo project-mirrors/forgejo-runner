@@ -98,6 +98,11 @@ func TestParse(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:    "evaluated_matrix_needs_scalar_array",
+			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
