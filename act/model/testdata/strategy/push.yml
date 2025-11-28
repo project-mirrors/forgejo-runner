@@ -46,5 +46,14 @@ jobs:
       - run: echo 'Hello!'
     strategy:
       max-parallel: 2
+  strategy-empty-dimension:
+    name: ${{ matrix.node-version }} | ${{ matrix.site }} | ${{ matrix.datacenter }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'Hello!'
+    strategy:
+      matrix:
+        datacenter: []
+        node-version: [14.x, 16.x]
 'on':
   push: null

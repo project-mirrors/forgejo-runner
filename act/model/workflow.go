@@ -510,9 +510,6 @@ func (j *Job) GetMatrixes() ([]map[string]any, error) {
 				log.Debugf("Adding include '%v'", include)
 				matrixes = append(matrixes, include)
 			}
-			if len(matrixes) == 0 {
-				matrixes = append(matrixes, make(map[string]any))
-			}
 		} else {
 			matrixes = append(matrixes, make(map[string]any))
 		}

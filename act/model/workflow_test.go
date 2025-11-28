@@ -547,6 +547,20 @@ func TestReadWorkflow_Strategy(t *testing.T) {
 	)
 	assert.Equal(t, job.Strategy.MaxParallel, 2)
 	assert.Equal(t, job.Strategy.FailFast, false)
+
+	// With one empty dimension (datacenter), the catesian product should be empty; this is a realistic scenario when
+	// the matrix is dynamically defined by an earlier job's output:
+	job = wf.Jobs["strategy-empty-dimension"]
+	matrixes, err = job.GetMatrixes()
+	assert.NoError(t, err)
+	assert.Equal(t, []map[string]any{}, matrixes)
+	assert.Equal(t,
+		map[string][]any{
+			"datacenter":   {},
+			"node-version": {"14.x", "16.x"},
+		},
+		job.Matrix(),
+	)
 }
 
 // Various levels of "incomplete" matrix -- where it the unevaluated YAML isn't a map[string][]string -- should parse
