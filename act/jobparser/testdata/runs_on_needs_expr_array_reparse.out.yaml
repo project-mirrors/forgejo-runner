@@ -1,0 +1,8 @@
+jobs:
+  with-vars:
+    name: with-vars
+    runs-on:
+      - ubuntu
+      - fedora
+    steps:
+      - run: echo Hello world!

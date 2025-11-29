@@ -1,0 +1,14 @@
+jobs:
+  define-runs-on:
+    runs-on: docker
+    outputs:
+      runner: ${{ steps.runners.outputs.runner }}
+    steps:
+      - id: runners
+        run: |
+          echo 'runner=ubuntu-1.2.3' >> "$GITHUB_OUTPUT"
+  with-vars:
+    needs: define-runs-on
+    runs-on: ${{ needs.define-runs-on.outputs.runner }}
+    steps:
+      - run: echo Hello world!

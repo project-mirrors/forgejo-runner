@@ -1,0 +1,14 @@
+jobs:
+  define-runs-on:
+    runs-on: docker
+    outputs:
+      runners: ${{ steps.runners.outputs.runners }}
+    steps:
+      - id: runners
+        run: |
+          echo 'runners=["a", "b", "c"]' >> "$GITHUB_OUTPUT"
+  with-vars:
+    needs: define-runs-on
+    runs-on: ${{ fromJSON(needs.define-runs-on.outputs.runners) }}
+    steps:
+      - run: echo Hello world!

@@ -1,0 +1,10 @@
+jobs:
+  with-vars:
+    name: with-vars
+    runs-on: ${{ fromJSON(needs.define-runs-on.outputs.runners) }}
+    steps:
+      - run: echo Hello world!
+incomplete_runs_on: true
+incomplete_runs_on_needs:
+  job: define-runs-on
+  output: runners
