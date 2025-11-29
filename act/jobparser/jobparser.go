@@ -18,20 +18,6 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 	if err := yaml.Unmarshal(content, workflow); err != nil {
 		return nil, fmt.Errorf("yaml.Unmarshal: %w", err)
 	}
-	if workflow.IncompleteMatrix {
-		// The IncompleteMatrix tag can't be unmarshaled into `model.Workflow`; it's only applicable for
-		// `SingleWorkflow`.  If it's being passed back to `Parse` in the `content` field, then we're currently trying
-		// to expand the incomplete matrix from a `SingleWorkflow` that we previously generated.
-		//
-		// To allow the creation of `origin`, remove this field...
-		workflow.IncompleteMatrix = false
-		workflow.IncompleteMatrixNeeds = nil
-		rewrittenContent, err := workflow.Marshal()
-		if err != nil {
-			return nil, err
-		}
-		content = rewrittenContent
-	}
 
 	origin, err := model.ReadWorkflow(bytes.NewReader(content), validate)
 	if err != nil {
