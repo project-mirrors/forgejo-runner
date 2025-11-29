@@ -22,11 +22,16 @@ type SingleWorkflow struct {
 	// jobs.
 	IncompleteMatrix      bool             `yaml:"incomplete_matrix,omitempty"`
 	IncompleteMatrixNeeds *IncompleteNeeds `yaml:"incomplete_matrix_needs,omitempty"`
+
+	// IncompleteRunsOn indicates that it wasn't possible to evaluate the `runs_on` section of the job
+	// because it references a job output that is currently undefined.
+	IncompleteRunsOn      bool             `yaml:"incomplete_runs_on,omitempty"`
+	IncompleteRunsOnNeeds *IncompleteNeeds `yaml:"incomplete_runs_on_needs,omitempty"`
 }
 
 type IncompleteNeeds struct {
-	Job    string `yaml:"job,omitempty"`    // if ${{ needs.some-job.outputs.some-output }} was incomplete the matrix, this will contain "some-job"
-	Output string `yaml:"output,omitempty"` // if ${{ needs.some-job.outputs.some-output }} was incomplete the matrix, this will contain "some-output"
+	Job    string `yaml:"job,omitempty"`    // if ${{ needs.some-job.outputs.some-output }} was incomplete, this will contain "some-job"
+	Output string `yaml:"output,omitempty"` // if ${{ needs.some-job.outputs.some-output }} was incomplete, this will contain "some-output"
 }
 
 func (w *SingleWorkflow) Job() (string, *Job) {

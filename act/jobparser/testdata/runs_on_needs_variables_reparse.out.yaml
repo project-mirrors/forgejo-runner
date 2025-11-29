@@ -1,0 +1,6 @@
+jobs:
+  with-vars:
+    name: with-vars
+    runs-on: ubuntu
+    steps:
+      - run: echo Hello world!
