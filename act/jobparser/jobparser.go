@@ -128,10 +128,28 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 				}
 			}
 
-			runsOn := origin.GetJob(id).RunsOn()
-			for i, v := range runsOn {
-				runsOn[i] = evaluator.Interpolate(v)
+			var runsOnInvalidJobReference *exprparser.InvalidJobOutputReferencedError
+			var runsOn []string
+			if pc.supportIncompleteRunsOn {
+				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput, jobNeeds))
+				rawRunsOn := origin.GetJob(id).RawRunsOn
+				// Evaluate the entire `runs-on` node at once, which permits behavior like `runs-on: ${{ fromJSON(...)
+				// }}` where it can generate an array
+				err = evaluatorOutputAware.EvaluateYamlNode(&rawRunsOn)
+				if err != nil {
+					// Store error and we'll use it to tag `IncompleteRunsOn`
+					errors.As(err, &runsOnInvalidJobReference)
+				}
+				runsOn = model.FlattenRunsOnNode(rawRunsOn)
+			} else {
+				// Legacy behaviour; run interpolator on each individual entry in the `runsOn` array without support for
+				// `IncompleteRunsOn` detection:
+				runsOn = origin.GetJob(id).RunsOn()
+				for i, v := range runsOn {
+					runsOn[i] = evaluator.Interpolate(v)
+				}
 			}
+
 			job.RawRunsOn = encodeRunsOn(runsOn)
 			swf := &SingleWorkflow{
 				Name:     workflow.Name,
@@ -144,6 +162,13 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 				swf.IncompleteMatrixNeeds = &IncompleteNeeds{
 					Job:    refErr.JobID,
 					Output: refErr.OutputName,
+				}
+			}
+			if runsOnInvalidJobReference != nil {
+				swf.IncompleteRunsOn = true
+				swf.IncompleteRunsOnNeeds = &IncompleteNeeds{
+					Job:    runsOnInvalidJobReference.JobID,
+					Output: runsOnInvalidJobReference.OutputName,
 				}
 			}
 			if err := swf.SetJob(id, job); err != nil {
@@ -185,6 +210,12 @@ func WithVars(vars map[string]string) ParseOption {
 	}
 }
 
+func SupportIncompleteRunsOn() ParseOption {
+	return func(c *parseContext) {
+		c.supportIncompleteRunsOn = true
+	}
+}
+
 // `WithWorkflowNeeds` allows overridding the `needs` field for a job being parsed.
 //
 // In the case that a `SingleWorkflow`, returned from `Parse`, is passed back into `Parse` later in order to expand its
@@ -200,12 +231,13 @@ func WithWorkflowNeeds(needs []string) ParseOption {
 }
 
 type parseContext struct {
-	jobResults    map[string]string
-	jobOutputs    map[string]map[string]string // map job ID -> output key -> output value
-	gitContext    *model.GithubContext
-	inputs        map[string]any
-	vars          map[string]string
-	workflowNeeds []string
+	jobResults              map[string]string
+	jobOutputs              map[string]map[string]string // map job ID -> output key -> output value
+	gitContext              *model.GithubContext
+	inputs                  map[string]any
+	vars                    map[string]string
+	workflowNeeds           []string
+	supportIncompleteRunsOn bool
 }
 
 type ParseOption func(c *parseContext)

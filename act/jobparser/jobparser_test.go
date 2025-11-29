@@ -103,6 +103,42 @@ func TestParse(t *testing.T) {
 			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
 			wantErr: false,
 		},
+		{
+			name: "runs_on_needs_variables",
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name:                    "runs_on_needs_variables_reparse",
+			reparsingSingleWorkflow: true,
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{"define-runs-on": {"runner": "ubuntu"}}),
+				WithWorkflowNeeds([]string{"define-runs-on"}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "runs_on_needs_expr_array",
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name:                    "runs_on_needs_expr_array_reparse",
+			reparsingSingleWorkflow: true,
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{"define-runs-on": {"runners": "[\"ubuntu\", \"fedora\"]"}}),
+				WithWorkflowNeeds([]string{"define-runs-on"}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
