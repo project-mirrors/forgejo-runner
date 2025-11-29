@@ -640,7 +640,7 @@ func TestErrorModes(t *testing.T) {
 		expected    any
 		name        string
 		errorMode   ErrorMode
-		expectedErr error
+		expectedErr *InvalidJobOutputReferencedError
 	}{
 		{
 			name:     "needs-output-defaulterrmode",
@@ -665,16 +665,23 @@ func TestErrorModes(t *testing.T) {
 			errorMode: InvalidJobOutput,
 		},
 		{
-			name:        "needs-output-invalidjoboutputerrmode-err",
-			input:       "needs.job-id.outputs.non-existent-output",
-			errorMode:   InvalidJobOutput,
-			expectedErr: ErrInvalidJobOutputReferenced,
+			name:      "needs-output-invalidjoboutputerrmode-err",
+			input:     "needs.job-id.outputs.non-existent-output",
+			errorMode: InvalidJobOutput,
+			expectedErr: &InvalidJobOutputReferencedError{
+				JobID:      "job-id",
+				OutputName: "non-existent-output",
+				String:     "output \"non-existent-output\" is not available on job \"job-id\"",
+			},
 		},
 		{
-			name:        "needs-output-badjob-invalidjoboutputerrmode-err",
-			input:       "needs.non-existent-job.outputs.non-existent-output",
-			errorMode:   InvalidJobOutput,
-			expectedErr: ErrInvalidJobOutputReferenced,
+			name:      "needs-output-badjob-invalidjoboutputerrmode-err",
+			input:     "needs.non-existent-job.outputs.non-existent-output",
+			errorMode: InvalidJobOutput,
+			expectedErr: &InvalidJobOutputReferencedError{
+				JobID:  "non-existent-job",
+				String: "job \"non-existent-job\" is not available",
+			},
 		},
 	}
 
@@ -704,7 +711,9 @@ func TestErrorModes(t *testing.T) {
 
 			output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
 			if tt.expectedErr != nil {
-				assert.ErrorIs(t, err, tt.expectedErr)
+				var perr *InvalidJobOutputReferencedError
+				assert.ErrorAs(t, err, &perr)
+				assert.Equal(t, *tt.expectedErr, *perr)
 			} else {
 				assert.Nil(t, err)
 				assert.Equal(t, tt.expected, output)

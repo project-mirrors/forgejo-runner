@@ -2,7 +2,6 @@ package exprparser
 
 import (
 	"encoding"
-	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -238,11 +237,25 @@ func (impl *interperterImpl) evaluateIndexAccess(indexAccessNode *actionlint.Ind
 	}
 }
 
+type JobOutputsWrapper struct {
+	JobID string
+	Needs *Needs
+}
+
 type NeedsWrapper struct {
+	JobID   string
 	Outputs map[string]string
 }
 
-var ErrInvalidJobOutputReferenced = errors.New("invalid job output")
+type InvalidJobOutputReferencedError struct {
+	JobID      string
+	OutputName string
+	String     string
+}
+
+func (e *InvalidJobOutputReferencedError) Error() string {
+	return e.String
+}
 
 func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.ObjectDerefNode) (any, error) {
 	left, err := impl.evaluateNode(objectDerefNode.Receiver)
@@ -264,21 +277,33 @@ func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.Obj
 			// trigger an error rather than treating it as an empty variable.
 			jobNeeds, ok := jobMap[objectDerefNode.Property]
 			if !ok {
-				return nil, fmt.Errorf("job %q is not available: %w", objectDerefNode.Property, ErrInvalidJobOutputReferenced)
+				return nil, &InvalidJobOutputReferencedError{
+					JobID:  objectDerefNode.Property,
+					String: fmt.Sprintf("job %q is not available", objectDerefNode.Property),
+				}
 			}
-			return jobNeeds, nil
+			return &JobOutputsWrapper{JobID: objectDerefNode.Property, Needs: &jobNeeds}, nil
 		}
-		if needs, ok := left.(Needs); ok && objectDerefNode.Property == "outputs" {
-			// We've accessed `needs.some-job.outputs`.  In order to easily detect the next access, wrap the result in
-			// an expected type that we can inspect as we evaluate the next node.
-			return &NeedsWrapper{Outputs: needs.Outputs}, nil
+		if outputsWrapper, ok := left.(*JobOutputsWrapper); ok {
+			switch objectDerefNode.Property {
+			case "outputs":
+				// We've accessed `needs.some-job.outputs`.  In order to easily detect the next access, wrap the result in
+				// an expected type that we can inspect as we evaluate the next node.
+				return &NeedsWrapper{JobID: outputsWrapper.JobID, Outputs: outputsWrapper.Needs.Outputs}, nil
+			case "result":
+				return outputsWrapper.Needs.Result, nil
+			}
 		}
 		if needsWrapper, ok := left.(*NeedsWrapper); ok {
 			// We've accessed `needs.some-job.outputs.some-output` and `some-output` is in objectDerefNode.Property.
 			// Because we're in `InvalidJobOutput` error mode, we'll treat this as an error if the output doesn't exist.
 			output, ok := needsWrapper.Outputs[objectDerefNode.Property]
 			if !ok {
-				return nil, fmt.Errorf("output %q is not available: %w", objectDerefNode.Property, ErrInvalidJobOutputReferenced)
+				return nil, &InvalidJobOutputReferencedError{
+					JobID:      needsWrapper.JobID,
+					OutputName: objectDerefNode.Property,
+					String:     fmt.Sprintf("output %q is not available on job %q", objectDerefNode.Property, needsWrapper.JobID),
+				}
 			}
 			return output, nil
 		}

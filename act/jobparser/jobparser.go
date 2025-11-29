@@ -25,6 +25,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		//
 		// To allow the creation of `origin`, remove this field...
 		workflow.IncompleteMatrix = false
+		workflow.IncompleteMatrixNeeds = nil
 		rewrittenContent, err := workflow.Marshal()
 		if err != nil {
 			return nil, err
@@ -56,7 +57,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			Outputs: pc.jobOutputs[id],
 		}
 	}
-	incompleteMatrix := make(map[string]bool) // map job id -> incomplete matrix true
+	incompleteMatrix := make(map[string]*exprparser.InvalidJobOutputReferencedError) // map job id -> incomplete matrix reason
 	for id, job := range origin.Jobs {
 		if job.Strategy != nil {
 			jobNeeds := pc.workflowNeeds
@@ -67,8 +68,9 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			if err := matrixEvaluator.EvaluateYamlNode(&job.Strategy.RawMatrix); err != nil {
 				// IncompleteMatrix tagging is only supported when `WithJobOutputs()` is used as an option, in order to
 				// maintain jobparser's backwards compatibility.
-				if pc.jobOutputs != nil && errors.Is(err, exprparser.ErrInvalidJobOutputReferenced) {
-					incompleteMatrix[id] = true
+				var perr *exprparser.InvalidJobOutputReferencedError
+				if pc.jobOutputs != nil && errors.As(err, &perr) {
+					incompleteMatrix[id] = perr
 				} else {
 					return nil, fmt.Errorf("failure to evaluate strategy.matrix on job %s: %w", job.Name, err)
 				}
@@ -91,7 +93,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		if err != nil {
 			return nil, fmt.Errorf("getMatrixes: %w", err)
 		}
-		if incompleteMatrix[id] {
+		if incompleteMatrix[id] != nil {
 			// If this job is IncompleteMatrix, then ensure that the matrices for the job are undefined.  Otherwise if
 			// there's an array like `[value1, ${{ needs... }}]` then multiple IncompleteMatrix jobs will be emitted.
 			matricxes = []map[string]any{{}}
@@ -100,7 +102,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			job := job.Clone()
 			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
 
-			if incompleteMatrix[id] {
+			if incompleteMatrix[id] != nil {
 				// Preserve the original incomplete `matrix` value so that when the `IncompleteMatrix` state is
 				// discovered later, it can be expanded.
 				job.Strategy.RawMatrix = origin.GetJob(id).Strategy.RawMatrix
@@ -110,7 +112,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 
 			// If we're IncompleteMatrix, don't compute the job name -- this will allow it to remain blank and be
 			// computed when the matrix is expanded in a future reparse.
-			if !incompleteMatrix[id] {
+			if incompleteMatrix[id] == nil {
 				if job.Name == "" {
 					job.Name = nameWithMatrix(id, matrix)
 				} else if strings.HasSuffix(job.Name, " (incomplete matrix)") {
@@ -132,11 +134,17 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			}
 			job.RawRunsOn = encodeRunsOn(runsOn)
 			swf := &SingleWorkflow{
-				Name:             workflow.Name,
-				RawOn:            workflow.RawOn,
-				Env:              workflow.Env,
-				Defaults:         workflow.Defaults,
-				IncompleteMatrix: incompleteMatrix[id],
+				Name:     workflow.Name,
+				RawOn:    workflow.RawOn,
+				Env:      workflow.Env,
+				Defaults: workflow.Defaults,
+			}
+			if refErr := incompleteMatrix[id]; refErr != nil {
+				swf.IncompleteMatrix = true
+				swf.IncompleteMatrixNeeds = &IncompleteNeeds{
+					Job:    refErr.JobID,
+					Output: refErr.OutputName,
+				}
 			}
 			if err := swf.SetJob(id, job); err != nil {
 				return nil, fmt.Errorf("SetJob: %w", err)
