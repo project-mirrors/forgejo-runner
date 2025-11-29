@@ -1,6 +1,7 @@
 package jobparser
 
 import (
+	"log"
 	"strings"
 	"testing"
 
@@ -13,6 +14,13 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	// Ensure any decoding errors cause test failures; these cause error logs in Forgejo.
+	origOnDecodeNodeError := model.OnDecodeNodeError
+	model.OnDecodeNodeError = func(node yaml.Node, out any, err error) {
+		log.Panicf("Failed to decode node %v into %T: %v", node, out, err)
+	}
+	defer func() { model.OnDecodeNodeError = origOnDecodeNodeError }()
+
 	tests := []struct {
 		name                    string
 		options                 []ParseOption
