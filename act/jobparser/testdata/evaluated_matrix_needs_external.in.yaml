@@ -25,3 +25,6 @@ jobs:
       matrix:
         color: ${{ fromJSON(needs.define-matrix.outputs.colors) }}
 incomplete_matrix: true
+incomplete_matrix_needs:
+  job: define-matrix
+  output: colors
