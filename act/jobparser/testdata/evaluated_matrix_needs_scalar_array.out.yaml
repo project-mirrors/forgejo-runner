@@ -30,3 +30,6 @@ jobs:
           - "${{ needs.define-matrix.outputs.scalar-value }}"
           - hard-coded value
 incomplete_matrix: true
+incomplete_matrix_needs:
+  job: define-matrix
+  output: scalar-value
