@@ -644,7 +644,7 @@ func TestErrorModes(t *testing.T) {
 		name                  string
 		errorMode             ErrorMode
 		testWithAllErrorModes bool // test case that should have the same result in every error mode
-		expectedErr           *InvalidJobOutputReferencedError
+		expectedErr           error
 	}{
 		{
 			name:                  "needs-output-defaulterrmode",
@@ -748,6 +748,47 @@ func TestErrorModes(t *testing.T) {
 				String: "job \"non-existent-job\" is not available",
 			},
 		},
+		{
+			name:                  "matrix-defaulterrmode-present",
+			input:                 "matrix.os",
+			expected:              "nixos",
+			testWithAllErrorModes: true,
+		},
+		{
+			name:                  "matrix-defaulterrmode-present-index",
+			input:                 "matrix['os']",
+			expected:              "nixos",
+			testWithAllErrorModes: true,
+		},
+		{
+			name:                  "matrix-defaulterrmode-present-deref",
+			input:                 "matrix.*",
+			expected:              map[string]any{"os": "nixos"},
+			testWithAllErrorModes: true,
+		},
+		{
+			name:     "matrix-defaulterrmode-absent",
+			input:    "matrix.platform",
+			expected: nil,
+		},
+		{
+			name:      "matrix-invalidmatrixdimerrormode-absent",
+			input:     "matrix.platform",
+			errorMode: InvalidMatrixDimension,
+			expectedErr: &InvalidMatrixDimensionReferencedError{
+				Dimension: "platform",
+				String:    "matrix dimension \"platform\" is not defined",
+			},
+		},
+		{
+			name:      "matrix-invalidmatrixdimerrormode-absent-array",
+			input:     "matrix['platform']",
+			errorMode: InvalidMatrixDimension,
+			expectedErr: &InvalidMatrixDimensionReferencedError{
+				Dimension: "platform",
+				String:    "matrix dimension \"platform\" is not defined",
+			},
+		},
 	}
 
 	env := &EvaluationEnvironment{
@@ -768,19 +809,20 @@ func TestErrorModes(t *testing.T) {
 		Inputs: map[string]any{
 			"name": "value",
 		},
+		Matrix: map[string]any{
+			"os": "nixos",
+		},
 	}
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.testWithAllErrorModes {
-				for _, errorMode := range []ErrorMode{0, InvalidJobOutput} {
+				for _, errorMode := range []ErrorMode{0, InvalidJobOutput, InvalidMatrixDimension, InvalidJobOutput | InvalidMatrixDimension} {
 					t.Run(fmt.Sprintf("ErrorMode=%v", errorMode), func(t *testing.T) {
 						env.ErrorMode = errorMode
 						output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
 						if tt.expectedErr != nil {
-							var perr *InvalidJobOutputReferencedError
-							assert.ErrorAs(t, err, &perr)
-							assert.Equal(t, *tt.expectedErr, *perr)
+							assert.Equal(t, tt.expectedErr, err)
 						} else {
 							assert.Nil(t, err)
 							if tt.postProcess != nil {
@@ -794,9 +836,7 @@ func TestErrorModes(t *testing.T) {
 				env.ErrorMode = tt.errorMode
 				output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
 				if tt.expectedErr != nil {
-					var perr *InvalidJobOutputReferencedError
-					assert.ErrorAs(t, err, &perr)
-					assert.Equal(t, *tt.expectedErr, *perr)
+					assert.Equal(t, tt.expectedErr, err)
 				} else {
 					assert.Nil(t, err)
 					if tt.postProcess != nil {

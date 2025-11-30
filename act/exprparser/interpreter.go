@@ -53,6 +53,7 @@ type ErrorMode int
 
 const (
 	InvalidJobOutput ErrorMode = 1 << iota
+	InvalidMatrixDimension
 	// Future: add flags enums for other error modes
 )
 
@@ -188,7 +189,7 @@ func (impl *interperterImpl) evaluateVariable(variableNode *actionlint.VariableN
 	case "strategy":
 		return impl.env.Strategy, nil
 	case "matrix":
-		return impl.env.Matrix, nil
+		return &MatrixWrapper{Matrix: impl.env.Matrix}, nil
 	case "needs":
 		return impl.env.Needs, nil
 	case "inputs":
@@ -262,6 +263,19 @@ func (e *InvalidJobOutputReferencedError) Error() string {
 	return e.String
 }
 
+type MatrixWrapper struct {
+	Matrix map[string]any
+}
+
+type InvalidMatrixDimensionReferencedError struct {
+	Dimension string
+	String    string
+}
+
+func (e *InvalidMatrixDimensionReferencedError) Error() string {
+	return e.String
+}
+
 func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.ObjectDerefNode) (any, error) {
 	left, err := impl.evaluateNode(objectDerefNode.Receiver)
 	if err != nil {
@@ -322,6 +336,24 @@ func (impl *interperterImpl) drilldownSpecialObjectsObject(left any, property st
 			return output, true, nil
 		}
 	}
+
+	if matrixWrapper, ok := left.(*MatrixWrapper); ok {
+		if impl.env.ErrorMode&InvalidMatrixDimension == InvalidMatrixDimension {
+			if _, ok := matrixWrapper.Matrix[property]; !ok {
+				return nil, true, &InvalidMatrixDimensionReferencedError{
+					Dimension: property,
+					String:    fmt.Sprintf("matrix dimension %q is not defined", property),
+				}
+			}
+		}
+		left = matrixWrapper.Matrix
+		value, err := impl.getPropertyValue(reflect.ValueOf(left), property)
+		if err != nil {
+			return nil, true, err
+		}
+		return value, true, nil
+	}
+
 	return nil, false, nil
 }
 
@@ -343,6 +375,10 @@ func (impl *interperterImpl) evaluateArrayDeref(arrayDerefNode *actionlint.Array
 			// We've accessed `needs.some-job.outputs.*`.
 			return needsWrapper.Outputs, nil
 		}
+	}
+	// MatrixWrapper has to be part of the the expression tree regardless of whether the related error mode is used
+	if matrixWrapper, ok := left.(*MatrixWrapper); ok {
+		return matrixWrapper.Matrix, nil
 	}
 
 	return impl.getSafeValue(reflect.ValueOf(left)), nil
