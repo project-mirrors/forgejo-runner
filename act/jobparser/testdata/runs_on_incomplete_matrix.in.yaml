@@ -1,0 +1,22 @@
+on:
+  push:
+jobs:
+  define-matrix:
+    runs-on: docker
+    outputs:
+      scalar-value: ${{ steps.define.outputs.scalar }}
+    steps:
+      - id: define
+        run: |
+          echo 'scalar=debian-ci-latest' >> "$FORGEJO_OUTPUT"
+  runs-on-dynamic-matrix:
+    needs: define-matrix
+    strategy:
+      matrix:
+        os:
+          - debian-latest
+          - "${{ needs.define-matrix.outputs.scalar-value }}"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: uname -a
+      - run: sleep 10

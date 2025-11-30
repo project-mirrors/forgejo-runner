@@ -115,9 +115,10 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			}
 
 			var runsOnInvalidJobReference *exprparser.InvalidJobOutputReferencedError
+			var runsOnInvalidMatrixReference *exprparser.InvalidMatrixDimensionReferencedError
 			var runsOn []string
 			if pc.supportIncompleteRunsOn {
-				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput, jobNeeds))
+				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput|exprparser.InvalidMatrixDimension, jobNeeds))
 				rawRunsOn := origin.GetJob(id).RawRunsOn
 				// Evaluate the entire `runs-on` node at once, which permits behavior like `runs-on: ${{ fromJSON(...)
 				// }}` where it can generate an array
@@ -125,6 +126,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 				if err != nil {
 					// Store error and we'll use it to tag `IncompleteRunsOn`
 					errors.As(err, &runsOnInvalidJobReference)
+					errors.As(err, &runsOnInvalidMatrixReference)
 				}
 				runsOn = model.FlattenRunsOnNode(rawRunsOn)
 			} else {
@@ -155,6 +157,12 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 				swf.IncompleteRunsOnNeeds = &IncompleteNeeds{
 					Job:    runsOnInvalidJobReference.JobID,
 					Output: runsOnInvalidJobReference.OutputName,
+				}
+			}
+			if runsOnInvalidMatrixReference != nil {
+				swf.IncompleteRunsOn = true
+				swf.IncompleteRunsOnMatrix = &IncompleteMatrix{
+					Dimension: runsOnInvalidMatrixReference.Dimension,
 				}
 			}
 			if err := swf.SetJob(id, job); err != nil {
