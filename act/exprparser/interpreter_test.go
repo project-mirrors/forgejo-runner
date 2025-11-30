@@ -1,7 +1,9 @@
 package exprparser
 
 import (
+	"fmt"
 	"math"
+	"slices"
 	"testing"
 
 	"code.forgejo.org/forgejo/runner/v12/act/model"
@@ -636,33 +638,77 @@ func TestContexts(t *testing.T) {
 
 func TestErrorModes(t *testing.T) {
 	table := []struct {
-		input       string
-		expected    any
-		name        string
-		errorMode   ErrorMode
-		expectedErr *InvalidJobOutputReferencedError
+		input                 string
+		expected              any
+		postProcess           func(expected any) any
+		name                  string
+		errorMode             ErrorMode
+		testWithAllErrorModes bool // test case that should have the same result in every error mode
+		expectedErr           *InvalidJobOutputReferencedError
 	}{
 		{
-			name:     "needs-output-defaulterrmode",
-			input:    "needs.job-id.outputs.output-name",
-			expected: "value",
+			name:                  "needs-output-defaulterrmode",
+			input:                 "needs.job-id.outputs.output-name",
+			expected:              "value",
+			testWithAllErrorModes: true,
 		},
 		{
-			name:     "needs-result-defaulterrmode",
-			input:    "needs.job-id.result",
-			expected: "success",
+			name:                  "needs-output-defaulterrmode-index",
+			input:                 "needs['job-id']['outputs']['output-name']",
+			expected:              "value",
+			testWithAllErrorModes: true,
 		},
 		{
-			name:      "needs-output-invalidjoboutputerrmode",
-			input:     "needs.job-id.outputs.output-name",
-			expected:  "value",
-			errorMode: InvalidJobOutput,
+			name:                  "needs-output-defaulterrmode-deref-1",
+			input:                 "needs.job-id.outputs.*",
+			expected:              map[string]string{"output-name": "value"},
+			testWithAllErrorModes: true,
 		},
 		{
-			name:      "needs-result-invalidjoboutputerrmode",
-			input:     "needs.job-id.result",
-			expected:  "success",
-			errorMode: InvalidJobOutput,
+			name:                  "needs-output-defaulterrmode-deref-2",
+			input:                 "needs.job-id.*.outputs",
+			expected:              map[string]string{"output-name": "value"},
+			testWithAllErrorModes: true,
+		},
+		{
+			name:     "needs-output-defaulterrmode-deref-3",
+			input:    "needs.*.outputs.output-name",
+			expected: []any{"another value", "value"},
+			postProcess: func(expected any) any {
+				// need to sort for a consistent test
+				expectedSlice := expected.([]any)
+				// make it into a []string so we can sort it
+				val := make([]string, 0, len(expectedSlice))
+				for _, s := range expectedSlice {
+					val = append(val, s.(string))
+				}
+				slices.Sort(val)
+				// make it back into a []any so we can compare with `expected`
+				retval := make([]any, 0, len(val))
+				for _, s := range val {
+					retval = append(retval, s)
+				}
+				return retval
+			},
+			testWithAllErrorModes: true,
+		},
+		{
+			name:                  "needs-result-defaulterrmode",
+			input:                 "needs.job-id.result",
+			expected:              "success",
+			testWithAllErrorModes: true,
+		},
+		{
+			name:                  "needs-result-defaulterrmode-index",
+			input:                 "needs['job-id']['result']",
+			expected:              "success",
+			testWithAllErrorModes: true,
+		},
+		{
+			name:                  "needs-result-defaulterrmode-deref",
+			input:                 "needs.*.result",
+			expected:              []any{"success", "success"},
+			testWithAllErrorModes: true,
 		},
 		{
 			name:      "needs-output-invalidjoboutputerrmode-err",
@@ -675,8 +721,27 @@ func TestErrorModes(t *testing.T) {
 			},
 		},
 		{
+			name:      "needs-output-invalidjoboutputerrmode-err-index",
+			input:     "needs.job-id.outputs['non-existent-output']",
+			errorMode: InvalidJobOutput,
+			expectedErr: &InvalidJobOutputReferencedError{
+				JobID:      "job-id",
+				OutputName: "non-existent-output",
+				String:     "output \"non-existent-output\" is not available on job \"job-id\"",
+			},
+		},
+		{
 			name:      "needs-output-badjob-invalidjoboutputerrmode-err",
 			input:     "needs.non-existent-job.outputs.non-existent-output",
+			errorMode: InvalidJobOutput,
+			expectedErr: &InvalidJobOutputReferencedError{
+				JobID:  "non-existent-job",
+				String: "job \"non-existent-job\" is not available",
+			},
+		},
+		{
+			name:      "needs-output-badjob-invalidjoboutputerrmode-err-index",
+			input:     "needs['non-existent-job'].outputs.non-existent-output",
 			errorMode: InvalidJobOutput,
 			expectedErr: &InvalidJobOutputReferencedError{
 				JobID:  "non-existent-job",
@@ -695,7 +760,7 @@ func TestErrorModes(t *testing.T) {
 			},
 			"another-job-id": {
 				Outputs: map[string]string{
-					"output-name": "value",
+					"output-name": "another value",
 				},
 				Result: "success",
 			},
@@ -707,16 +772,38 @@ func TestErrorModes(t *testing.T) {
 
 	for _, tt := range table {
 		t.Run(tt.name, func(t *testing.T) {
-			env.ErrorMode = tt.errorMode
-
-			output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
-			if tt.expectedErr != nil {
-				var perr *InvalidJobOutputReferencedError
-				assert.ErrorAs(t, err, &perr)
-				assert.Equal(t, *tt.expectedErr, *perr)
+			if tt.testWithAllErrorModes {
+				for _, errorMode := range []ErrorMode{0, InvalidJobOutput} {
+					t.Run(fmt.Sprintf("ErrorMode=%v", errorMode), func(t *testing.T) {
+						env.ErrorMode = errorMode
+						output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
+						if tt.expectedErr != nil {
+							var perr *InvalidJobOutputReferencedError
+							assert.ErrorAs(t, err, &perr)
+							assert.Equal(t, *tt.expectedErr, *perr)
+						} else {
+							assert.Nil(t, err)
+							if tt.postProcess != nil {
+								output = tt.postProcess(output)
+							}
+							assert.Equal(t, tt.expected, output)
+						}
+					})
+				}
 			} else {
-				assert.Nil(t, err)
-				assert.Equal(t, tt.expected, output)
+				env.ErrorMode = tt.errorMode
+				output, err := NewInterpreter(env, Config{}).Evaluate(tt.input, DefaultStatusCheckNone)
+				if tt.expectedErr != nil {
+					var perr *InvalidJobOutputReferencedError
+					assert.ErrorAs(t, err, &perr)
+					assert.Equal(t, *tt.expectedErr, *perr)
+				} else {
+					assert.Nil(t, err)
+					if tt.postProcess != nil {
+						output = tt.postProcess(output)
+					}
+					assert.Equal(t, tt.expected, output)
+				}
 			}
 		})
 	}
