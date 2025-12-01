@@ -53,6 +53,7 @@ type ErrorMode int
 
 const (
 	InvalidJobOutput ErrorMode = 1 << iota
+	InvalidMatrixDimension
 	// Future: add flags enums for other error modes
 )
 
@@ -188,7 +189,7 @@ func (impl *interperterImpl) evaluateVariable(variableNode *actionlint.VariableN
 	case "strategy":
 		return impl.env.Strategy, nil
 	case "matrix":
-		return impl.env.Matrix, nil
+		return &MatrixWrapper{Matrix: impl.env.Matrix}, nil
 	case "needs":
 		return impl.env.Needs, nil
 	case "inputs":
@@ -219,7 +220,12 @@ func (impl *interperterImpl) evaluateIndexAccess(indexAccessNode *actionlint.Ind
 
 	switch rightValue.Kind() {
 	case reflect.String:
-		return impl.getPropertyValue(leftValue, rightValue.String())
+		rightString := rightValue.String()
+		accessedValue, useAccessedValue, err := impl.drilldownSpecialObjectsObject(left, rightString)
+		if useAccessedValue {
+			return accessedValue, err
+		}
+		return impl.getPropertyValue(leftValue, rightString)
 
 	case reflect.Int:
 		switch leftValue.Kind() {
@@ -257,6 +263,19 @@ func (e *InvalidJobOutputReferencedError) Error() string {
 	return e.String
 }
 
+type MatrixWrapper struct {
+	Matrix map[string]any
+}
+
+type InvalidMatrixDimensionReferencedError struct {
+	Dimension string
+	String    string
+}
+
+func (e *InvalidMatrixDimensionReferencedError) Error() string {
+	return e.String
+}
+
 func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.ObjectDerefNode) (any, error) {
 	left, err := impl.evaluateNode(objectDerefNode.Receiver)
 	if err != nil {
@@ -268,6 +287,15 @@ func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.Obj
 		return impl.getPropertyValueDereferenced(reflect.ValueOf(left), objectDerefNode.Property)
 	}
 
+	accessedValue, useAccessedValue, err := impl.drilldownSpecialObjectsObject(left, objectDerefNode.Property)
+	if useAccessedValue {
+		return accessedValue, err
+	}
+
+	return impl.getPropertyValue(reflect.ValueOf(left), objectDerefNode.Property)
+}
+
+func (impl *interperterImpl) drilldownSpecialObjectsObject(left any, property string) (any, bool, error) {
 	// When the environment is configured with the `InvalidJobOutput` error mode, exprparser detects specifically the
 	// access to `needs.some-job.outputs.some-output` and returns a typed error if `some-output` isn't presently a valid
 	// output.
@@ -275,47 +303,82 @@ func (impl *interperterImpl) evaluateObjectDeref(objectDerefNode *actionlint.Obj
 		if jobMap, ok := left.(map[string]Needs); ok {
 			// We've accessed `needs.some-job...`.  In this error mode, if `some-job` doesn't exist then we want to
 			// trigger an error rather than treating it as an empty variable.
-			jobNeeds, ok := jobMap[objectDerefNode.Property]
+			jobNeeds, ok := jobMap[property]
 			if !ok {
-				return nil, &InvalidJobOutputReferencedError{
-					JobID:  objectDerefNode.Property,
-					String: fmt.Sprintf("job %q is not available", objectDerefNode.Property),
+				return nil, true, &InvalidJobOutputReferencedError{
+					JobID:  property,
+					String: fmt.Sprintf("job %q is not available", property),
 				}
 			}
-			return &JobOutputsWrapper{JobID: objectDerefNode.Property, Needs: &jobNeeds}, nil
+			return &JobOutputsWrapper{JobID: property, Needs: &jobNeeds}, true, nil
 		}
 		if outputsWrapper, ok := left.(*JobOutputsWrapper); ok {
-			switch objectDerefNode.Property {
+			switch property {
 			case "outputs":
 				// We've accessed `needs.some-job.outputs`.  In order to easily detect the next access, wrap the result in
 				// an expected type that we can inspect as we evaluate the next node.
-				return &NeedsWrapper{JobID: outputsWrapper.JobID, Outputs: outputsWrapper.Needs.Outputs}, nil
+				return &NeedsWrapper{JobID: outputsWrapper.JobID, Outputs: outputsWrapper.Needs.Outputs}, true, nil
 			case "result":
-				return outputsWrapper.Needs.Result, nil
+				return outputsWrapper.Needs.Result, true, nil
 			}
 		}
 		if needsWrapper, ok := left.(*NeedsWrapper); ok {
-			// We've accessed `needs.some-job.outputs.some-output` and `some-output` is in objectDerefNode.Property.
+			// We've accessed `needs.some-job.outputs.some-output` and `some-output` is in property.
 			// Because we're in `InvalidJobOutput` error mode, we'll treat this as an error if the output doesn't exist.
-			output, ok := needsWrapper.Outputs[objectDerefNode.Property]
+			output, ok := needsWrapper.Outputs[property]
 			if !ok {
-				return nil, &InvalidJobOutputReferencedError{
+				return nil, true, &InvalidJobOutputReferencedError{
 					JobID:      needsWrapper.JobID,
-					OutputName: objectDerefNode.Property,
-					String:     fmt.Sprintf("output %q is not available on job %q", objectDerefNode.Property, needsWrapper.JobID),
+					OutputName: property,
+					String:     fmt.Sprintf("output %q is not available on job %q", property, needsWrapper.JobID),
 				}
 			}
-			return output, nil
+			return output, true, nil
 		}
 	}
 
-	return impl.getPropertyValue(reflect.ValueOf(left), objectDerefNode.Property)
+	if matrixWrapper, ok := left.(*MatrixWrapper); ok {
+		if impl.env.ErrorMode&InvalidMatrixDimension == InvalidMatrixDimension {
+			if _, ok := matrixWrapper.Matrix[property]; !ok {
+				return nil, true, &InvalidMatrixDimensionReferencedError{
+					Dimension: property,
+					String:    fmt.Sprintf("matrix dimension %q is not defined", property),
+				}
+			}
+		}
+		left = matrixWrapper.Matrix
+		value, err := impl.getPropertyValue(reflect.ValueOf(left), property)
+		if err != nil {
+			return nil, true, err
+		}
+		return value, true, nil
+	}
+
+	return nil, false, nil
 }
 
 func (impl *interperterImpl) evaluateArrayDeref(arrayDerefNode *actionlint.ArrayDerefNode) (any, error) {
 	left, err := impl.evaluateNode(arrayDerefNode.Receiver)
 	if err != nil {
 		return nil, err
+	}
+
+	// When the environment is configured with the `InvalidJobOutput` error mode, exprparser injects some specialized
+	// types like `NeedsWrapper` in order to track access to variables in `needs.some-job.outputs.some-output`.  If
+	// we're derefing an array like `needs.some-job.outputs.*` then we need to handle those wrapper objects:
+	if impl.env.ErrorMode&InvalidJobOutput == InvalidJobOutput {
+		if outputsWrapper, ok := left.(*JobOutputsWrapper); ok {
+			// We've accessed `needs.some-job.*`.
+			return outputsWrapper.Needs, nil
+		}
+		if needsWrapper, ok := left.(*NeedsWrapper); ok {
+			// We've accessed `needs.some-job.outputs.*`.
+			return needsWrapper.Outputs, nil
+		}
+	}
+	// MatrixWrapper has to be part of the the expression tree regardless of whether the related error mode is used
+	if matrixWrapper, ok := left.(*MatrixWrapper); ok {
+		return matrixWrapper.Matrix, nil
 	}
 
 	return impl.getSafeValue(reflect.ValueOf(left)), nil

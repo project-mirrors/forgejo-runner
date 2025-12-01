@@ -1,6 +1,7 @@
 package jobparser
 
 import (
+	"log"
 	"strings"
 	"testing"
 
@@ -13,6 +14,13 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	// Ensure any decoding errors cause test failures; these cause error logs in Forgejo.
+	origOnDecodeNodeError := model.OnDecodeNodeError
+	model.OnDecodeNodeError = func(node yaml.Node, out any, err error) {
+		log.Panicf("Failed to decode node %v into %T: %v", node, out, err)
+	}
+	defer func() { model.OnDecodeNodeError = origOnDecodeNodeError }()
+
 	tests := []struct {
 		name                    string
 		options                 []ParseOption
@@ -101,6 +109,50 @@ func TestParse(t *testing.T) {
 		{
 			name:    "evaluated_matrix_needs_scalar_array",
 			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
+			wantErr: false,
+		},
+		{
+			name: "runs_on_needs_variables",
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name:                    "runs_on_needs_variables_reparse",
+			reparsingSingleWorkflow: true,
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{"define-runs-on": {"runner": "ubuntu"}}),
+				WithWorkflowNeeds([]string{"define-runs-on"}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "runs_on_needs_expr_array",
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name:                    "runs_on_needs_expr_array_reparse",
+			reparsingSingleWorkflow: true,
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{"define-runs-on": {"runners": "[\"ubuntu\", \"fedora\"]"}}),
+				WithWorkflowNeeds([]string{"define-runs-on"}),
+				SupportIncompleteRunsOn(),
+			},
+			wantErr: false,
+		},
+		{
+			name: "runs_on_incomplete_matrix",
+			options: []ParseOption{
+				WithJobOutputs(map[string]map[string]string{}),
+				SupportIncompleteRunsOn(),
+			},
 			wantErr: false,
 		},
 	}
