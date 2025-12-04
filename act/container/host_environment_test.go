@@ -2,6 +2,7 @@ package container
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -112,12 +113,13 @@ while ($true) { Start-Sleep -Seconds 1 }
 		expectedExit = "signal: killed"
 	}
 
+	outputBuffer := bytes.NewBuffer(make([]byte, 0, 8192))
 	e := &HostEnvironment{
 		Path:      dir,
 		TmpDir:    dir,
 		ToolCache: dir,
 		ActPath:   dir,
-		StdOut:    io.Discard,
+		StdOut:    outputBuffer,
 		Workdir:   dir,
 	}
 
@@ -126,7 +128,9 @@ while ($true) { Start-Sleep -Seconds 1 }
 	execTime := time.Now()
 	execResult := make(chan error)
 	go func() {
-		execResult <- e.Exec(argv, map[string]string{}, "", dir)(ctx)
+		execResult <- e.Exec(argv, map[string]string{
+			"PATH": os.Getenv("PATH"),
+		}, "", dir)(ctx)
 	}()
 
 	// The child process tree will repeatedly create a file named 'check_file'. Wait for
@@ -134,9 +138,11 @@ while ($true) { Start-Sleep -Seconds 1 }
 	// under extreme load, we wait up to 60 seconds for that to happen, though it will
 	// typically happen much faster.
 	checkFilePath := filepath.Join(dir, "check_file")
-	assert.EventuallyWithT(t, func(c *assert.CollectT) {
+	if !assert.EventuallyWithT(t, func(c *assert.CollectT) {
 		assert.FileExists(c, checkFilePath)
-	}, 60*time.Second, 100*time.Millisecond)
+	}, 60*time.Second, 100*time.Millisecond) {
+		t.Logf("subcommand output was: %q", outputBuffer.String())
+	}
 
 	// Now that everything is running, cancel the child process.
 	cancel()
