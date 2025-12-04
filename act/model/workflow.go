@@ -635,6 +635,7 @@ type Step struct {
 	If                 yaml.Node         `yaml:"if"`
 	Name               string            `yaml:"name"`
 	Uses               string            `yaml:"uses"`
+	DefaultActionsURL  string            `yaml:"default_actions_url"`
 	Run                string            `yaml:"run"`
 	WorkingDirectory   string            `yaml:"working-directory"`
 	RawShell           string            `yaml:"shell"`

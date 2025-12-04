@@ -26,6 +26,7 @@ type stepActionRemote struct {
 	readAction          readAction
 	runAction           runAction
 	action              *model.Action
+	defaultActionsURL   string
 	env                 map[string]string
 	remoteAction        *remoteAction
 	workTree            git.Worktree
@@ -63,11 +64,36 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			}
 		}
 
+		// When the step URL is resolved, if it is not a full-qualified name, allow the step to override it with
+		// `default_actions_url`, and then fallback to the configuration provided by the run config (which can be an
+		// exec cmdline option, or coming from Forgejo).
+		//
+		// defaultActionsURL is the root to use for this execution, and cascadeDefaultActionsURL may optionally be the
+		// root that is cascaded down to steps within this action.
+		var defaultActionsURL, cascadeDefaultActionsURL string
+		if sar.Step.DefaultActionsURL != "" {
+			// most-specific -- on the actual step we're running
+			defaultActionsURL = sar.Step.DefaultActionsURL
+			cascadeDefaultActionsURL = sar.Step.DefaultActionsURL // cascade down
+			println(fmt.Sprintf("(override) sar.Step.DefaultActionsURL = %q", defaultActionsURL))
+		} else if sar.defaultActionsURL != "" {
+			// less-specific -- cascaded from a parent
+			defaultActionsURL = sar.Step.DefaultActionsURL
+			cascadeDefaultActionsURL = sar.Step.DefaultActionsURL // continue to cascade down
+			println(fmt.Sprintf("(cascade) sar.defaultActionsURL = %q", defaultActionsURL))
+		} else {
+			defaultActionsURL = sar.RunContext.Config.DefaultActionInstance
+			// FIXME: maybe this "not cascading" isn't needed
+			cascadeDefaultActionsURL = "" // don't cascade this global config value down
+			println(fmt.Sprintf("(default) sar.defaultActionsURL = %q", defaultActionsURL))
+		}
+		println(fmt.Sprintf("(default) clone URL = %q", sar.remoteAction.CloneURL(defaultActionsURL)))
+
 		var ntErr common.Executor
 		if sar.workTree == nil {
 			wt, err := stepActionRemoteGitClone(ctx, git.CloneInput{
 				CacheDir: sar.RunContext.ActionCacheDir(),
-				URL:      sar.remoteAction.CloneURL(sar.RunContext.Config.DefaultActionInstance),
+				URL:      sar.remoteAction.CloneURL(defaultActionsURL),
 				Ref:      sar.remoteAction.Ref,
 				Token:    "", /*
 					Shouldn't provide token when cloning actions,
@@ -105,6 +131,7 @@ func (sar *stepActionRemote) prepareActionExecutor() common.Executor {
 			func(ctx context.Context) error {
 				actionModel, err := sar.readAction(ctx, sar.Step, sar.workTree.WorktreeDir(), sar.remoteAction.Path, remoteReader(ctx), os.WriteFile)
 				sar.action = actionModel
+				sar.defaultActionsURL = cascadeDefaultActionsURL
 				return err
 			},
 		)(ctx)

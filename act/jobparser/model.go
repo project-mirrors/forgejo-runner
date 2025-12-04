@@ -146,17 +146,18 @@ func (j *Job) RunsOn() []string {
 }
 
 type Step struct {
-	ID               string            `yaml:"id,omitempty"`
-	If               yaml.Node         `yaml:"if,omitempty"`
-	Name             string            `yaml:"name,omitempty"`
-	Uses             string            `yaml:"uses,omitempty"`
-	Run              string            `yaml:"run,omitempty"`
-	WorkingDirectory string            `yaml:"working-directory,omitempty"`
-	Shell            string            `yaml:"shell,omitempty"`
-	Env              yaml.Node         `yaml:"env,omitempty"`
-	With             map[string]string `yaml:"with,omitempty"`
-	ContinueOnError  bool              `yaml:"continue-on-error,omitempty"`
-	TimeoutMinutes   string            `yaml:"timeout-minutes,omitempty"`
+	ID                string            `yaml:"id,omitempty"`
+	If                yaml.Node         `yaml:"if,omitempty"`
+	Name              string            `yaml:"name,omitempty"`
+	Uses              string            `yaml:"uses,omitempty"`
+	DefaultActionsURL string            `yaml:"default_actions_url"`
+	Run               string            `yaml:"run,omitempty"`
+	WorkingDirectory  string            `yaml:"working-directory,omitempty"`
+	Shell             string            `yaml:"shell,omitempty"`
+	Env               yaml.Node         `yaml:"env,omitempty"`
+	With              map[string]string `yaml:"with,omitempty"`
+	ContinueOnError   bool              `yaml:"continue-on-error,omitempty"`
+	TimeoutMinutes    string            `yaml:"timeout-minutes,omitempty"`
 }
 
 // String gets the name of step
