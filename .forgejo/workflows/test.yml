@@ -75,7 +75,7 @@ jobs:
   runner-exec-tests:
     name: runner exec tests
     if: vars.ROLE == 'forgejo-coding'
-    runs-on: lxc-bookworm
+    runs-on: lxc-trixie
     needs: [build-and-tests]
     steps:
 
@@ -129,7 +129,7 @@ jobs:
   integration-tests:
     name: integration tests (docker-${{ matrix.docker }})
     if: vars.ROLE == 'forgejo-coding'
-    runs-on: lxc-bookworm
+    runs-on: lxc-trixie
     strategy:
       matrix:
         docker:
@@ -165,7 +165,7 @@ jobs:
   runner-integration-tests:
     name: runner integration tests
     if: vars.ROLE == 'forgejo-coding'
-    runs-on: lxc-bookworm
+    runs-on: lxc-trixie
     needs: [build-and-tests]
 
     steps:
