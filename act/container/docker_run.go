@@ -68,7 +68,7 @@ func (cr *containerReference) platform(ctx context.Context) (string, error) {
 
 	if platform == "" {
 		// cr.input.DefaultPlatform wasn't provided, --platform wasn't provided, fallback to the system platform
-		defaultPlatform, err := currentSystemPlatform(ctx)
+		defaultPlatform, err := CurrentSystemPlatform(ctx)
 		if err != nil {
 			return "", err
 		}
