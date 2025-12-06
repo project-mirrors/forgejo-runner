@@ -21,7 +21,7 @@ import (
 // atomic isn't "really" needed, but its used to avoid the data race detector causing errors.
 var cachedSystemPlatform atomic.Pointer[string]
 
-func currentSystemPlatform(ctx context.Context) (string, error) {
+func CurrentSystemPlatform(ctx context.Context) (string, error) {
 	lastCache := cachedSystemPlatform.Load()
 	if lastCache != nil {
 		return *lastCache, nil

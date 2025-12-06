@@ -108,7 +108,7 @@ jobs:
             ]
           }
           EOF
-          apt --quiet install --yes -qq docker.io
+          apt-get install -y -qq docker.io
 
       - name: forgejo-runner exec --enable-ipv6
         run: |
@@ -127,9 +127,14 @@ jobs:
           grep --quiet 'Success - Main echo "VAR -> testvariable"' /tmp/var.out
 
   integration-tests:
-    name: integration tests
+    name: integration tests (docker-${{ matrix.docker }})
     if: vars.ROLE == 'forgejo-coding'
     runs-on: lxc-bookworm
+    strategy:
+      matrix:
+        docker:
+          - stable # docker version distributed by Debian
+          - latest # latest stable version of docker distributed by Docker
     steps:
       - uses: https://data.forgejo.org/actions/checkout@v5
 
@@ -137,14 +142,16 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: install docker
+        run: ./.forgejo/install-docker.sh ${{ matrix.docker }}
+
       - name: apt install
         run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update -qq
           # qemu & binfmt -- for mixed architecture testing
           # gcc -- for `go test -race`
-          apt-get -q install -qq -y \
-            docker.io \
+          apt-get install -qq -y \
             qemu-user-static binfmt-support \
             gcc
 
@@ -189,14 +196,14 @@ jobs:
             ]
           }
           EOF
-          apt --quiet install --yes -qq docker.io make
+          apt-get install -y -qq docker.io make
 
       - name: install LXC
         run: |
           act/runner/lxc-helpers.sh lxc_prepare_environment
           act/runner/lxc-helpers.sh lxc_install_lxc_inside 10.39.28 fdb1
 
-      - run: apt-get -q install -qq -y gcc # required for `-race`
+      - run: apt-get install -y -qq gcc # required for `-race`
 
       - run: make integration-test
 
@@ -247,7 +254,7 @@ jobs:
           PIP_PROGRESS_BAR: off
         run: |
           apt-get update -qq
-          apt-get -q install -qq -y python3-pip
+          apt-get install -y -qq python3-pip
           python3 -m pip install 'pre-commit>=3.2.0'
 
       - name: validate .pre-commit-hooks.yaml

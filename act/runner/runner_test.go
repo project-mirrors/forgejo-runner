@@ -479,7 +479,7 @@ func TestRunner_RunSkipped(t *testing.T) {
 			ctx := common.WithLoggerHook(t.Context(), h)
 
 			jobLoggerLevel := log.InfoLevel
-			tjfi.runTest(ctx, t, &Config{ContainerArchitecture: "linux/arm64", JobLoggerLevel: &jobLoggerLevel})
+			tjfi.runTest(ctx, t, &Config{JobLoggerLevel: &jobLoggerLevel})
 
 			assert.True(t, h.found)
 		})

@@ -281,6 +281,15 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, basedir stri
 	rc := step.getRunContext()
 	action := step.getActionModel()
 
+	targetPlatform := rc.Config.ContainerArchitecture
+	if targetPlatform == "" {
+		currentSystemPlatform, err := container.CurrentSystemPlatform(ctx)
+		if err != nil {
+			return fmt.Errorf("unable to evaluate current system architecture: %w", err)
+		}
+		targetPlatform = currentSystemPlatform
+	}
+
 	var prepImage common.Executor
 	var image string
 	forcePull := false
@@ -296,28 +305,13 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, basedir stri
 		}
 		contextDir, fileName := filepath.Split(filepath.Join(basedir, action.Runs.Image))
 
-		anyArchExists, err := container.ImageExistsLocally(ctx, image, "any")
+		imageExists, err := container.ImageExistsLocally(ctx, image, targetPlatform)
 		if err != nil {
 			return err
 		}
 
-		correctArchExists, err := container.ImageExistsLocally(ctx, image, rc.Config.ContainerArchitecture)
-		if err != nil {
-			return err
-		}
-
-		if anyArchExists && !correctArchExists {
-			wasRemoved, err := container.RemoveImage(ctx, image, true, true)
-			if err != nil {
-				return err
-			}
-			if !wasRemoved {
-				return fmt.Errorf("failed to remove image '%s'", image)
-			}
-		}
-
-		if !correctArchExists || rc.Config.ForceRebuild {
-			logger.Debugf("image '%s' for architecture '%s' will be built from context '%s", image, rc.Config.ContainerArchitecture, contextDir)
+		if !imageExists || rc.Config.ForceRebuild {
+			logger.Debugf("image '%s' for architecture '%s' will be built from context '%s", image, targetPlatform, contextDir)
 			var buildContext io.ReadCloser
 			if localAction {
 				buildContext, err = rc.JobContainer.GetContainerArchive(ctx, contextDir+"/.")
@@ -331,10 +325,10 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, basedir stri
 				Dockerfile:   fileName,
 				ImageTag:     image,
 				BuildContext: buildContext,
-				Platform:     rc.Config.ContainerArchitecture,
+				Platform:     targetPlatform,
 			})
 		} else {
-			logger.Debugf("image '%s' for architecture '%s' already exists", image, rc.Config.ContainerArchitecture)
+			logger.Debugf("image '%s' for architecture '%s' already exists", image, targetPlatform)
 		}
 	}
 	eval := rc.NewStepExpressionEvaluator(ctx, step)
@@ -357,7 +351,7 @@ func execAsDocker(ctx context.Context, step actionStep, actionName, basedir stri
 			entrypoint = nil
 		}
 	}
-	stepContainer := newStepContainer(ctx, step, image, cmd, entrypoint)
+	stepContainer := newStepContainer(ctx, step, image, cmd, entrypoint, targetPlatform)
 	return common.NewPipelineExecutor(
 		prepImage,
 		stepContainer.Pull(forcePull),
@@ -398,7 +392,7 @@ func evalDockerArgs(ctx context.Context, step step, action *model.Action, cmd *[
 	}
 }
 
-func newStepContainer(ctx context.Context, step step, image string, cmd, entrypoint []string) container.Container {
+func newStepContainer(ctx context.Context, step step, image string, cmd, entrypoint []string, targetPlatform string) container.Container {
 	rc := step.getRunContext()
 	stepModel := step.getStepModel()
 	rawLogger := common.Logger(ctx).WithField("raw_output", true)
@@ -442,7 +436,7 @@ func newStepContainer(ctx context.Context, step step, image string, cmd, entrypo
 		Stderr:          logWriter,
 		Privileged:      rc.Config.Privileged,
 		UsernsMode:      rc.Config.UsernsMode,
-		DefaultPlatform: rc.Config.ContainerArchitecture,
+		DefaultPlatform: targetPlatform,
 		ValidVolumes:    validVolumes,
 
 		ConfigOptions: rc.Config.ContainerOptions,
