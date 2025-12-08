@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"path"
-	"regexp"
 	"strings"
 
 	"code.forgejo.org/forgejo/runner/v12/act/common"
@@ -32,7 +31,7 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	// uses string format is {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}
 	uses := fmt.Sprintf("%s/%s@%s", rc.Config.PresetGitHubContext.Repository, trimmedUses, rc.Config.PresetGitHubContext.Sha)
 
-	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
+	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
 	if remoteReusableWorkflow == nil {
 		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
 	}
@@ -59,7 +58,7 @@ func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 		host = rc.Config.GitHubInstance
 	}
 
-	remoteReusableWorkflow := newRemoteReusableWorkflowWithPlat(host, strings.TrimPrefix(url.Path, "/"))
+	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(host, strings.TrimPrefix(url.Path, "/"))
 	if remoteReusableWorkflow == nil {
 		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", url.Path))
 	}
@@ -74,7 +73,7 @@ func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	return cloneIfRequired(rc, *remoteReusableWorkflow, token, makeWorkflowExecutorForWorkTree)
 }
 
-func cloneIfRequired(rc *RunContext, remoteReusableWorkflow remoteReusableWorkflow, token string, makeWorkflowExecutorForWorkTree func(workflowDir string) common.Executor) common.Executor {
+func cloneIfRequired(rc *RunContext, remoteReusableWorkflow model.RemoteReusableWorkflow, token string, makeWorkflowExecutorForWorkTree func(workflowDir string) common.Executor) common.Executor {
 	return func(ctx context.Context) error {
 		// Do not change the remoteReusableWorkflow.URL, because:
 		// 	1. Gitea doesn't support specifying GithubContext.ServerURL by the GITHUB_SERVER_URL env
@@ -131,49 +130,6 @@ func NewReusableWorkflowRunner(rc *RunContext) (Runner, error) {
 	}
 
 	return runner.configure()
-}
-
-type remoteReusableWorkflow struct {
-	URL      string
-	Org      string
-	Repo     string
-	Filename string
-	Ref      string
-
-	GitPlatform string
-}
-
-func (r *remoteReusableWorkflow) CloneURL() string {
-	// In Gitea, r.URL always has the protocol prefix, we don't need to add extra prefix in this case.
-	if strings.HasPrefix(r.URL, "http://") || strings.HasPrefix(r.URL, "https://") {
-		return fmt.Sprintf("%s/%s/%s", r.URL, r.Org, r.Repo)
-	}
-	return fmt.Sprintf("https://%s/%s/%s", r.URL, r.Org, r.Repo)
-}
-
-func (r *remoteReusableWorkflow) FilePath() string {
-	return fmt.Sprintf("./.%s/workflows/%s", r.GitPlatform, r.Filename)
-}
-
-// For Gitea
-// newRemoteReusableWorkflowWithPlat create a `remoteReusableWorkflow`
-// workflows from `.gitea/workflows` and `.github/workflows` are supported
-func newRemoteReusableWorkflowWithPlat(url, uses string) *remoteReusableWorkflow {
-	// GitHub docs:
-	// https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_iduses
-	r := regexp.MustCompile(`^([^/]+)/([^/]+)/\.([^/]+)/workflows/([^@]+)@(.*)$`)
-	matches := r.FindStringSubmatch(uses)
-	if len(matches) != 6 {
-		return nil
-	}
-	return &remoteReusableWorkflow{
-		Org:         matches[1],
-		Repo:        matches[2],
-		GitPlatform: matches[3],
-		Filename:    matches[4],
-		Ref:         matches[5],
-		URL:         url,
-	}
 }
 
 // finalizeReusableWorkflow prints the final job banner from the parent job context.
