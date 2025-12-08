@@ -64,18 +64,37 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		}
 	}
 
-	var ret []*SingleWorkflow
-	ids, jobs, err := workflow.jobs()
+	ids, jobParserJobs, err := workflow.jobs()
 	if err != nil {
 		return nil, fmt.Errorf("invalid jobs: %w", err)
 	}
-	for i, id := range ids {
-		job := jobs[i]
+
+	type BothJobTypes struct {
+		id           string
+		jobParserJob *Job
+		workflowJob  *model.Job
+	}
+	jobs := make([]BothJobTypes, len(ids))
+	for i, jobName := range ids {
+		jobs[i] = BothJobTypes{
+			id:           jobName,
+			jobParserJob: jobParserJobs[i],
+			workflowJob:  origin.GetJob(jobName),
+		}
+	}
+
+	var ret []*SingleWorkflow
+	for _, bothJobs := range jobs {
+		id := bothJobs.id
+		jobParserJob := bothJobs.jobParserJob
+		workflowJob := bothJobs.workflowJob
+
 		jobNeeds := pc.workflowNeeds
 		if jobNeeds == nil {
-			jobNeeds = job.Needs()
+			jobNeeds = jobParserJob.Needs()
 		}
-		matricxes, err := getMatrixes(origin.GetJob(id))
+
+		matricxes, err := getMatrixes(workflowJob)
 		if err != nil {
 			return nil, fmt.Errorf("getMatrixes: %w", err)
 		}
@@ -85,13 +104,13 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			matricxes = []map[string]any{{}}
 		}
 		for _, matrix := range matricxes {
-			job := job.Clone()
-			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
+			job := jobParserJob.Clone()
+			evaluator := NewExpressionEvaluator(NewInterpreter(id, workflowJob, matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
 
 			if incompleteMatrix[id] != nil {
 				// Preserve the original incomplete `matrix` value so that when the `IncompleteMatrix` state is
 				// discovered later, it can be expanded.
-				job.Strategy.RawMatrix = origin.GetJob(id).Strategy.RawMatrix
+				job.Strategy.RawMatrix = workflowJob.Strategy.RawMatrix
 			} else {
 				job.Strategy.RawMatrix = encodeMatrix(matrix)
 			}
@@ -118,8 +137,8 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			var runsOnInvalidMatrixReference *exprparser.InvalidMatrixDimensionReferencedError
 			var runsOn []string
 			if pc.supportIncompleteRunsOn {
-				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput|exprparser.InvalidMatrixDimension, jobNeeds))
-				rawRunsOn := origin.GetJob(id).RawRunsOn
+				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, workflowJob, matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput|exprparser.InvalidMatrixDimension, jobNeeds))
+				rawRunsOn := workflowJob.RawRunsOn
 				// Evaluate the entire `runs-on` node at once, which permits behavior like `runs-on: ${{ fromJSON(...)
 				// }}` where it can generate an array
 				err = evaluatorOutputAware.EvaluateYamlNode(&rawRunsOn)
@@ -132,7 +151,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			} else {
 				// Legacy behaviour; run interpolator on each individual entry in the `runsOn` array without support for
 				// `IncompleteRunsOn` detection:
-				runsOn = origin.GetJob(id).RunsOn()
+				runsOn = workflowJob.RunsOn()
 				for i, v := range runsOn {
 					runsOn[i] = evaluator.Interpolate(v)
 				}
@@ -224,6 +243,15 @@ func WithWorkflowNeeds(needs []string) ParseOption {
 	}
 }
 
+// Allows the job parser to convert a workflow job that references a local reusable workflow (eg. `uses:
+// ./.forgejo/workflows/reusable.yml`) into one-or-more jobs contained within the local workflow.  The
+// `localWorkflowFetcher` function allows jobparser to read the target workflow file.
+func ExpandLocalReusableWorkflows(localWorkflowFetcher func(path string) ([]byte, error)) ParseOption {
+	return func(c *parseContext) {
+		c.localWorkflowFetcher = localWorkflowFetcher
+	}
+}
+
 type parseContext struct {
 	jobResults              map[string]string
 	jobOutputs              map[string]map[string]string // map job ID -> output key -> output value
@@ -232,6 +260,7 @@ type parseContext struct {
 	vars                    map[string]string
 	workflowNeeds           []string
 	supportIncompleteRunsOn bool
+	localWorkflowFetcher    func(path string) ([]byte, error)
 }
 
 type ParseOption func(c *parseContext)
