@@ -1,6 +1,7 @@
 package jobparser
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	"testing"
@@ -24,78 +25,64 @@ func TestParse(t *testing.T) {
 	tests := []struct {
 		name                    string
 		options                 []ParseOption
-		wantErr                 bool
+		wantErr                 string
 		reparsingSingleWorkflow bool
 	}{
 		{
 			name:    "multiple_named_matrix",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "multiple_jobs",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "multiple_matrix",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "evaluated_matrix",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "has_needs",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "has_with",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "job_concurrency",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "job_concurrency_eval",
 			options: nil,
-			wantErr: false,
 		},
 		{
 			name:    "runs_on_forge_variables",
 			options: []ParseOption{WithGitContext(&model.GithubContext{RunID: "18"})},
-			wantErr: false,
 		},
 		{
 			name:    "runs_on_github_variables",
 			options: []ParseOption{WithGitContext(&model.GithubContext{RunID: "25"})},
-			wantErr: false,
 		},
 		{
 			name:    "runs_on_inputs_variables",
 			options: []ParseOption{WithInputs(map[string]any{"chosen-os": "Ubuntu"})},
-			wantErr: false,
 		},
 		{
 			name:    "runs_on_vars_variables",
 			options: []ParseOption{WithVars(map[string]string{"RUNNER": "Windows"})},
-			wantErr: false,
 		},
 		{
 			name:    "evaluated_matrix_needs",
 			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
-			wantErr: false,
 		},
 		{
 			name:    "evaluated_matrix_needs_provided",
 			options: []ParseOption{WithJobOutputs(map[string]map[string]string{"define-matrix": {"colors": "[\"red\",\"green\",\"blue\"]"}})},
-			wantErr: false,
 		},
 		{
 			name:                    "evaluated_matrix_needs_external",
@@ -104,12 +91,10 @@ func TestParse(t *testing.T) {
 				WithJobOutputs(map[string]map[string]string{"define-matrix": {"colors": "[\"red\",\"green\",\"blue\"]"}}),
 				WithWorkflowNeeds([]string{"define-matrix"}),
 			},
-			wantErr: false,
 		},
 		{
 			name:    "evaluated_matrix_needs_scalar_array",
 			options: []ParseOption{WithJobOutputs(map[string]map[string]string{})},
-			wantErr: false,
 		},
 		{
 			name: "runs_on_needs_variables",
@@ -117,7 +102,6 @@ func TestParse(t *testing.T) {
 				WithJobOutputs(map[string]map[string]string{}),
 				SupportIncompleteRunsOn(),
 			},
-			wantErr: false,
 		},
 		{
 			name:                    "runs_on_needs_variables_reparse",
@@ -127,7 +111,6 @@ func TestParse(t *testing.T) {
 				WithWorkflowNeeds([]string{"define-runs-on"}),
 				SupportIncompleteRunsOn(),
 			},
-			wantErr: false,
 		},
 		{
 			name: "runs_on_needs_expr_array",
@@ -135,7 +118,6 @@ func TestParse(t *testing.T) {
 				WithJobOutputs(map[string]map[string]string{}),
 				SupportIncompleteRunsOn(),
 			},
-			wantErr: false,
 		},
 		{
 			name:                    "runs_on_needs_expr_array_reparse",
@@ -145,7 +127,6 @@ func TestParse(t *testing.T) {
 				WithWorkflowNeeds([]string{"define-runs-on"}),
 				SupportIncompleteRunsOn(),
 			},
-			wantErr: false,
 		},
 		{
 			name: "runs_on_incomplete_matrix",
@@ -153,32 +134,93 @@ func TestParse(t *testing.T) {
 				WithJobOutputs(map[string]map[string]string{}),
 				SupportIncompleteRunsOn(),
 			},
-			wantErr: false,
+		},
+		{
+			name: "expand_local_workflow",
+			options: []ParseOption{
+				ExpandLocalReusableWorkflows(func(path string) ([]byte, error) {
+					if path == "./.forgejo/workflows/expand_local_workflow_reusable-1.yml" {
+						content := ReadTestdata(t, "expand_local_workflow_reusable-1.yaml", true)
+						return content, nil
+					}
+					return nil, fmt.Errorf("unexpected local path: %q", path)
+				}),
+			},
+		},
+		{
+			name: "expand_local_workflow_recursion_limit",
+			options: []ParseOption{
+				ExpandLocalReusableWorkflows(func(path string) ([]byte, error) {
+					if path == "./.forgejo/workflows/expand_local_workflow_recursion_limit-reusable-1.yml" {
+						content := ReadTestdata(t, "expand_local_workflow_recursion_limit-reusable-1.yaml", true)
+						return content, nil
+					}
+					return nil, fmt.Errorf("unexpected local path: %q", path)
+				}),
+			},
+			wantErr: "failed to parse workflow due to exceeding the workflow recursion limit",
+		},
+		{
+			name: "expand_remote_workflow",
+			options: []ParseOption{
+				ExpandRemoteReusableWorkflows(func(ref *model.RemoteReusableWorkflowWithHost) ([]byte, error) {
+					if ref.Org != "some-org" {
+						return nil, fmt.Errorf("unexpected remote Org: %q", ref.Org)
+					}
+					if ref.Repo != "some-repo" {
+						return nil, fmt.Errorf("unexpected remote Repo: %q", ref.Repo)
+					}
+					if ref.GitPlatform != "forgejo" {
+						return nil, fmt.Errorf("unexpected remote GitPlatform: %q", ref.GitPlatform)
+					}
+					if ref.Host == nil {
+						// relative reference in expand_remote_workflow.in.yaml
+						if ref.Filename != "expand_remote_workflow_reusable-2.yml" {
+							return nil, fmt.Errorf("unexpected remote Filename: %q", ref.Filename)
+						}
+					} else {
+						// absolute reference in expand_remote_workflow.in.yaml
+						if *ref.Host != "example.com" {
+							return nil, fmt.Errorf("unexpected remote Host: %v", ref.Host)
+						}
+						if ref.Filename != "expand_remote_workflow_reusable-1.yml" {
+							return nil, fmt.Errorf("unexpected remote Filename: %q", ref.Filename)
+						}
+					}
+					if ref.Ref != "v1" {
+						return nil, fmt.Errorf("unexpected remote Ref: %q", ref.Ref)
+					}
+					content := ReadTestdata(t, "expand_remote_workflow_reusable-1.yaml", true)
+					return content, nil
+				}),
+			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			content := ReadTestdata(t, tt.name+".in.yaml", tt.reparsingSingleWorkflow)
-			want := ReadTestdata(t, tt.name+".out.yaml", false)
 			got, err := Parse(content, false, tt.options...)
-			if tt.wantErr {
+			if tt.wantErr != "" {
 				require.Error(t, err)
-			}
-			require.NoError(t, err)
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
 
-			builder := &strings.Builder{}
-			for _, v := range got {
-				if builder.Len() > 0 {
-					builder.WriteString("---\n")
+				want := ReadTestdata(t, tt.name+".out.yaml", false)
+				builder := &strings.Builder{}
+				for _, v := range got {
+					if builder.Len() > 0 {
+						builder.WriteString("---\n")
+					}
+					encoder := yaml.NewEncoder(builder)
+					encoder.SetIndent(2)
+					require.NoError(t, encoder.Encode(v))
+					id, job := v.Job()
+					assert.NotEmpty(t, id)
+					assert.NotNil(t, job)
 				}
-				encoder := yaml.NewEncoder(builder)
-				encoder.SetIndent(2)
-				require.NoError(t, encoder.Encode(v))
-				id, job := v.Job()
-				assert.NotEmpty(t, id)
-				assert.NotNil(t, job)
+				assert.Equal(t, string(want), builder.String())
 			}
-			assert.Equal(t, string(want), builder.String())
 		})
 	}
 }
