@@ -3,7 +3,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"path"
 	"strings"
 
@@ -31,54 +30,45 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	// uses string format is {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}
 	uses := fmt.Sprintf("%s/%s@%s", rc.Config.PresetGitHubContext.Repository, trimmedUses, rc.Config.PresetGitHubContext.Sha)
 
-	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(uses)
-	if remoteReusableWorkflow == nil {
-		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
+	reusable, err := model.ParseRemoteReusableWorkflow(uses)
+	if err != nil {
+		return common.NewErrorExecutor(err)
 	}
-	remoteReusableWorkflowWithBaseURL := model.RemoteReusableWorkflowWithHost{
-		RemoteReusableWorkflow: *remoteReusableWorkflow,
-		Host:                   &rc.Config.GitHubInstance,
+	if reusable.Host == nil {
+		// Non-URL qualified remote reusable workflow; default Host for cloning to the currently configured forgejo
+		reusable.Host = &rc.Config.GitHubInstance
 	}
 
 	// If the repository is private, we need a token to clone it
 	token := rc.Config.GetToken()
 
 	makeWorkflowExecutorForWorkTree := func(workflowDir string) common.Executor {
-		return newReusableWorkflowExecutor(rc, workflowDir, remoteReusableWorkflow.FilePath())
+		return newReusableWorkflowExecutor(rc, workflowDir, reusable.FilePath())
 	}
 
-	return cloneIfRequired(rc, &remoteReusableWorkflowWithBaseURL, token, makeWorkflowExecutorForWorkTree)
+	return cloneIfRequired(rc, reusable, token, makeWorkflowExecutorForWorkTree)
 }
 
 func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	uses := rc.Run.Job().Uses
 
-	url, err := url.Parse(uses)
+	reusable, err := model.ParseRemoteReusableWorkflow(uses)
 	if err != nil {
-		return common.NewErrorExecutor(fmt.Errorf("'%s' cannot be parsed as a URL: %v", uses, err))
+		return common.NewErrorExecutor(err)
 	}
-	host := url.Host
-	if host == "" {
-		host = rc.Config.GitHubInstance
-	}
-
-	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(strings.TrimPrefix(url.Path, "/"))
-	if remoteReusableWorkflow == nil {
-		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", url.Path))
-	}
-	remoteReusableWorkflowWithBaseURL := model.RemoteReusableWorkflowWithHost{
-		RemoteReusableWorkflow: *remoteReusableWorkflow,
-		Host:                   &host,
+	if reusable.Host == nil {
+		// Non-URL qualified remote reusable workflow; default Host for cloning to the currently configured forgejo
+		reusable.Host = &rc.Config.GitHubInstance
 	}
 
 	// FIXME: if the reusable workflow is from a private repository, we need to provide a token to access the repository.
 	token := ""
 
 	makeWorkflowExecutorForWorkTree := func(workflowDir string) common.Executor {
-		return newReusableWorkflowExecutor(rc, workflowDir, remoteReusableWorkflow.FilePath())
+		return newReusableWorkflowExecutor(rc, workflowDir, reusable.FilePath())
 	}
 
-	return cloneIfRequired(rc, &remoteReusableWorkflowWithBaseURL, token, makeWorkflowExecutorForWorkTree)
+	return cloneIfRequired(rc, reusable, token, makeWorkflowExecutorForWorkTree)
 }
 
 func cloneIfRequired(rc *RunContext, remoteReusableWorkflow *model.RemoteReusableWorkflowWithHost, token string, makeWorkflowExecutorForWorkTree func(workflowDir string) common.Executor) common.Executor {

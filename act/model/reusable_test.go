@@ -4,7 +4,74 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestParseRemoteReusableWorkflow(t *testing.T) {
+	tests := []struct {
+		name             string
+		url              string
+		uses             string
+		expectedHost     string
+		expectedOrg      string
+		expectedRepo     string
+		expectedPlatform string
+		expectedFilename string
+		expectedRef      string
+		shouldFail       bool
+	}{
+		{
+			name:             "valid non-qualified workflow",
+			uses:             "owner/repo/.github/workflows/test.yml@main",
+			expectedOrg:      "owner",
+			expectedRepo:     "repo",
+			expectedPlatform: "github",
+			expectedFilename: "test.yml",
+			expectedRef:      "main",
+			shouldFail:       false,
+		},
+		{
+			name:             "valid qualified workflow",
+			uses:             "https://example.com/forgejo/runner/.gitea/workflows/build.yaml@v1.0.0",
+			expectedHost:     "example.com",
+			expectedOrg:      "forgejo",
+			expectedRepo:     "runner",
+			expectedPlatform: "gitea",
+			expectedFilename: "build.yaml",
+			expectedRef:      "v1.0.0",
+			shouldFail:       false,
+		},
+		{
+			name:       "invalid format - missing platform",
+			uses:       "owner/repo/workflows/test.yml@main",
+			shouldFail: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseRemoteReusableWorkflow(tt.uses)
+			if tt.shouldFail {
+				require.Error(t, err)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				if tt.expectedHost != "" {
+					require.NotNil(t, result.Host)
+					assert.Equal(t, tt.expectedHost, *result.Host)
+				} else {
+					assert.Nil(t, result.Host)
+				}
+				assert.Equal(t, tt.expectedOrg, result.Org)
+				assert.Equal(t, tt.expectedRepo, result.Repo)
+				assert.Equal(t, tt.expectedPlatform, result.GitPlatform)
+				assert.Equal(t, tt.expectedFilename, result.Filename)
+				assert.Equal(t, tt.expectedRef, result.Ref)
+			}
+		})
+	}
+}
 
 func TestNewRemoteReusableWorkflowWithPlat(t *testing.T) {
 	tests := []struct {
