@@ -31,9 +31,13 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 	// uses string format is {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}
 	uses := fmt.Sprintf("%s/%s@%s", rc.Config.PresetGitHubContext.Repository, trimmedUses, rc.Config.PresetGitHubContext.Sha)
 
-	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(rc.Config.GitHubInstance, uses)
+	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(uses)
 	if remoteReusableWorkflow == nil {
 		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", uses))
+	}
+	remoteReusableWorkflowWithBaseURL := model.RemoteReusableWorkflowWithHost{
+		RemoteReusableWorkflow: *remoteReusableWorkflow,
+		Host:                   &rc.Config.GitHubInstance,
 	}
 
 	// If the repository is private, we need a token to clone it
@@ -43,7 +47,7 @@ func newLocalReusableWorkflowExecutor(rc *RunContext) common.Executor {
 		return newReusableWorkflowExecutor(rc, workflowDir, remoteReusableWorkflow.FilePath())
 	}
 
-	return cloneIfRequired(rc, *remoteReusableWorkflow, token, makeWorkflowExecutorForWorkTree)
+	return cloneIfRequired(rc, &remoteReusableWorkflowWithBaseURL, token, makeWorkflowExecutorForWorkTree)
 }
 
 func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
@@ -58,9 +62,13 @@ func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 		host = rc.Config.GitHubInstance
 	}
 
-	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(host, strings.TrimPrefix(url.Path, "/"))
+	remoteReusableWorkflow := model.NewRemoteReusableWorkflowWithPlat(strings.TrimPrefix(url.Path, "/"))
 	if remoteReusableWorkflow == nil {
 		return common.NewErrorExecutor(fmt.Errorf("expected format {owner}/{repo}/.{git_platform}/workflows/{filename}@{ref}. Actual '%s' Input string was not in a correct format", url.Path))
+	}
+	remoteReusableWorkflowWithBaseURL := model.RemoteReusableWorkflowWithHost{
+		RemoteReusableWorkflow: *remoteReusableWorkflow,
+		Host:                   &host,
 	}
 
 	// FIXME: if the reusable workflow is from a private repository, we need to provide a token to access the repository.
@@ -70,10 +78,10 @@ func newRemoteReusableWorkflowExecutor(rc *RunContext) common.Executor {
 		return newReusableWorkflowExecutor(rc, workflowDir, remoteReusableWorkflow.FilePath())
 	}
 
-	return cloneIfRequired(rc, *remoteReusableWorkflow, token, makeWorkflowExecutorForWorkTree)
+	return cloneIfRequired(rc, &remoteReusableWorkflowWithBaseURL, token, makeWorkflowExecutorForWorkTree)
 }
 
-func cloneIfRequired(rc *RunContext, remoteReusableWorkflow model.RemoteReusableWorkflow, token string, makeWorkflowExecutorForWorkTree func(workflowDir string) common.Executor) common.Executor {
+func cloneIfRequired(rc *RunContext, remoteReusableWorkflow *model.RemoteReusableWorkflowWithHost, token string, makeWorkflowExecutorForWorkTree func(workflowDir string) common.Executor) common.Executor {
 	return func(ctx context.Context) error {
 		// Do not change the remoteReusableWorkflow.URL, because:
 		// 	1. Gitea doesn't support specifying GithubContext.ServerURL by the GITHUB_SERVER_URL env
