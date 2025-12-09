@@ -13,6 +13,8 @@ import (
 	"code.forgejo.org/forgejo/runner/v12/act/model"
 )
 
+var ErrUnsupportedReusableWorkflowFetch = errors.New("unable to support reusable workflow fetch")
+
 // utility structure as we're working with the vague job definitions in jobparser, and the more complete ones from
 // act/model
 type bothJobTypes struct {
@@ -230,6 +232,10 @@ func expandReusableWorkflows(jobs []*bothJobTypes, validate bool, options []Pars
 		if jobType == model.JobTypeReusableWorkflowLocal && pc.localWorkflowFetcher != nil {
 			contents, err := pc.localWorkflowFetcher(workflowJob.Uses)
 			if err != nil {
+				if errors.Is(err, ErrUnsupportedReusableWorkflowFetch) {
+					// Skip workflow expansion.
+					continue
+				}
 				return nil, fmt.Errorf("unable to read local workflow %q: %w", workflowJob.Uses, err)
 			}
 			reusableWorkflow = contents
@@ -241,7 +247,11 @@ func expandReusableWorkflows(jobs []*bothJobTypes, validate bool, options []Pars
 			}
 			contents, err := pc.remoteWorkflowFetcher(parsed)
 			if err != nil {
-				return nil, fmt.Errorf("unable to read local workflow %q: %w", workflowJob.Uses, err)
+				if errors.Is(err, ErrUnsupportedReusableWorkflowFetch) {
+					// Skip workflow expansion.
+					continue
+				}
+				return nil, fmt.Errorf("unable to read remote workflow %q: %w", workflowJob.Uses, err)
 			}
 			reusableWorkflow = contents
 		}
@@ -260,6 +270,7 @@ func expandReusableWorkflows(jobs []*bothJobTypes, validate bool, options []Pars
 func expandReusableWorkflow(contents []byte, validate bool, options []ParseOption, pc *parseContext) ([]*bothJobTypes, error) {
 	innerParseOptions := append([]ParseOption{}, options...) // copy original slice
 	innerParseOptions = append(innerParseOptions, withRecursionDepth(pc.recursionDepth+1))
+
 	innerWorkflows, err := Parse(contents, validate, innerParseOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse local workflow: %w", err)
@@ -337,6 +348,11 @@ func WithWorkflowNeeds(needs []string) ParseOption {
 // Allows the job parser to convert a workflow job that references a local reusable workflow (eg. `uses:
 // ./.forgejo/workflows/reusable.yml`) into one-or-more jobs contained within the local workflow.  The
 // `localWorkflowFetcher` function allows jobparser to read the target workflow file.
+//
+// The `localWorkflowFetcher` can return the error ErrUnsupportedReusableWorkflowFetch if the fetcher doesn't support
+// the target workflow for job parsing.  The job will go to the "fallback" mode of operation where its internal jobs are
+// not expanded into the parsed workflow, and it can still be executed as a single monolithic job.  All other errors are
+// considered fatal for job parsing.
 func ExpandLocalReusableWorkflows(localWorkflowFetcher func(path string) ([]byte, error)) ParseOption {
 	return func(c *parseContext) {
 		c.localWorkflowFetcher = localWorkflowFetcher
@@ -349,6 +365,11 @@ func ExpandLocalReusableWorkflows(localWorkflowFetcher func(path string) ([]byte
 // workflow file.
 //
 // `ref.Host` will be `nil` if the remote reference was not a fully-qualified URL.  No default value is provided.
+//
+// The `remoteWorkflowFetcher` can return the error ErrUnsupportedReusableWorkflowFetch if the fetcher doesn't support
+// the target workflow for job parsing.  The job will go to the "fallback" mode of operation where its internal jobs are
+// not expanded into the parsed workflow, and it can still be executed as a single monolithic job.  All other errors are
+// considered fatal for job parsing.
 func ExpandRemoteReusableWorkflows(remoteWorkflowFetcher func(ref *model.RemoteReusableWorkflowWithHost) ([]byte, error)) ParseOption {
 	return func(c *parseContext) {
 		c.remoteWorkflowFetcher = remoteWorkflowFetcher
