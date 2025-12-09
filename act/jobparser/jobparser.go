@@ -319,6 +319,11 @@ func expandReusableWorkflow(contents []byte, validate bool, options []ParseOptio
 	}
 	retval := []*bothJobTypes{}
 	for _, swf := range innerWorkflows {
+
+		// FIXME: something about a reusable workflow's job has to change so that it's outputs can be mapped.  While we're
+		// parsing `contents` might be the only time that we have access to the `on.workflow_call.outputs` structure in
+		// order to preserve this output mapping...
+
 		id, job := swf.Job()
 		content, err := swf.Marshal()
 		if err != nil {
