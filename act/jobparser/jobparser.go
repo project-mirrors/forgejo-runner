@@ -13,6 +13,17 @@ import (
 	"code.forgejo.org/forgejo/runner/v12/act/model"
 )
 
+var ErrUnsupportedReusableWorkflowFetch = errors.New("unable to support reusable workflow fetch")
+
+// utility structure as we're working with the vague job definitions in jobparser, and the more complete ones from
+// act/model
+type bothJobTypes struct {
+	id           string
+	jobParserJob *Job
+	workflowJob  *model.Job
+	ignore       bool
+}
+
 func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWorkflow, error) {
 	workflow := &SingleWorkflow{}
 	if err := yaml.Unmarshal(content, workflow); err != nil {
@@ -28,6 +39,10 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 	for _, o := range options {
 		o(pc)
 	}
+	if pc.recursionDepth > 5 {
+		return nil, fmt.Errorf("failed to parse workflow due to exceeding the workflow recursion limit (5)")
+	}
+
 	results := map[string]*JobResult{}
 	for id, job := range origin.Jobs {
 		results[id] = &JobResult{
@@ -64,18 +79,45 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		}
 	}
 
-	var ret []*SingleWorkflow
-	ids, jobs, err := workflow.jobs()
+	ids, jobParserJobs, err := workflow.jobs()
 	if err != nil {
 		return nil, fmt.Errorf("invalid jobs: %w", err)
 	}
-	for i, id := range ids {
-		job := jobs[i]
+
+	jobs := make([]*bothJobTypes, len(ids))
+	for i, jobName := range ids {
+		jobs[i] = &bothJobTypes{
+			id:           jobName,
+			jobParserJob: jobParserJobs[i],
+			workflowJob:  origin.GetJob(jobName),
+		}
+	}
+
+	// Expand reusable workflows:
+	if pc.localWorkflowFetcher != nil || pc.remoteWorkflowFetcher != nil {
+		newJobs, err := expandReusableWorkflows(jobs, validate, options, pc)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, newJobs...)
+	}
+
+	var ret []*SingleWorkflow
+	for _, bothJobs := range jobs {
+		if bothJobs.ignore {
+			continue
+		}
+
+		id := bothJobs.id
+		jobParserJob := bothJobs.jobParserJob
+		workflowJob := bothJobs.workflowJob
+
 		jobNeeds := pc.workflowNeeds
 		if jobNeeds == nil {
-			jobNeeds = job.Needs()
+			jobNeeds = jobParserJob.Needs()
 		}
-		matricxes, err := getMatrixes(origin.GetJob(id))
+
+		matricxes, err := getMatrixes(workflowJob)
 		if err != nil {
 			return nil, fmt.Errorf("getMatrixes: %w", err)
 		}
@@ -85,13 +127,13 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			matricxes = []map[string]any{{}}
 		}
 		for _, matrix := range matricxes {
-			job := job.Clone()
-			evaluator := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
+			job := jobParserJob.Clone()
+			evaluator := NewExpressionEvaluator(NewInterpreter(id, workflowJob, matrix, pc.gitContext, results, pc.vars, pc.inputs, 0, jobNeeds))
 
 			if incompleteMatrix[id] != nil {
 				// Preserve the original incomplete `matrix` value so that when the `IncompleteMatrix` state is
 				// discovered later, it can be expanded.
-				job.Strategy.RawMatrix = origin.GetJob(id).Strategy.RawMatrix
+				job.Strategy.RawMatrix = workflowJob.Strategy.RawMatrix
 			} else {
 				job.Strategy.RawMatrix = encodeMatrix(matrix)
 			}
@@ -118,8 +160,8 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			var runsOnInvalidMatrixReference *exprparser.InvalidMatrixDimensionReferencedError
 			var runsOn []string
 			if pc.supportIncompleteRunsOn {
-				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, origin.GetJob(id), matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput|exprparser.InvalidMatrixDimension, jobNeeds))
-				rawRunsOn := origin.GetJob(id).RawRunsOn
+				evaluatorOutputAware := NewExpressionEvaluator(NewInterpreter(id, workflowJob, matrix, pc.gitContext, results, pc.vars, pc.inputs, exprparser.InvalidJobOutput|exprparser.InvalidMatrixDimension, jobNeeds))
+				rawRunsOn := workflowJob.RawRunsOn
 				// Evaluate the entire `runs-on` node at once, which permits behavior like `runs-on: ${{ fromJSON(...)
 				// }}` where it can generate an array
 				err = evaluatorOutputAware.EvaluateYamlNode(&rawRunsOn)
@@ -132,7 +174,7 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 			} else {
 				// Legacy behaviour; run interpolator on each individual entry in the `runsOn` array without support for
 				// `IncompleteRunsOn` detection:
-				runsOn = origin.GetJob(id).RunsOn()
+				runsOn = workflowJob.RunsOn()
 				for i, v := range runsOn {
 					runsOn[i] = evaluator.Interpolate(v)
 				}
@@ -172,6 +214,85 @@ func Parse(content []byte, validate bool, options ...ParseOption) ([]*SingleWork
 		}
 	}
 	return ret, nil
+}
+
+func expandReusableWorkflows(jobs []*bothJobTypes, validate bool, options []ParseOption, pc *parseContext) ([]*bothJobTypes, error) {
+	retval := []*bothJobTypes{}
+	for _, bothJobs := range jobs {
+		if bothJobs.ignore {
+			continue
+		}
+		workflowJob := bothJobs.workflowJob
+
+		jobType, err := workflowJob.Type()
+		if err != nil {
+			return nil, err
+		}
+		var reusableWorkflow []byte
+		if jobType == model.JobTypeReusableWorkflowLocal && pc.localWorkflowFetcher != nil {
+			contents, err := pc.localWorkflowFetcher(workflowJob.Uses)
+			if err != nil {
+				if errors.Is(err, ErrUnsupportedReusableWorkflowFetch) {
+					// Skip workflow expansion.
+					continue
+				}
+				return nil, fmt.Errorf("unable to read local workflow %q: %w", workflowJob.Uses, err)
+			}
+			reusableWorkflow = contents
+		}
+		if jobType == model.JobTypeReusableWorkflowRemote && pc.remoteWorkflowFetcher != nil {
+			parsed, err := model.ParseRemoteReusableWorkflow(workflowJob.Uses)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse `uses: %q` as a valid reusable workflow: %w", workflowJob.Uses, err)
+			}
+			contents, err := pc.remoteWorkflowFetcher(parsed)
+			if err != nil {
+				if errors.Is(err, ErrUnsupportedReusableWorkflowFetch) {
+					// Skip workflow expansion.
+					continue
+				}
+				return nil, fmt.Errorf("unable to read remote workflow %q: %w", workflowJob.Uses, err)
+			}
+			reusableWorkflow = contents
+		}
+		if reusableWorkflow != nil {
+			bothJobs.ignore = true // drop the job that referenced the reusable workflow
+			newJobs, err := expandReusableWorkflow(reusableWorkflow, validate, options, pc)
+			if err != nil {
+				return nil, fmt.Errorf("error expanding reusable workflow %q: %v", workflowJob.Uses, err)
+			}
+			retval = append(retval, newJobs...)
+		}
+	}
+	return retval, nil
+}
+
+func expandReusableWorkflow(contents []byte, validate bool, options []ParseOption, pc *parseContext) ([]*bothJobTypes, error) {
+	innerParseOptions := append([]ParseOption{}, options...) // copy original slice
+	innerParseOptions = append(innerParseOptions, withRecursionDepth(pc.recursionDepth+1))
+
+	innerWorkflows, err := Parse(contents, validate, innerParseOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse local workflow: %w", err)
+	}
+	retval := []*bothJobTypes{}
+	for _, swf := range innerWorkflows {
+		id, job := swf.Job()
+		content, err := swf.Marshal()
+		if err != nil {
+			return nil, fmt.Errorf("unable to marshal SingleWorkflow: %w", err)
+		}
+		workflow, err := model.ReadWorkflow(bytes.NewReader(content), validate)
+		if err != nil {
+			return nil, fmt.Errorf("model.ReadWorkflow: %w", err)
+		}
+		retval = append(retval, &bothJobTypes{
+			id:           id,
+			jobParserJob: job,
+			workflowJob:  workflow.GetJob(id),
+		})
+	}
+	return retval, nil
 }
 
 func WithJobResults(results map[string]string) ParseOption {
@@ -224,6 +345,43 @@ func WithWorkflowNeeds(needs []string) ParseOption {
 	}
 }
 
+// Allows the job parser to convert a workflow job that references a local reusable workflow (eg. `uses:
+// ./.forgejo/workflows/reusable.yml`) into one-or-more jobs contained within the local workflow.  The
+// `localWorkflowFetcher` function allows jobparser to read the target workflow file.
+//
+// The `localWorkflowFetcher` can return the error ErrUnsupportedReusableWorkflowFetch if the fetcher doesn't support
+// the target workflow for job parsing.  The job will go to the "fallback" mode of operation where its internal jobs are
+// not expanded into the parsed workflow, and it can still be executed as a single monolithic job.  All other errors are
+// considered fatal for job parsing.
+func ExpandLocalReusableWorkflows(localWorkflowFetcher func(path string) ([]byte, error)) ParseOption {
+	return func(c *parseContext) {
+		c.localWorkflowFetcher = localWorkflowFetcher
+	}
+}
+
+// Allows the job parser to convert a workflow job that references a remote (eg. not part of the current workflow's
+// repository) reusable workflow (eg. `uses: some-org/some-repo/.forgejo/workflows/reusable.yml`) into one-or-more jobs
+// contained within the remote workflow.  The `remoteWorkflowFetcher` function allows jobparser to read the target
+// workflow file.
+//
+// `ref.Host` will be `nil` if the remote reference was not a fully-qualified URL.  No default value is provided.
+//
+// The `remoteWorkflowFetcher` can return the error ErrUnsupportedReusableWorkflowFetch if the fetcher doesn't support
+// the target workflow for job parsing.  The job will go to the "fallback" mode of operation where its internal jobs are
+// not expanded into the parsed workflow, and it can still be executed as a single monolithic job.  All other errors are
+// considered fatal for job parsing.
+func ExpandRemoteReusableWorkflows(remoteWorkflowFetcher func(ref *model.RemoteReusableWorkflowWithHost) ([]byte, error)) ParseOption {
+	return func(c *parseContext) {
+		c.remoteWorkflowFetcher = remoteWorkflowFetcher
+	}
+}
+
+func withRecursionDepth(depth int) ParseOption {
+	return func(c *parseContext) {
+		c.recursionDepth = depth
+	}
+}
+
 type parseContext struct {
 	jobResults              map[string]string
 	jobOutputs              map[string]map[string]string // map job ID -> output key -> output value
@@ -232,6 +390,9 @@ type parseContext struct {
 	vars                    map[string]string
 	workflowNeeds           []string
 	supportIncompleteRunsOn bool
+	localWorkflowFetcher    func(path string) ([]byte, error)
+	remoteWorkflowFetcher   func(ref *model.RemoteReusableWorkflowWithHost) ([]byte, error)
+	recursionDepth          int
 }
 
 type ParseOption func(c *parseContext)
