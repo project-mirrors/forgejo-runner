@@ -21,7 +21,7 @@ type bothJobTypes struct {
 	id           string
 	jobParserJob *Job
 	workflowJob  *model.Job
-	ignore       bool
+	ignore       bool // FIXME: can probably remove this
 
 	overrideOnClause *yaml.Node
 }
@@ -261,11 +261,18 @@ func expandReusableWorkflows(jobs []*bothJobTypes, validate bool, options []Pars
 			reusableWorkflow = contents
 		}
 		if reusableWorkflow != nil {
-			bothJobs.ignore = true // drop the job that referenced the reusable workflow
 			newJobs, err := expandReusableWorkflow(reusableWorkflow, validate, options, pc, jobResults, bothJobs)
 			if err != nil {
 				return nil, fmt.Errorf("error expanding reusable workflow %q: %v", workflowJob.Uses, err)
 			}
+
+			// The "callee" job will still exist in order to act as a `sentinel` for `needs` job ordering & output
+			// moment we'll just mark it as a job with `if: false` and remove the `uses: ...` to ensure that it never
+			// gets executed as its own reusable workflow.
+			_ = bothJobs.jobParserJob.If.Encode(false)
+			bothJobs.jobParserJob.Uses = ""
+			bothJobs.jobParserJob.With = nil
+
 			retval = append(retval, newJobs...)
 		}
 	}
