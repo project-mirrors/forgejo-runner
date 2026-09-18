@@ -547,6 +547,23 @@ func TestParse(t *testing.T) {
 				}),
 			},
 		},
+		// Similar to expand_reusable_incomplete5 but with namespaces enabled:
+		{
+			name:                           "expand_reusable_ns_incomplete5",
+			expectingInvalidWorkflowOutput: true,
+			options: []ParseOption{
+				EnableNamespaces(),
+				WithJobOutputs(map[string]map[string]string{}),
+				SupportIncompleteRunsOn(),
+				ExpandLocalReusableWorkflows(func(job *Job, path string) ([]byte, error) {
+					if path == "./.forgejo/workflows/expand_reusable_ns_incomplete5_reusable.yml" {
+						content := ReadTestdata(t, "expand_reusable_ns_incomplete5_reusable.yaml", true)
+						return content, nil
+					}
+					return nil, fmt.Errorf("unexpected local path: %q", path)
+				}),
+			},
+		},
 		// `expand_reusable_incomplete6` tests expanding an incomplete reusable workflow within a parent reusable
 		// workflow, and being able to reference the inputs that were defined from the parent workflow and stored in
 		// `on.workflow_call.inputs` as default values.  In particular, the `inputs` provided to the jobparser shouldn't

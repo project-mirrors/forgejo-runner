@@ -20,7 +20,7 @@ jobs:
         secrets: inherit
 incomplete_with: true
 incomplete_with_needs:
-    job: layer-1.callee-1
+    job: callee-1
 __metadata:
     incomplete_recursion_depth: 1
     workflow_call_id: b5ceaa0c4d60c3d245cac8436ed1198ff75c2bcb1dc5c85c3c8a123bf6f79b3e

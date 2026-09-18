@@ -703,17 +703,23 @@ func expandReusableWorkflow(contents []byte, validate bool, options []ParseOptio
 
 		if swf.IncompleteMatrix || swf.IncompleteRunsOn || swf.IncompleteWith {
 			newEntry.internalIncompleteState = swf
-			// If we have a reference to a job stored in the incomplete state, then qualify that job name.  Namespaces
-			// aren't used here because these job identifiers aren't used for internal dereferencing, but are instead
-			// used to display useful error messages to the user.
-			if swf.IncompleteMatrixNeeds != nil {
-				swf.IncompleteMatrixNeeds.Job = fmt.Sprintf("%s.%s", callerJob.id, swf.IncompleteMatrixNeeds.Job)
-			}
-			if swf.IncompleteRunsOnNeeds != nil {
-				swf.IncompleteRunsOnNeeds.Job = fmt.Sprintf("%s.%s", callerJob.id, swf.IncompleteRunsOnNeeds.Job)
-			}
-			if swf.IncompleteWithNeeds != nil {
-				swf.IncompleteWithNeeds.Job = fmt.Sprintf("%s.%s", callerJob.id, swf.IncompleteWithNeeds.Job)
+			// If we have a reference to a job stored in the incomplete state, then qualify that job name.
+			//
+			// When namespaces are enabled, qualification of the job isn't necessary -- it should be interpreted as
+			// relative to the namespace of this job.  It isn't possible for a job to have an incomplete (matrix, with,
+			// needs) definition based upon a job that is from a different namespace; in all those cases the output from
+			// a job would have to go through a reusable workflow's `with` and be materialized into the workflows'
+			// inputs, and therefore wouldn't be incomplete.
+			if !pc.enableNamespaces {
+				if swf.IncompleteMatrixNeeds != nil {
+					swf.IncompleteMatrixNeeds.Job = fmt.Sprintf("%s.%s", callerJob.id, swf.IncompleteMatrixNeeds.Job)
+				}
+				if swf.IncompleteRunsOnNeeds != nil {
+					swf.IncompleteRunsOnNeeds.Job = fmt.Sprintf("%s.%s", callerJob.id, swf.IncompleteRunsOnNeeds.Job)
+				}
+				if swf.IncompleteWithNeeds != nil {
+					swf.IncompleteWithNeeds.Job = fmt.Sprintf("%s.%s", callerJob.id, swf.IncompleteWithNeeds.Job)
+				}
 			}
 		}
 
