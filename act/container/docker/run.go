@@ -77,32 +77,32 @@ func (cr *containerReference) platform(ctx context.Context) (string, error) {
 
 // supportsContainerImagePlatform returns true if the underlying Docker server
 // API version is 1.41 and beyond
-func supportsContainerImagePlatform(ctx context.Context, cli client.APIClient) bool {
+func supportsContainerImagePlatform(ctx context.Context, cli client.APIClient) (bool, error) {
 	result, err := cli.ServerVersion(ctx, client.ServerVersionOptions{})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get Docker API Version: %s", err))
+		return false, fmt.Errorf("Failed to get Docker API Version: %s", err)
 	}
 	sv, err := semver.NewVersion(result.APIVersion)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to unmarshal Docker Version: %s", err))
+		return false, fmt.Errorf("Failed to unmarshal Docker Version: %s", err)
 	}
 	constraint, _ := semver.NewConstraint(">= 1.41")
-	return constraint.Check(sv)
+	return constraint.Check(sv), nil
 }
 
 // supportsImageInspectPlatform returns true if the underlying Docker server supports using
 // `client.ImageInspectWithPlatform`, which is API version 1.49 and beyond.
-func supportsImageInspectPlatform(ctx context.Context, cli client.APIClient) bool {
+func supportsImageInspectPlatform(ctx context.Context, cli client.APIClient) (bool, error) {
 	result, err := cli.ServerVersion(ctx, client.ServerVersionOptions{})
 	if err != nil {
-		panic(fmt.Sprintf("Failed to get Docker API Version: %s", err))
+		return false, fmt.Errorf("Failed to get Docker API Version: %s", err)
 	}
 	sv, err := semver.NewVersion(result.APIVersion)
 	if err != nil {
-		panic(fmt.Sprintf("Failed to unmarshal Docker Version: %s", err))
+		return false, fmt.Errorf("Failed to unmarshal Docker Version: %s", err)
 	}
 	constraint, _ := semver.NewConstraint(">= 1.49")
-	return constraint.Check(sv)
+	return constraint.Check(sv), nil
 }
 
 func (cr *containerReference) Create(capAdd, capDrop []string) common.Executor {
@@ -566,7 +566,9 @@ func (cr *containerReference) create(capAdd, capDrop []string) common.Executor {
 		var platform string
 		var err error
 		var platSpec ocispec.Platform
-		if supportsContainerImagePlatform(ctx, cr.cli) {
+		if supportsImagePlatform, err := supportsContainerImagePlatform(ctx, cr.cli); err != nil {
+			return fmt.Errorf("failed to check if docker supports image platforms: %w", err)
+		} else if supportsImagePlatform {
 			platform, err = cr.platform(ctx)
 			if err != nil {
 				return err

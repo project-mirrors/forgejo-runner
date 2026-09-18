@@ -18,7 +18,9 @@ func ImageExistsLocally(ctx context.Context, ep Endpoint, imageName, platform st
 
 	cli := ep.Client()
 
-	if supportsImageInspectPlatform(ctx, cli) {
+	if inspectImagePlatform, err := supportsImageInspectPlatform(ctx, cli); err != nil {
+		return false, fmt.Errorf("failed to check if docker supports inspecting image platforms: %w", err)
+	} else if inspectImagePlatform {
 		platSpec, err := parsePlatform(platform)
 		if err != nil {
 			return false, err
