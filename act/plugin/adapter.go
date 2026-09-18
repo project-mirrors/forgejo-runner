@@ -204,7 +204,14 @@ func (p *pluginEnvironment) Create(capAdd, capDrop []string) common.Executor {
 		if p.envCreated != nil {
 			panic("Create()() invoked on a plugin environment that has already had Create invoked")
 		}
-		req := newCreateRequest(p.input, p.backendOpts, p.labelArg, p.timeout)
+		timeout := p.timeout
+		// The job deadline can be shorter than the runner's maximum lifetime.
+		if deadline, ok := ctx.Deadline(); ok {
+			if remaining := time.Until(deadline); timeout <= 0 || remaining < timeout {
+				timeout = remaining
+			}
+		}
+		req := newCreateRequest(p.input, p.backendOpts, p.labelArg, timeout)
 		req.CapAdd = capAdd
 		req.CapDrop = capDrop
 		req.Services = p.services

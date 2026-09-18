@@ -352,6 +352,54 @@ func TestPluginEnvironment_CreatePassesInput(t *testing.T) {
 	assert.Contains(t, env.envCreated.envVariables, "RUNNER_TEMP=/tmp")
 }
 
+func TestPluginEnvironment_CreateTimeout(t *testing.T) {
+	for _, tt := range []struct {
+		name          string
+		maxLifetime   time.Duration
+		jobTimeout    time.Duration
+		runnerTimeout time.Duration
+		wantDeadline  bool
+	}{
+		{name: "job timeout", maxLifetime: 179 * time.Minute, jobTimeout: 5 * time.Minute, runnerTimeout: 3 * time.Hour, wantDeadline: true},
+		{name: "runner timeout", maxLifetime: 3 * time.Hour, jobTimeout: 10 * time.Minute, runnerTimeout: 2 * time.Minute, wantDeadline: true},
+		{name: "maximum lifetime", maxLifetime: time.Minute, jobTimeout: 5 * time.Minute},
+		{name: "no deadline", maxLifetime: 3 * time.Hour},
+		{name: "no maximum lifetime", jobTimeout: 5 * time.Minute, wantDeadline: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mock, conn := startMockServer(t)
+			env := newTestEnv(t, conn)
+			env.timeout = tt.maxLifetime
+
+			ctx := t.Context()
+			if tt.runnerTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.runnerTimeout)
+				defer cancel()
+			}
+			if tt.jobTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tt.jobTimeout)
+				defer cancel()
+			}
+
+			before := time.Now()
+			require.NoError(t, env.Create(nil, nil)(ctx))
+			after := time.Now()
+			require.NotNil(t, mock.createReq)
+			timeout := mock.createReq.EnvironmentTimeout.AsDuration()
+			if tt.wantDeadline {
+				deadline, ok := ctx.Deadline()
+				require.True(t, ok)
+				assert.GreaterOrEqual(t, timeout, deadline.Sub(after))
+				assert.LessOrEqual(t, timeout, deadline.Sub(before))
+			} else {
+				assert.Equal(t, tt.maxLifetime, timeout)
+			}
+		})
+	}
+}
+
 func TestPluginEnvironment_Lifecycle(t *testing.T) {
 	mock, conn := startMockServer(t)
 	env := newTestEnv(t, conn)
