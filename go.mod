@@ -13,7 +13,7 @@ require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/creack/pty v1.1.24
 	github.com/distribution/reference v0.6.0
-	github.com/docker/cli v29.8.0+incompatible
+	github.com/docker/cli v29.8.1+incompatible
 	github.com/docker/go-connections v0.8.1
 	github.com/gdgvda/cron v0.7.0
 	github.com/gobwas/glob v0.2.3
