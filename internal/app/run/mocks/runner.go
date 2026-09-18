@@ -8,7 +8,6 @@ import (
 	"context"
 
 	"code.forgejo.org/forgejo/actions-proto/runner/v1"
-
 	mock "github.com/stretchr/testify/mock"
 )
 

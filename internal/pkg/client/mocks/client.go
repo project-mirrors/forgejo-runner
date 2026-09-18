@@ -11,7 +11,6 @@ import (
 	"code.forgejo.org/forgejo/actions-proto/ping/v1"
 	"code.forgejo.org/forgejo/actions-proto/runner/v1"
 	"connectrpc.com/connect"
-
 	"github.com/google/uuid"
 	mock "github.com/stretchr/testify/mock"
 )

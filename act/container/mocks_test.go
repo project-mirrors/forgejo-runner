@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"code.forgejo.org/forgejo/runner/v13/act/common"
-
 	mock "github.com/stretchr/testify/mock"
 )
 
