@@ -221,7 +221,10 @@ jobs:
                 "base": "fd05:d0ca:2::/104",
                 "size": 112
               }
-            ]
+            ],
+            "features": {
+              "containerd-snapshotter": false
+            }
           }
           EOF
           ./.forgejo/install-docker.sh ${{ matrix.docker }}
