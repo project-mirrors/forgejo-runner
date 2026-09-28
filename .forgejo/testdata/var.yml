@@ -4,6 +4,6 @@ jobs:
   var:
     runs-on: docker
     container:
-      image: code.forgejo.org/oci/debian:bookworm
+      image: code.forgejo.org/oci/debian:trixie
     steps:
       - run: echo "VAR -> ${{ vars.MY_VAR }}"
