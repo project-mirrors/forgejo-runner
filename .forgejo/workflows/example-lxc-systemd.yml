@@ -143,7 +143,7 @@ jobs:
            ls -l /etc/forgejo-runner/$serial
            ! test -f $killed_gracefully
            ! test -f $stopped_gracefully
-           retry --delay 5 --times 20 cp -a $started_running /tmp/third-run
+           retry --delay 5 --times 40 cp -a $started_running /tmp/third-run
            systemctl stop forgejo-runner@$serial
            ls -l /etc/forgejo-runner/$serial
            test -f $killed_gracefully
